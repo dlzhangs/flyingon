@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+</head>
+<body>
+
+    <script type="text/javascript" src="../flyingon/js/flyingon.js"></script>
+    
+    <script type="text/javascript">
+    
+        //指定引入资源初始路径
+        flyingon.include_path('../');
+      
+    </script>
+    
+    <script type="text/javascript" src="../flyingon/js/flyingon.ui.js"></script>
+    
+    <script type="text/javascript">
+        
+        
+    
+        flyingon.layout('flyingon-Panel', {
+   
+            type: 'dock',
+            spacingX: 10,    
+            spacingY: 10,
+
+            //子布局
+            sublayouts: [
+                {
+                    length: 3,
+                    width: 100,
+                    height: 'auto',
+
+                    layout: {
+
+                        type: 'line',
+
+                        //子项
+                        subitems: {
+
+                            each: ['switch', 'index % 5', {
+
+                                1: {
+
+                                },
+
+                                2: {
+
+                                }
+                            }]
+                        }
+                    }
+                },
+
+                {
+                    length: 0.5,
+
+                    layout: {
+
+                        type: 'dock'
+                    }
+                },
+
+                {
+                    length: 0.5,
+
+                    layout: {
+
+                        type: 'dock'
+                    }
+                },
+
+                {
+                    length: 1,
+
+                    layout: {
+
+                        type: 'dock'
+                    }
+                }
+            ],
+
+            //自适应布局
+            adaptation: {
+
+                'width > 10000': {
+
+                    type: 'table',
+
+                    subitem: {
+
+                    }
+                },
+
+                'width > 5000': {
+
+                    type: 'grid',
+
+                    subitem: {
+
+                    }
+                }
+            }
+
+        });
+        
+        
+        var container = new flyingon.Panel();
+        
+        var items = [];
+        
+        for (var i = 0; i < 100; i++)
+        {
+            items.push(new flyingon.Control());
+        }
+        
+        flyingon.findLayout('flyingon-Panel').init(container, {}, items);
+        
+      
+    </script>
+
+</body>
+</html>

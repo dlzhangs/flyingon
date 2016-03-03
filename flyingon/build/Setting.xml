@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration>
+
+
+    <!--compress 0:不压缩 1:仅去空格 2:去空格及压缩-->
+    <combine output="..\js\flyingon.js" compress="0">
+
+        <file>..\src\flyingon.js</file>
+
+    </combine>
+
+    <combine output="..\js\flyingon.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+
+        <file>..\src\flyingon.js</file>
+
+    </combine>
+    
+
+    <combine output="..\js\flyingon.ui.js" compress="0" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+
+        <file>..\src\flyingon.utils.js</file>
+        <file>..\src\controls\layout.js</file>
+        <file>..\src\controls\control.js</file>
+        <file>..\src\controls\container.js</file>
+        <file>..\src\controls\panel.js</file>
+
+    </combine>
+    
+    <combine output="..\js\flyingon.ui.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+
+        <file>..\js\flyingon.ui.js</file>
+
+    </combine>
+
+
+</configuration>

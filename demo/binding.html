@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+</head>
+<body>
+
+    <script type="text/javascript" src="../flyingon/js/flyingon.js"></script>
+
+    <script type="text/javascript">
+    
+        
+        $class('TestClass', flyingon.Component, function (self) {
+            
+            
+            self.defineProperty('a', 0);
+            
+            self.defineProperty('b', 0);
+            
+            self.defineProperty('c', 0);
+            
+            self.defineProperty('d', 0);
+            
+        });
+        
+        
+        var source = new flyingon.TestClass();
+        var target = new flyingon.TestClass();
+        
+        target.addBinding('a', source, 'b');
+        target.addBinding('c', source, 'd + 10');
+        
+        
+    </script>
+
+</body>
+</html>

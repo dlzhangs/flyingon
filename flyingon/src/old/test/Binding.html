@@ -1,0 +1,67 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="no-cache" />
+    <title></title>
+
+    <script src="../scripts/flyingon.js"></script>
+    <script src="../scripts/flyingon.controls.js"></script>
+    <script src="../themes/default/flyingon.js"></script>
+
+    <script type="text/javascript">
+
+
+        var w = new flyingon.Window().init({
+
+            border: "4px solid blue",
+            spacingWidth: "10px",
+            spacingHeight: "10px",
+
+            children: [{
+
+                __id__: 1,
+                id: "button1",
+                xtype: "flyingon.Button",
+                width: "200px",
+                text: "点击同步增加宽度",
+                resizable: "both",
+                bindings: {
+
+                    width: { source: 2, expression: "width"/*, setter: null*/ },
+                    height: { source: 2, expression: "height" }
+                }
+
+            }, {
+
+                __id__: 2,
+                id: "button2",
+                xtype: "flyingon.Button",
+                width: "200px",
+                text: "点击同步减小宽度",
+                resizable: "both"
+            }]
+        });
+
+
+        w.query("#button1").on("click", function (event) {
+
+            this.set_width(this.offsetWidth + 10 + "px");
+        });
+
+        w.query("#button2").on("click", function (event) {
+
+            this.set_width(this.offsetWidth - 10 + "px");
+        });
+
+
+        w.show();
+
+
+    </script>
+
+</head>
+<body>
+
+
+</body>
+</html>

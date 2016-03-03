@@ -1,0 +1,155 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <!--<meta http-equiv="X-UA-Compatible" content="IE=8" />-->
+    <title></title>
+
+    <script src="../scripts/flyingon.js"></script>
+    <script src="../themes/default/flyingon.js"></script>
+
+
+    <script type="text/javascript">
+
+
+        //定义样式
+        flyingon.defineStyle({
+
+            ".test-control": {
+
+                overflow: "hidden",
+                border: "1px solid black",
+                paddingTop: "2px",
+                backgroundColor: "white",
+                cursor: "pointer",
+                textAlign: "center"
+            }
+
+        });
+
+
+        var w = new flyingon.Window().sets({
+
+            layoutType: "flow",
+            border: "4px solid blue",
+            padding: "10px",
+            spacingWidth: "10px",
+            spacingHeight: "10px",
+            droppable: true
+        });
+
+
+        var panel = new flyingon.TabPanel().sets({
+
+            padding: "10px",
+            layoutType: "flow",
+            spacingWidth: "10px",
+            spacingHeight: "10px",
+            icon: "url('/themes/@theme/images/flyingon.gif') 4px 4px",
+            showClose: true,
+            showCollapse: true,
+            //style: "common",
+            //header: "top",
+            //collapse: true,
+            resizable: "both",
+            text: "页签"
+        });
+
+        for (var j = 0; j < 50; j++)
+        {
+            var ctrl = new flyingon.Label().sets({
+
+                className: "test-control",
+                text: "text " + j
+            });
+
+            panel.appendChild(ctrl);
+        }
+
+
+        w.appendChild(panel);
+
+        w.show("host");
+
+
+        flyingon.ready(function () {
+
+
+            var inputs = tool.getElementsByTagName("input");
+
+            for (var i = 0; i < inputs.length; i++)
+            {
+                inputs[i].onkeydown = function (event) {
+
+                    event = event || window.event;
+
+                    if (event.keyCode === 13)
+                    {
+                        this.blur();
+                    }
+                };
+            }
+        });
+
+
+        function set_tab(value) {
+
+            panel.set_tab(value);
+        };
+
+        function set_tabStyle(value) {
+
+            panel.set_tabStyle(value);
+        };
+
+        function set_tabWidth(value) {
+
+            panel.set_tabWidth(value);
+        };
+
+        function set_tabHeight(value) {
+
+            panel.set_tabHeight(value);
+        };
+
+        function set_tabOffset(value) {
+
+            panel.set_tabOffset(value);
+        };
+
+
+    </script>
+
+</head>
+<body>
+
+    <div id="tool" style="border:1px solid black; padding:2px; background-color: yellow;">
+
+        <input type="button" value="normal" onclick="set_tabStyle(this.value)" />
+        <input type="button" value="outlook" onclick="set_tabStyle(this.value)" />
+        <input type="button" value="thumb" onclick="set_tabStyle(this.value)" />
+        <input type="button" value="tab1" onclick="set_tabStyle(this.value)" />
+        <input type="button" value="tab2" onclick="set_tabStyle(this.value)" />
+        <input type="button" value="tab3" onclick="set_tabStyle(this.value)" />
+        <input type="button" value="tab4" onclick="set_tabStyle(this.value)" />
+
+        <span style="margin-left: 20px"></span>
+
+        <input type="button" value="top" onclick="set_tab(this.value)" />
+        <input type="button" value="left" onclick="set_tab(this.value)" />
+        <input type="button" value="right" onclick="set_tab(this.value)" />
+        <input type="button" value="bottom" onclick="set_tab(this.value)" />
+
+        <span style="margin-left: 20px"></span>
+        headerWidth<input type="text" style="width:40px;" value="" onchange="set_tabWidth(this.value)" />
+        headerHeight<input type="text" style="width:40px;" value="" onchange="set_tabHeight(this.value)" />
+        headerOffset<input type="text" style="width:40px;" value="0" onchange="set_tabOffset(+this.value || 0)" />
+
+    </div>
+
+    <div id="host">
+
+    </div>
+
+</body>
+</html>

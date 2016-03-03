@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+</head>
+<body>
+
+    <script type="text/javascript" src="../flyingon/js/flyingon.js"></script>
+
+    <script type="text/javascript">
+    
+                
+        $class('TestClass', flyingon.Component, function (self) {
+            
+            
+            self.defineProperty('a', 0);
+            
+            self.defineProperty('b', 0);
+            
+            self.defineProperty('c', 0);
+            
+            self.defineProperty('d', 0);
+            
+        });
+        
+        
+        var text = flyingon.SerializeWriter.serialize({
+            
+            target: {
+                xtype: 'flyingon.TestClass',
+                id: 'target',
+                bindings: {
+                    a: { source: 'source', expression: 'b' },
+                    c: { source: 'source', expression: 'd + 10' }
+                }
+            },
+            source: {
+                xtype: 'flyingon.TestClass',
+                id: 'source',
+                a: 10,
+                b: 20,
+                c: 30,
+                d: 40
+            }
+        });
+        
+        alert(text);
+        
+       
+        
+        var obj = flyingon.SerializeReader.deserialize(text);
+        
+        obj.source.b(100).d(200);
+        
+        alert(obj.target.a() + ', ' + obj.target.c());
+
+    
+    </script>
+
+</body>
+</html>
