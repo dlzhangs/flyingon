@@ -23,26 +23,6 @@ flyingon.version = '0.0.1.0';
 
 
 
-//扩展Object.getOwnPropertyNames方法
-Object.getOwnPropertyNames || (Object.getOwnPropertyNames = function (target) {
-    
-    var names = [];
-    
-    if (target)
-    {
-        for (var name in target)
-        {
-            if (target.hasOwnProperty(name))
-            {
-                names.push(name);
-            }
-        }
-    }
-    
-    return names;    
-});
-
-
 //复制源对象成员至目标对象
 flyingon.extend = function (target, source, deep) {
     
@@ -2639,7 +2619,7 @@ $class('SerializeReader', function (self) {
                 }
                 else
                 {
-                    this.read_fields(target, values); 
+                    this.read_properties(target, values); 
                 }
             }
             else if ((id = values.xtype) && (target = class_list[id]))
@@ -2648,7 +2628,7 @@ $class('SerializeReader', function (self) {
             }
             else
             {
-                this.read_fields(target = {}, values); 
+                this.read_properties(target = {}, values); 
             }
             
             if (id = values.id)
@@ -2673,7 +2653,7 @@ $class('SerializeReader', function (self) {
     };
 
     
-    self.read_fields = function (target, values) {
+    self.read_properties = function (target, values) {
       
         for (var name in values)
         {
@@ -2720,7 +2700,8 @@ $class('SerializeReader', function (self) {
 $class('SerializeWriter', function (self) {
 
 
-    var Array = window.Array;
+    var Array = window.Array,
+        object = Object.prototype;
 
     
     $static('serialize', function (target) {
@@ -2860,16 +2841,23 @@ $class('SerializeWriter', function (self) {
 
         if (values)
         {
-            var names = Object.getOwnPropertyNames(values), //默认不序列化原型的属性
-                data = this.data,
-                cache;
+            var data = this.data,
+                prototype = values.constructor,
+                value;
             
-            for (var i = 0, _ = names.length; i < _; i++)
+            if (prototype && (prototype = prototype.prototype) && prototype === object)
             {
-                if ((cache = values[name = names[i]]) !== void 0) //不序列化值为undefined的属性
+                prototype = null;
+            }
+            
+            for (var name in values)
+            {
+                value = values[name];
+                
+                if (!prototype || value !== prototype[name])
                 {
                     data.push('"' + name + '":');
-                    this.write(cache);
+                    this.write(value);
                 }
             }
         }
@@ -2889,12 +2877,12 @@ $class('SerializeWriter', function (self) {
         {
             var id = target.id;
             
-            if (!id || typeof id === 'function' && !target.id())
+            if (!id || typeof id === 'function' && !(id = target.id()))
             {
                 throw $errortext('serialize id').replace('{0}', target);
             }
             
-            data.push('"' + name + '":');
+            this.data.push('"' + name + '":');
             this.write(id);
         }
     };

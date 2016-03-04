@@ -189,6 +189,25 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     flyingon.ILocatable(self, true);
 
 
+    self.after_locate = function () {
+      
+        var style = this.dom.style;
+        
+        style.left = this.offsetLeft + 'px';
+        style.top = this.offsetTop + 'px';
+        style.width = this.offsetWidth + 'px';
+        style.height = this.offsetHeight + 'px';
+    };
+    
+    
+    //样式默认属性值
+    var style_attributes = {
+
+        group: 'appearance',
+        query: true
+    };
+    
+    
     //创建样式
     function style(name, defaultValue, style) {
 
@@ -198,12 +217,10 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         });
         
         //定义属性
-        self.defineProperty(name, defaultValue, {
-
-            group: 'appearance',
-            query: true,
-            set: style || 'this.dom.style.' + name + ' = value;\n'
-        });
+        var attributes = style_attributes;
+        
+        attributes.set = style || 'this.dom.style.' + name + ' = value;\n';
+        self.defineProperty(name, defaultValue,  attributes);
     };
 
 

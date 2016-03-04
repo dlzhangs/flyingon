@@ -31,7 +31,7 @@
             sublayouts: [
                 {
                     length: 3,
-                    width: 100,
+                    width: 300,
                     height: 'auto',
 
                     layout: {
@@ -41,6 +41,8 @@
                         //子项
                         subitems: {
 
+                            margin: 10,
+                            
                             each: ['switch', 'index % 5', {
 
                                 1: {
@@ -57,7 +59,8 @@
 
                 {
                     length: 0.5,
-
+                    width: 300,
+                    
                     layout: {
 
                         type: 'dock'
@@ -66,6 +69,7 @@
 
                 {
                     length: 0.5,
+                    width: 300,
 
                     layout: {
 
@@ -75,6 +79,7 @@
 
                 {
                     length: 1,
+                    width: 300,
 
                     layout: {
 
@@ -107,17 +112,34 @@
 
         });
         
+        flyingon.layout('flyingon-Panel', {
+           
+            type: 'line',
+            spacingX: 10,
+            spacingY: 10,
+            alignY: 'middle',
+            vertical: true
+        });
         
-        var container = new flyingon.Panel();
         
-        var items = [];
+        var container = new flyingon.Panel(),
+            dom = container.dom,
+            controls = [];
         
         for (var i = 0; i < 100; i++)
         {
-            items.push(new flyingon.Control());
+            var control = new flyingon.Control(),
+                style = control.dom.style;
+            
+            style.border = '1px solid black';
+            dom.appendChild(control.dom);
+            
+            controls.push(control);
         }
         
-        flyingon.findLayout('flyingon-Panel').init(container, {}, items);
+        document.body.appendChild(dom);
+        
+        flyingon.findLayout('flyingon-Panel').init(container, { left: 0, top: 0, width: 1000, height: 200 }, controls);
         
       
     </script>

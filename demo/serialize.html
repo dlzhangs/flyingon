@@ -25,17 +25,21 @@
         });
         
         
-        var text = flyingon.SerializeWriter.serialize({
+        var obj = flyingon.SerializeReader.deserialize({
             
             target: {
+                
                 xtype: 'flyingon.TestClass',
                 id: 'target',
+                
                 bindings: {
+                    
                     a: { source: 'source', expression: 'b' },
-                    c: { source: 'source', expression: 'd + 10' }
+                    c: { source: 'source', expression: 'c + d + 10' }
                 }
             },
             source: {
+                
                 xtype: 'flyingon.TestClass',
                 id: 'source',
                 a: 10,
@@ -45,16 +49,12 @@
             }
         });
         
-        alert(text);
-        
-       
-        
-        var obj = flyingon.SerializeReader.deserialize(text);
-        
         obj.source.b(100).d(200);
         
         alert(obj.target.a() + ', ' + obj.target.c());
 
+        alert(flyingon.SerializeWriter.serialize(obj));
+        
     
     </script>
 
