@@ -1,67 +1,121 @@
-/*
 
-$class('IContainerControl', function (self) {
-
-
-
-
-    //是否需要重新排列子控件
-    self.__arrange_dirty = true;
-
-
-    //是否需要重新处理子dom
-    self.__dom_dirty = true;
+//容器控件接口
+flyingon.IContainerControl = function (self) {
 
 
 
-
+    //接口标记
+    self['flyingon.IContainerControl'] = true;
+    
+    
     //dom元素模板
-    self.create_dom_template('<div><div style="position:relative;margin:0;border:0;padding:0;left:0;top:0;overflow:hidden;"></div></div>');
+    self.createDomTemplate('<div><div style="position:relative;margin:0;border:0;padding:0;left:0;top:0;overflow:hidden;"></div></div>');
 
+    
 
-
-    self.defineProperty('layout', '');
+    //当前布局
+    self.defineProperty('layout', null);
     
     
 
     //子控件集合
     self.defineProperty('children', function () {
 
-        return this.__children || (this.__children = new flyingon.ControlCollection(this));
+        return this.__children || (this.__children = []);
     });
 
 
+    //未处理的dom数量
+    self.__dom_append = 0;
+    
 
     //添加子控件
-    self.appendChild = function (item) {
+    self.append = function (control) {
 
-        var children = this.__children || this.children();
-
-        children.append.apply(children, arguments);
-
+        if (control && control.__parent !== this)
+        {
+            control.__parent = this;
+            this.__dom_append++;
+            
+            (this.__children || (this.__children = [])).push(control);
+        }
+        
         return this;
     };
 
 
     //在指定位置插入子控件
-    self.insertChild = function (index, item) {
+    self.insert = function (index, control) {
 
-        var children = this.__children || this.children();
-
-        children.insert.apply(children, arguments);
+        if (control && control.__parent !== this)
+        {
+            control.__parent = this;
+            
+            if (this.__dom_append)
+            {
+                this.__dom_append++;
+            }
+            else
+            {
+                this.dom.insertBefore(control.dom, this.dom.children[index] || null);
+            }
+            
+            (this.__children || (this.__children = [])).splice(index, 0, control);
+        }
 
         return this;
     };
-
-
-    //移除子控件
-    self.removeChild = function (item) {
-
-        var children;
-
-        if (children = this.__children)
+    
+    
+    //获取或设置当前控件在父控件中的索引号
+    self.indexOf = function (index) {
+        
+        var parent = this.__parent,
+            children;
+        
+        if (index >= 0)
         {
-            children.remove.call(children, item);
+            if (parent && (children = parent.__children) && children[index] !== this)
+            {
+                var dom = this.dom,
+                    dom_parent = dom.parentNode,
+                    i = children.indexOf(this);
+                
+                children.splice(i, 1);
+                children.splice(index, 0, this);
+                
+                dom_parent.insertBefore(dom, dom_parent.children[index] || null);
+            }
+            
+            return this;
+        }
+
+        return parent ? parent.__children.indexOf(this) : -1;
+    };
+
+
+    //移除子控件或从父控件中移除
+    self.remove = function (control) {
+            
+        var parent, children, index;
+
+        if (control)
+        {
+            if ((children = this.__children) && (index = children.indexOf(control)) >= 0)
+            {
+                control.__parent = null;
+
+                if (control.dom.parentNode === this.dom)
+                {
+                    this.dom.removeChild(control.dom);
+                }
+
+                children.splice(index, 1);
+            }
+        }
+        else if (parent = this.__parent)
+        {
+            parent.remove(this);
         }
 
         return this;
@@ -69,55 +123,65 @@ $class('IContainerControl', function (self) {
 
 
     //移除指定位置的子控件
-    self.removeAt = function (index, length) {
+    self.removeAt = function (index) {
 
-        var children;
+        var children, control;
 
-        if (children = this.__children)
-        {
-            children.removeAt.call(children, index, length);
+        if ((children = this.__children) && (control = children[index]))
+        {       
+            control.__parent = null;
+            
+            if (control.dom.parentNode === this.dom)
+            {
+                this.dom.removeChild(control.dom);
+            }
+            
+            children.splice(index, 1);
         }
 
         return this;
     };
 
 
-
-    //渲染控件
-    self.render = function () {
-
-        switch (this.__update_dirty)
+    //清除子控件
+    self.clear = function () {
+      
+        var children = this.__children;
+        
+        if (children)
         {
-            case 1:
-                render_children.call(this);
-                break;
-
-            case 2:
-                render_children.call(this);
-                break;
-        }
-    };
-
-
-    //渲染子控件
-    function render_children() {
-
-        var items = this.__children;
-
-        if (items && items.length > 0)
-        {
-            var width = this.clientWidth,
-                height = this.clientHeight,
-                cache;
-
-            //重排
-            if (this.__arrange_dirty || this.__arrange_width !== width || this.__arrange_height !== height)
+            var dom_parent = this.dom;
+            
+            for (var i = children.length - 1; i >= 0; i--)
             {
-                if (width > 0 && height > 0)
+                var control = children[i],
+                    dom = control.dom;
+                
+                control.__parent = null;
+                
+                if (dom.parentNode === dom_parent)
                 {
-                    //处理子dom
-                    if (this.__dom_dirty)
-                    {
+                    dom_parent.removeChild(dom);
+                }
+            }
+            
+            children.length = 0;
+        }
+        
+        return this;
+    };
+    
+
+    //排列子控件
+    self.arrange = function () {
+
+        var children = this.__children;
+
+        if (children && children.length > 0)
+        {
+            //初始化dom
+            if (this.__dom_dirty)
+            {
                         cache = document.createDocumentFragment();
 
                         for (var i = 0, _ = items.length; i < _; i++)
@@ -127,114 +191,43 @@ $class('IContainerControl', function (self) {
 
                         this.dom_children.appendChild(cache);
                         this.__dom_dirty = false;
-                    }
-
-                    this.arrange(width, height);
-                    this.__arrange_dirty = false;
-                }
-
-                this.__arrange_width = width;
-                this.__arrange_height = height;
             }
 
-            //渲染子控件
-            this.render_children();
-        }
-
-        this.__update_dirty = 0;
-    };
-
-
-
-    //渲染子控件
-    self.render_children = function () {
-
-        var items = this.__children,
-            length;
-
-        if (items && (length = items.length) > 0)
-        {
-            for (var i = 0; i < length; i++)
-            {
-                items[i].render();
-            }
         }
     };
 
 
+    //测量自动大小
+    self.measure_auto = function (box, auto_width, auto_height) {
 
-    //当前布局类型
-    self.__layout = flyingon.layouts.column3;
 
-
-    //测量自动大小(需返回width及height的变化量)
-    self.__measure_auto = function (box) {
-
-        var dom = this.dom_children.parentNode,
-            style = this.__compute_style,
-            value = style.fontSize; //记录原来的字体大小
-
-        this.__measure_client(box); //计算客户区大小
-
-        this.render();
-
-        if (style.fontSize !== value)
-        {
-            style.fontSize = value;
-        }
-
-        return {
-
-            width: box.auto_width ? this.contentWidth - this.clientWidth : 0,
-            height: box.auto_height ? this.contentHeight - this.clientHeight : 0
-        };
     };
 
 
     //排列子控件
-    self.arrange = function (width, height) {
+    self.arrange = function () {
 
         this.__layout.arrange(this, width, height);
     };
-
-
-
-
-
-    //隐藏dom暂存器
-    var hide_dom = document.createDocumentFragment();
-
-
-    //隐藏子项
-    self.hide = function (item) {
-
-        if (item.dom.parentNode !== hide_dom)
+    
+    
+    self.serialize = function (writer) {
+        
+        var children;
+        
+        base.serialize.call(this, writer);
+        
+        if (children && children.length)
         {
-            hide_dom.appendChild(item.dom);
-
-            item.__visible = false;
-            this.__dom_dirty = true;
+            writer.write_property('children', children);
         }
     };
-
-
-    //隐藏指定索引后的子项
-    self.hide_after = function (items, index) {
-
-        var item;
-
-        for (var i = index, _ = items.length; i < _; i++)
-        {
-            if ((item = items[i]).dom !== hide_dom)
-            {
-                hide_dom.appendChild(item.dom);
-
-                item.__visible = false;
-                this.__dom_dirty = true;
-            }
-        }
+    
+    
+    self.deserialize_list.children = function (reader, values) {
+      
+        this.__children = reader.read_array(values);
     };
-
 
 
     self.dispose = function () {
@@ -243,7 +236,7 @@ $class('IContainerControl', function (self) {
 
         if (children)
         {
-            for (var i = 0, _ = children.length; i < _; i++)
+            for (var i = children.length - 1; i >= 0; i--)
             {
                 children[i].dispose();
             }
@@ -253,6 +246,4 @@ $class('IContainerControl', function (self) {
     };
 
 
-});
-
-*/
+};

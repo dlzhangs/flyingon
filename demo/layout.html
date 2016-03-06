@@ -114,11 +114,11 @@
         
         flyingon.layout('flyingon-Panel', {
            
-            type: 'line',
+            //type: 'line',
             spacingX: 10,
             spacingY: 10,
             alignY: 'middle',
-            vertical: true
+            vertical: false
         });
         
         
@@ -126,20 +126,32 @@
             dom = container.dom,
             controls = [];
         
+        container.sets({
+        
+            width: 600,
+            height: 400,
+            overflow: 'auto'
+        });
+        
         for (var i = 0; i < 100; i++)
         {
-            var control = new flyingon.Control(),
-                style = control.dom.style;
+            var control = new flyingon.Control().sets({
+                
+                border: '1px',
+                borderStyle: 'solid'
+            });
             
-            style.border = '1px solid black';
-            dom.appendChild(control.dom);
-            
+            dom.appendChild(control.dom);            
             controls.push(control);
         }
         
         document.body.appendChild(dom);
+
+        var date = new Date();
         
-        flyingon.findLayout('flyingon-Panel').init(container, { left: 0, top: 0, width: 1000, height: 200 }, controls);
+        flyingon.findLayout('flyingon-Panel').init(container, { left: 0, top: 0, width: 600, height: 400 }, controls);
+
+        alert(new Date() - date);
         
       
     </script>

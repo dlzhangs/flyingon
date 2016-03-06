@@ -1,6 +1,43 @@
 
+Array.prototype.remove || (Array.prototype.remove = function (item) {
 
-//扩展Function.prototype.bind方法
+    var index = this.indexOf(item);
+    
+    if (index >= 0)
+    {
+        this.splice(index, 1);
+    }
+});
+
+
+Array.prototype.indexOf || (Array.prototype.indexOf = function (item) {
+
+    for (var i = 0, _ = this.length; i < _; i++)
+    {
+        if (this[i] === item)
+        {
+            return i;
+        }
+    }
+    
+    return -1;
+});
+
+
+Array.prototype.lastIndexOf || (Array.prototype.lastIndexOf = function (item) {
+
+    for (var i = this.length - 1; i >= 0; i--)
+    {
+        if (this[i] === item)
+        {
+            return i;
+        }
+    }
+    
+    return -1;
+});
+
+
 Function.prototype.bind || (Function.prototype.bind = function (context) {
     
     var fn = this;
@@ -43,41 +80,6 @@ flyingon.each = function (values, fn, context) {
     }
 };
 
-
-//设置指定对象的原型(注:只能使用返回值, 原始参数可能不会变)
-flyingon.setPrototypeOf = Object.setPrototypeOf || (function () {
-    
-    if (Array.prototype.__proto__)
-    {
-        return function (target, prototype) {
-          
-            target.__proto__ = prototype;
-            return target;
-        };
-    }
-    
-    var fn = function () {};
-    
-    return function (target, prototype) {
-
-        if (target && prototype)
-        {
-            fn.prototype = prototype;
-            prototype = new fn();
-            
-            for (var name in target)
-            {
-                prototype[name] = target[name];
-            }
-            
-            return prototype;
-        }
-
-        return target;
-    };
-    
-})();
-    
 
 //检测对象是否一个数组
 flyingon.isArray = Array.isArray || (function () {

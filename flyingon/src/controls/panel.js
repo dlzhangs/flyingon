@@ -1,10 +1,12 @@
     
-$class('Panel', [flyingon.Control, flyingon.IContainerControl], function (self, base) {
+$class('Panel', flyingon.Control, function (self, base) {
 
 
-
-
-
+    
+    //扩展接口标记
+    flyingon.IContainerControl(self);
+    
+    
 
 });
     

@@ -384,6 +384,98 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     //ellipsis	显示省略符号来代表被修剪的文本 	
     //string	使用给定的字符串来代表被修剪的文本 
     style('text-overflow');
+    
+    
+    
+    //从父控件中移除
+    self.remove = function () {
+    
+        var parent = this.__parent;
+        
+        if (parent)
+        {
+            parent.remove(this);
+        }
+    };
+    
+    
+    //附加控件至指定的dom
+    self.attach = function (dom) {
+
+        dom.appendChild(this.dom);
+    };
+    
+    
+    //移除附加
+    self.detach = function () {
+        
+        var dom = this.dom,
+            parent;
+    
+        if (dom && (parent = dom.parentNode))
+        {
+            parent.removeChild(dom);
+        }
+    };
+    
+    
+        
+    var update_controls = [],
+        update_timeout;
+    
+    
+    function update_delay() {
+        
+        clearTimeout(update_timeout);
+        update_timeout = 0;
+        
+        update(update_controls);
+    };
+    
+    
+    function update(controls) {
+        
+        for (var i = controls.length - 1; i >= 0; i++)
+        {
+            var control = controls[i];
+            
+            switch (control.__arrange_dirty)
+            {
+                case 2: //子组件需要排列
+                    update(controls.__children);
+                    break;
+                    
+                case 1: //自身需要排列
+                    control.arrange();
+                    break;
+            }
+        }
+    };
+    
+    
+    self.update = function (type) {
+        
+        var parent;
+        
+        if (parent = this.__parent)
+        {
+            if (!parent.__arrange_dirty)
+            {
+                parent.update(2);
+            }
+        }
+        else if (!this.__arrange_dirty)
+        {
+            update_controls.push(this);
+
+            if (!update_timer)
+            {
+                update_timer = setTimeout(update_delay, 10); //10毫秒后定时刷新
+            }
+        }
+        
+        this.__arrange_dirty = +type || 1;
+    };
 
 
 });
