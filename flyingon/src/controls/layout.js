@@ -207,14 +207,16 @@ flyingon.ILocatable = function (self, control) {
     
     self.locationProperty = function (name, defaultValue, attributes) {
         
-        if (control && attributes)
+        if (control)
         {
+            attributes = attributes || {};
             attributes.group = 'location';
             attributes.query = true;
-            attributes.set = (attributes.set || '') + '\n\t'
-                + 'if (!this.__location_dirty){\n\t\t'
-                    + 'this.__location_dirty = true;\n\t\t'
-                    + 'this.update();\n\t'
+            attributes.set = (attributes.set || '') 
+                + 'var target = this.__parent || this.__arrange_attach && this;\n\t'
+                + 'if (target && target.__arrange_dirty !== 2)\n\t'
+                + '{\n\t\t'
+                    + 'target.registry_arrange();\n\t'
                 + '}';
         }
         
@@ -228,11 +230,8 @@ flyingon.ILocatable = function (self, control) {
     //控件默认高度(height === 'default'时的高度)
     self.defaultHeight = 21;
 
-
+    //是否可见
     self.locationProperty('visible', true);
-    
-    //
-    self.locationProperty('overflow', 'visible');
     
     //控件横向对齐方式
     //left      左边对齐
@@ -498,6 +497,8 @@ flyingon.ILocatable = function (self, control) {
         this.offsetWidth = width;
         this.offsetHeight = height;
         
+        this.clientRect = this.computeClientRect(box, width, height);
+        
         return this;
     };
     
@@ -505,6 +506,21 @@ flyingon.ILocatable = function (self, control) {
     //测量自动大小
     self.measure_auto = function (box, auto_width, auto_height) {
         
+    };
+    
+    
+    //计算客户区信息
+    self.computeClientRect = function (box, width, height) {
+      
+        var value;
+        
+        return {
+          
+            left: box.spacing_left,
+            top: box.spacing_top,
+            width: (value = width - box.spacing_width) >= 0 ? value : 0,
+            height: (value = height - box.spacing_height) >= 0 ? value : 0
+        };
     };
     
     
@@ -545,22 +561,6 @@ flyingon.ILocatable = function (self, control) {
         this.offsetTop = y;
         
         return this;
-    };
-    
-    
-    //获取客户区信息
-    self.clientRect = function () {
-      
-        var box = this.__boxModel,
-            value;
-        
-        return {
-          
-            left: this.offsetLeft + box.spacing_left,
-            top: this.offsetTop + box.spacing_top,
-            width: (value = this.offsetWidth - box.spacing_width) >= 0 ? value : 0,
-            height: (value = this.offsetHeight - box.spacing_height) >= 0 ? value : 0
-        };
     };
     
     
@@ -694,8 +694,16 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
             }
         }
     };
-
-
+    
+    
+    
+    //水平滚动条 hidden|visible|auto
+    self.locationProperty('hscrollbar', 'hidden');
+    
+    //竖直滚动条 hidden|visible|auto
+    self.locationProperty('vscrollbar', 'hidden');
+    
+    
     //是否竖排
     //true      竖排
     //false     横排
@@ -754,14 +762,6 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         set: 'this.__adaptation_ = !!value;'
     });
 
-
-    //水平滚动条: false|true|'auto'
-    self.hscroll = 'auto';
-    
-    
-    //垂直滚动条: false|true|'auto'
-    self.vscroll = 'auto';
-    
         
     //计算滚动条大小
     flyingon.dom_test(function (div) {
@@ -1161,6 +1161,11 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
     self.type = 'line';
     
     
+    self.defaultValue('overflowX', 'auto');
+    
+    self.defaultValue('overflowY', 'auto');
+    
+    
     //排列布局
     self.arrange = function (container, clientRect, items, start, end, vertical) {
 
@@ -1177,7 +1182,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
             this.hscroll = false;
             
             //如果有竖直滚动条则减去滚动条宽度
-            if (this.vscroll === true)
+            if (this.hscroll === 'visible')
             {
                 clientRect.width = (width -= this.vscroll_width);
             }
@@ -1250,6 +1255,11 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
 
     self.type = 'flow';
 
+
+    self.defaultValue('overflowX', 'auto');
+    
+    self.defaultValue('overflowY', 'auto');
+    
     
     //竖直布局行宽
     self.arrangeProperty('lineWidth', 0, {

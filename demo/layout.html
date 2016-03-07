@@ -4,22 +4,18 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title></title>
 </head>
-<body>
+<body style="height:400px;">
 
     <script type="text/javascript" src="../flyingon/js/flyingon.js"></script>
-    
-    <script type="text/javascript">
-    
-        //指定引入资源初始路径
-        flyingon.include_path('../');
-      
-    </script>
     
     <script type="text/javascript" src="../flyingon/js/flyingon.ui.js"></script>
     
     <script type="text/javascript">
         
         
+        //指定引入资源初始路径
+        flyingon.include_path('../');
+      
     
         flyingon.layout('flyingon-Panel', {
    
@@ -122,37 +118,26 @@
         });
         
         
-        var container = new flyingon.Panel(),
-            dom = container.dom,
-            controls = [];
+        var container = new flyingon.Panel().sets({
         
-        container.sets({
-        
+            layout: 'flyingon-Panel',
             width: 600,
             height: 400,
-            overflow: 'auto'
+            overflowX: 'auto',
+            overflowY: 'auto'
         });
         
         for (var i = 0; i < 100; i++)
         {
-            var control = new flyingon.Control().sets({
+            container.append(new flyingon.Control().sets({
                 
                 border: '1px',
                 borderStyle: 'solid'
-            });
-            
-            dom.appendChild(control.dom);            
-            controls.push(control);
+            }));            
         }
         
-        document.body.appendChild(dom);
+        container.attach(document.body);
 
-        var date = new Date();
-        
-        flyingon.findLayout('flyingon-Panel').init(container, { left: 0, top: 0, width: 600, height: 400 }, controls);
-
-        alert(new Date() - date);
-        
       
     </script>
 

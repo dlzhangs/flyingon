@@ -5,17 +5,19 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     
 
     //控件集合
-    flyingon.controls = flyingon.create(null);
+    var controls = flyingon.controls = flyingon.create(null),
+        id = 1;
     
     
 
     $constructor(function () {
 
         //根据dom模板创建关联的dom元素
-        (this.dom = this.dom_template.cloneNode(false)).flyingon = this;
+        controls[(this.dom = this.dom_template.cloneNode(true)).flyingon_id = id++] = this;
     });
 
     
+        
     
     //盒模型大小是否包含边框
     self.box_sizing_border = false;
@@ -195,8 +197,19 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         
         style.left = this.offsetLeft + 'px';
         style.top = this.offsetTop + 'px';
-        style.width = this.offsetWidth + 'px';
-        style.height = this.offsetHeight + 'px';
+        
+        if (this.box_sizing_border)
+        {
+            style.width = this.offsetWidth + 'px';
+            style.height = this.offsetHeight + 'px';
+        }
+        else
+        {
+            var clientRect = this.clientRect;
+            
+            style.width = clientRect.width + 'px';
+            style.height = clientRect.height + 'px';
+        }
     };
     
     
@@ -209,7 +222,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     
     
     //创建样式
-    function style(name, defaultValue, style) {
+    function style(name, style) {
 
         name = name.replace(/-(\w)/g, function (_, x) {
         
@@ -220,10 +233,18 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         var attributes = style_attributes;
         
         attributes.set = style || 'this.dom.style.' + name + ' = value;\n';
-        self.defineProperty(name, defaultValue,  attributes);
+        self.defineProperty(name, '', attributes);
     };
 
 
+    
+    //水平滚动条 hidden|scroll|auto
+    style('overflow-x', '(this.dom_overflow || this.dom).style.overflowX = value;');
+    
+    //竖直滚动条 hidden|scroll|auto
+    style('overflow-y', '(this.dom_overflow || this.dom).style.overflowY = value;');
+    
+    
     //控件层叠顺序
     //number	整数值 
     style('z-index', 0);
@@ -399,10 +420,28 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
     
     
+        
+    var arrange_controls = [],
+        arrange_timeout;
+    
+    
     //附加控件至指定的dom
     self.attach = function (dom) {
 
-        dom.appendChild(this.dom);
+        if (dom)
+        {
+            if (this.arrange && arrange_controls.indexOf(this) < 0)
+            {
+                arrange_controls.push(this);
+                
+                if (!arrange_timeout)
+                {
+                    arrange_timeout = setTimeout(arrange_delay, 10); //10毫秒后定时刷新
+                }
+            }
+            
+            dom.appendChild(this.dom);
+        }
     };
     
     
@@ -410,71 +449,79 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     self.detach = function () {
         
         var dom = this.dom,
-            parent;
-    
-        if (dom && (parent = dom.parentNode))
+            cache = arrange_controls.indexOf(this);
+        
+        if (cache >= 0)
         {
-            parent.removeChild(dom);
+            arrange_controls.splice(cache, 1);
+        }
+    
+        if (dom && (cache = dom.parentNode))
+        {
+            cache.removeChild(dom);
         }
     };
     
     
+    //注册排列
+    self.registry_arrange = function () {
         
-    var update_controls = [],
-        update_timeout;
-    
-    
-    function update_delay() {
+        var target = this.__parent;
         
-        clearTimeout(update_timeout);
-        update_timeout = 0;
+        this.__arrange_dirty = 2;
         
-        update(update_controls);
+        while (target && !target.__arrange_dirty)
+        {
+            target.__arrange_dirty = 1;
+            target = target.__parent;
+        }
+        
+        if (!arrange_timeout)
+        {
+            arrange_timeout = setTimeout(arrange_delay, 10); //10毫秒后定时刷新
+        }
     };
     
     
-    function update(controls) {
+    function arrange_delay() {
         
-        for (var i = controls.length - 1; i >= 0; i++)
+        var controls = arrange_controls;
+        
+        for (var i = controls.length - 1; i >= 0; i--)
         {
             var control = controls[i];
             
             switch (control.__arrange_dirty)
             {
-                case 2: //子组件需要排列
-                    update(controls.__children);
+                case 2: //自身需要重新排列
+                    arrange_attach(control);
                     break;
                     
-                case 1: //自身需要排列
+                case 1: //子控件需要重新排列
                     control.arrange();
                     break;
             }
         }
+        
+        arrange_timeout = 0;
     };
     
     
-    self.update = function (type) {
+    function arrange_attach(control) {
         
-        var parent;
+        var dom = control.dom.parentNode;
         
-        if (parent = this.__parent)
+        if (dom)
         {
-            if (!parent.__arrange_dirty)
-            {
-                parent.update(2);
-            }
+            var box = control.boxModel(),
+                width = dom.clientWidth,
+                height = dom.clientHeight;
+            
+            control.measure(box, width, height, true, true);
+            control.locate(box, 0, 0, width, height);
+            control.after_locate();
+            control.arrange();
         }
-        else if (!this.__arrange_dirty)
-        {
-            update_controls.push(this);
-
-            if (!update_timer)
-            {
-                update_timer = setTimeout(update_delay, 10); //10毫秒后定时刷新
-            }
-        }
-        
-        this.__arrange_dirty = +type || 1;
     };
 
 

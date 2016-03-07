@@ -14,7 +14,10 @@ flyingon.IContainerControl = function (self) {
     
 
     //当前布局
-    self.defineProperty('layout', null);
+    self.defineProperty('layout', null, {
+     
+        set: 'this.__layout = value && typeof value === "object";'
+    });
     
     
 
@@ -25,19 +28,21 @@ flyingon.IContainerControl = function (self) {
     });
 
 
-    //未处理的dom数量
-    self.__dom_append = 0;
-    
 
     //添加子控件
     self.append = function (control) {
 
         if (control && control.__parent !== this)
         {
-            control.__parent = this;
-            this.__dom_append++;
+            this.__dom_dirty = true;
+            
+            if (this.__arrange_dirty !== 2)
+            {
+                this.registry_arrange();
+            }
             
             (this.__children || (this.__children = [])).push(control);
+            control.__parent = this;
         }
         
         return this;
@@ -49,18 +54,34 @@ flyingon.IContainerControl = function (self) {
 
         if (control && control.__parent !== this)
         {
-            control.__parent = this;
+            var dom = this.dom,
+                children = this.__children || (this.__children = []);
             
-            if (this.__dom_append)
+            if (index < 0)
             {
-                this.__dom_append++;
+                index = 0;
+            }
+            else if (index > children.length)
+            {
+                index = children.length;
+            }
+                     
+            if (dom.children.length >= index)
+            {
+                this.dom.insertBefore(control.dom, dom.children[index] || null);
             }
             else
             {
-                this.dom.insertBefore(control.dom, this.dom.children[index] || null);
+                this.__dom_dirty = true;
             }
             
-            (this.__children || (this.__children = [])).splice(index, 0, control);
+            if (this.__arrange_dirty !== 2)
+            {
+                this.registry_arrange();
+            }
+            
+            children.splice(index, 0, control);
+            control.__parent = this;
         }
 
         return this;
@@ -80,6 +101,11 @@ flyingon.IContainerControl = function (self) {
                 var dom = this.dom,
                     dom_parent = dom.parentNode,
                     i = children.indexOf(this);
+                
+                if (this.__arrange_dirty !== 2)
+                {
+                    this.registry_arrange();
+                }
                 
                 children.splice(i, 1);
                 children.splice(index, 0, this);
@@ -103,14 +129,18 @@ flyingon.IContainerControl = function (self) {
         {
             if ((children = this.__children) && (index = children.indexOf(control)) >= 0)
             {
-                control.__parent = null;
-
+                if (this.__arrange_dirty !== 2)
+                {
+                    this.registry_arrange();
+                }
+                
                 if (control.dom.parentNode === this.dom)
                 {
                     this.dom.removeChild(control.dom);
                 }
 
                 children.splice(index, 1);
+                control.__parent = null;
             }
         }
         else if (parent = this.__parent)
@@ -129,7 +159,10 @@ flyingon.IContainerControl = function (self) {
 
         if ((children = this.__children) && (control = children[index]))
         {       
-            control.__parent = null;
+            if (this.__arrange_dirty !== 2)
+            {
+                this.registry_arrange();
+            }
             
             if (control.dom.parentNode === this.dom)
             {
@@ -137,6 +170,7 @@ flyingon.IContainerControl = function (self) {
             }
             
             children.splice(index, 1);
+            control.__parent = null;
         }
 
         return this;
@@ -150,7 +184,7 @@ flyingon.IContainerControl = function (self) {
         
         if (children)
         {
-            var dom_parent = this.dom;
+            var dom_parent = this.dom.children[0];
             
             for (var i = children.length - 1; i >= 0; i--)
             {
@@ -175,24 +209,73 @@ flyingon.IContainerControl = function (self) {
     //排列子控件
     self.arrange = function () {
 
-        var children = this.__children;
+        var children = this.__children,
+            length;
 
-        if (children && children.length > 0)
+        switch (this.__arrange_dirty)
         {
-            //初始化dom
-            if (this.__dom_dirty)
-            {
-                        cache = document.createDocumentFragment();
+            case 2:
+                if (children && children.length > 0)
+                {
+                    arrange(this, children);
+                }
+                
+                this.__arrange_dirty = 0;
+                break;
 
-                        for (var i = 0, _ = items.length; i < _; i++)
+            case 1:
+                if (children && (length = children.length) > 0)
+                {
+                    for (var i = 0; i < length; i++)
+                    {
+                        var control = children[i];
+                        
+                        if (control.__arrange_dirty)
                         {
-                            cache.appendChild(items[i].dom);
+                            control.arrange();
                         }
+                    }
+                }
+                
+                this.__arrange_dirty = 0;
+                break;
+        }
+    };
+    
+    
+    function arrange(self, children) {
+        
+        var layout = this.__layout;
+            
+        //初始化dom
+        if (self.__dom_dirty)
+        {
+            var cache = document.createDocumentFragment();
 
-                        this.dom_children.appendChild(cache);
-                        this.__dom_dirty = false;
+            for (var i = 0, _ = children.length; i < _; i++)
+            {
+                cache.appendChild(children[i].dom);
             }
 
+            self.dom.children[0].appendChild(cache);
+            self.__dom_dirty = false;
+        }
+        
+        if (layout)
+        {
+            if (layout === true)
+            {
+                layout = self.__layout = flyingon.findLayout(self.layout());
+            }
+        }
+        else
+        {
+            layout = flyingon.findLayout(self.layout());
+        }
+        
+        if (layout)
+        {
+            layout.init(self, self.clientRect, children);
         }
     };
 
@@ -203,11 +286,31 @@ flyingon.IContainerControl = function (self) {
 
     };
 
+    
+    self.after_locate = function () {
+      
+        var dom = this.dom,
+            style = dom.style;
+        
+        style.left = this.offsetLeft + 'px';
+        style.top = this.offsetTop + 'px';
 
-    //排列子控件
-    self.arrange = function () {
-
-        this.__layout.arrange(this, width, height);
+        if (this.box_sizing_border)
+        {
+            style.width = this.offsetWidth + 'px';
+            style.height = this.offsetHeight + 'px';
+        }
+        else
+        {
+            var clientRect = this.clientRect;
+            
+            style.width = clientRect.width + 'px';
+            style.height = clientRect.height + 'px';
+        }
+        
+        style = dom.children[0].style;
+        style.width = this.clientRect.width + 'px';
+        style.height = this.clientRect.height + 'px';
     };
     
     
