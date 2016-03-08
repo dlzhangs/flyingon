@@ -871,8 +871,14 @@ flyingon.ILocatable = function (self, control) {
         extend_list = ILocatable.__extend_list,
         extend = flyingon.extend,
         pixel = flyingon.pixel,
-        pixel_sides = flyingon.pixel_sides;
-    
+        pixel_sides = flyingon.pixel_sides,
+        
+        location_attributes = 'var target = this.__parent || this.__arrange_attach && this;\n\t'
+            + 'if (target && target.__arrange_dirty !== 2)\n\t'
+            + '{\n\t\t'
+                + 'target.update();\n\t'
+            + '}';;
+
     
     //记录被扩展的目标
     (ILocatable.__target_list || (ILocatable.__target_list = [])).push(self);
@@ -884,17 +890,14 @@ flyingon.ILocatable = function (self, control) {
     
     self.locationProperty = function (name, defaultValue, attributes) {
         
+        var set;
+            
         if (control)
         {
             attributes = attributes || {};
             attributes.group = 'location';
             attributes.query = true;
-            attributes.set = (attributes.set || '') 
-                + 'var target = this.__parent || this.__arrange_attach && this;\n\t'
-                + 'if (target && target.__arrange_dirty !== 2)\n\t'
-                + '{\n\t\t'
-                    + 'target.registry_arrange();\n\t'
-                + '}';
+            attributes.set = ((set = attributes.set) ? set + '\n\t' : '') + location_attributes;
         }
         
         this.defineProperty(name, defaultValue, attributes);
@@ -908,7 +911,23 @@ flyingon.ILocatable = function (self, control) {
     self.defaultHeight = 21;
 
     //是否可见
-    self.locationProperty('visible', true);
+    self.locationProperty('visible', true, {
+     
+        set: 'this.dom.style.display = value ? "" : "none";'
+    });
+    
+        
+    self.locationProperty('overflowX', '', {
+       
+        set: 'this.__location_change("overflowX", value);'
+    });
+    
+    
+    self.locationProperty('overflowY', '', {
+       
+        set: 'this.__location_change("overflowY", value);'
+    });
+    
     
     //控件横向对齐方式
     //left      左边对齐
@@ -958,8 +977,17 @@ flyingon.ILocatable = function (self, control) {
         set: 'this.dom.style.borderWidth = value;\n\t'
     });
 
-    self.locationProperty('padding', '0');
+    self.locationProperty('padding', '0', {
+     
+        set: 'this.__location_change("padding", value);'
+    });
     
+
+    //特殊的定位属性值变更方法
+    self.__location_change = function (name, value) {
+      
+    };
+
     
     if (extend_list)
     {
@@ -993,15 +1021,12 @@ flyingon.ILocatable = function (self, control) {
             storage = this.__storage || this.__defaults,
             values = this.__location_values,
             fn = pixel,
-            border,
-            padding,
             value;
         
         if (values)
         {
             box.visible = (value = values.visible) != null ? value : storage.visible;
-            box.overflow = values.overflow || storage.overflow;
-            
+
             box.alignX = values.alignX || storage.alignX;
             box.alignY = values.alignY || storage.alignY;
             
@@ -1023,14 +1048,13 @@ flyingon.ILocatable = function (self, control) {
             
             //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
             box.margin = fn((value = values.margin) != null ? value : storage.margin, width);
-            box.border = border = fn((value = values.border) != null ? value : storage.border, width);
-            box.padding = padding = fn((value = values.padding) != null ? value : storage.padding, width);
+            box.border = fn((value = values.border) != null ? value : storage.border, width);
+            box.padding = fn((value = values.padding) != null ? value : storage.padding, width);
         }
         else
         {
             box.visible = storage.visible;
-            box.overflow = storage.overflow;
-            
+
             box.alignX = storage.alignX;
             box.alignY = storage.alignY;
             
@@ -1051,14 +1075,9 @@ flyingon.ILocatable = function (self, control) {
             
             //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
             box.margin = fn(storage.margin, width);
-            box.border = border = fn(storage.border, width);
-            box.padding = padding = fn(storage.padding, width);
+            box.border = fn(storage.border, width);
+            box.padding = fn(storage.padding, width);
         }
-
-        box.spacing_left = border.left + padding.left;
-        box.spacing_top = border.top + padding.top;
-        box.spacing_width = border.width + padding.width;
-        box.spacing_height = border.height + padding.height;
 
         return box;
     };
@@ -1166,40 +1185,20 @@ flyingon.ILocatable = function (self, control) {
             height = box.maxHeight;
         }
 
-        if (auto_width || auto_height)
-        {
-            this.measure_auto(box, auto_width, auto_height);
-        }
-
         this.offsetWidth = width;
         this.offsetHeight = height;
         
-        this.clientRect = this.computeClientRect(box, width, height);
+        this.onmeasure(box, auto_width, auto_height);
         
         return this;
     };
     
     
-    //测量自动大小
-    self.measure_auto = function (box, auto_width, auto_height) {
+    //测量后处理
+    self.onmeasure = function (box, auto_width, auto_height) {
         
     };
-    
-    
-    //计算客户区信息
-    self.computeClientRect = function (box, width, height) {
-      
-        var value;
         
-        return {
-          
-            left: box.spacing_left,
-            top: box.spacing_top,
-            width: (value = width - box.spacing_width) >= 0 ? value : 0,
-            height: (value = height - box.spacing_height) >= 0 ? value : 0
-        };
-    };
-    
     
     //定位
     self.locate = function (box, x, y, align_width, align_height) {
@@ -1241,6 +1240,24 @@ flyingon.ILocatable = function (self, control) {
     };
     
     
+    self.clientRect = function (box) {
+        
+        var border = (box || (box = this.__boxModel)).border,
+            padding = box.padding,
+            value;
+
+        return {
+          
+            left: padding.left,
+            top: padding.top,
+            right: padding.right,
+            bottom: padding.bottom,
+            width: (value = this.offsetWidth - border.width - padding.width) >= 0 ? value : 0,
+            height: (value = this.offsetHeight - border.height - padding.height) >= 0 ? value : 0
+        };
+    };
+    
+    
 };
 
 
@@ -1251,11 +1268,18 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
     
     
     //子项数
-    self.defineProperty('length', 0.0);
+    self.defineProperty('length', 0, {
+     
+        dataType: 'number'
+    });
     
     
     //扩展可定位对象接口
     flyingon.ILocatable(self);
+    
+    
+    //指定默认大小
+    this.defaultWidth = this.defaultHeight = 200;
     
     
     //布局
@@ -1264,6 +1288,19 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
         storage: 'this.__layout'
     });
     
+    
+    var clientRect = self.clientRect;
+    
+    self.clientRect = function (box) {
+        
+        var data = clientRect.call(this, box || (box = this.__boxModel)),
+            border = box.border;
+        
+        data.left += this.offsetLeft + border.left;
+        data.top += this.offsetTop + border.top;
+
+        return data;
+    };
     
     
     self.serialize = function (writer) {
@@ -1372,14 +1409,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         }
     };
     
-    
-    
-    //水平滚动条 hidden|visible|auto
-    self.locationProperty('hscrollbar', 'hidden');
-    
-    //竖直滚动条 hidden|visible|auto
-    self.locationProperty('vscrollbar', 'hidden');
-    
+        
     
     //是否竖排
     //true      竖排
@@ -1514,6 +1544,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
             subitems,
             cache;
         
+        //处理子布局
         if (sublayouts)
         {
             if (sublayouts === true)
@@ -1534,6 +1565,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         }
         else
         {
+            //处理强制子项值
             if (subitems = this.__subitems_)
             {
                 if (subitems === true)
@@ -1548,17 +1580,20 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
                     items[i].__location_values = cache && cache(i, items[i], container) || subitems;
                 }
             }
-
+            
+            //排列
             this.arrange(container, clientRect, items, start, end, this.vertical());
             
+            //镜像处理
             if ((cache = this.mirror()) !== 'none')
             {
                 arrange_mirror(clientRect, cache, items, start, end);
             }
             
+            //定位后处理
             for (var i = start; i <= end; i++)
             {
-                items[i].after_locate();
+                (cache = items[i]).onlocate(cache.__boxModel);
             }
         }
     };
@@ -1706,7 +1741,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         //再排列后面部分的子项
         while (i2 > i1)
         {
-            length = (target = sublayouts[i1]).length();
+            length = (target = sublayouts[i2]).length();
             
             if (length < 0)
             {
@@ -1727,11 +1762,14 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
             i2--;
         }
         
+        //记录总的余量
+        all = end - start;
+        
         //最后排列中间的余量
         while (i1 <= i2)
         {
-            length = (target = sublayouts[i1]).length() || 0.5;
-            length = Math.ceil(length * (end - start));
+            length = (target = sublayouts[i1]).length();
+            length = length > 0 ? Math.ceil(length * all) : (end - start);
             
             target.__layout_.init(container, target.clientRect(), items, start, start += length);
             
@@ -1837,12 +1875,10 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
 
     self.type = 'line';
     
-    
-    self.defaultValue('overflowX', 'auto');
-    
-    self.defaultValue('overflowY', 'auto');
-    
-    
+    //是否需要处理滚动条
+    self.scroll = true;
+        
+        
     //排列布局
     self.arrange = function (container, clientRect, items, start, end, vertical) {
 
@@ -1855,9 +1891,6 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
                 bottom = y + height,
                 spacingY = this.pixel(this.spacingY(), height);
         
-            //禁止出现水平滚动条
-            this.hscroll = false;
-            
             //如果有竖直滚动条则减去滚动条宽度
             if (this.hscroll === 'visible')
             {
@@ -1883,6 +1916,9 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
                     return this.arrange(container, clientRect, items, start, end, true);
                 }
             }
+            
+            this.contentWidth = width;
+            this.contentHeight = y + clientRect.bottom;
         }
         else
         {
@@ -1918,6 +1954,9 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
                     return this.arrange(container, clientRect, items, start, end);
                 }
             }
+            
+            this.contentWidth = x;
+            this.contentHeight = height + clientRect.right;
         }
     };
     
@@ -1933,9 +1972,8 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
     self.type = 'flow';
 
 
-    self.defaultValue('overflowX', 'auto');
-    
-    self.defaultValue('overflowY', 'auto');
+    //是否需要处理滚动条
+    self.scroll = true;
     
     
     //竖直布局行宽
@@ -1999,7 +2037,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
                 //换行
                 if (y + value > bottom || y > 0 && item.newline())
                 {
-                    y = 0;
+                    y = clientRect.top;
                     x += size + spacingX;
                     size = width;
                     
@@ -2048,7 +2086,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
                 //换行
                 if (x + value > right || x > 0 && item.newline())
                 {
-                    x = 0;
+                    x = clientRect.left;
                     y += size + spacingY;
                     size = height;
                     
@@ -2269,7 +2307,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
             
             style = dom.style;
 
-            if (cache && name !== cache)
+            if (cache && name !== (cache = cache.replace('.', '-')))
             {
                 name += ' ' + cache;
             }
@@ -2416,27 +2454,30 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     
     //扩展可布局对象接口
     flyingon.ILocatable(self, true);
+    
 
-
-    self.after_locate = function () {
+    self.__location_change = function (name, value) {
       
-        var style = this.dom.style;
+        this.dom.style[name] = value;
+    };
+    
+
+    self.onlocate = function (box) {
+      
+        var style = this.dom.style,
+            width = this.offsetWidth,
+            height = this.offsetHeight;
+        
+        if (!this.box_sizing_border && box)
+        {
+            width -= box.border.width + box.padding.width;
+            height -= box.border.height + box.padding.height;
+        }
         
         style.left = this.offsetLeft + 'px';
         style.top = this.offsetTop + 'px';
-        
-        if (this.box_sizing_border)
-        {
-            style.width = this.offsetWidth + 'px';
-            style.height = this.offsetHeight + 'px';
-        }
-        else
-        {
-            var clientRect = this.clientRect;
-            
-            style.width = clientRect.width + 'px';
-            style.height = clientRect.height + 'px';
-        }
+        style.width = width + 'px';
+        style.height = height + 'px';
     };
     
     
@@ -2464,13 +2505,6 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
 
 
-    
-    //水平滚动条 hidden|scroll|auto
-    style('overflow-x', '(this.dom_overflow || this.dom).style.overflowX = value;');
-    
-    //竖直滚动条 hidden|scroll|auto
-    style('overflow-y', '(this.dom_overflow || this.dom).style.overflowY = value;');
-    
     
     //控件层叠顺序
     //number	整数值 
@@ -2512,8 +2546,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     //控件可见性
     //visible	默认值 元素是可见的 
     //hidden	元素是不可见的 
-    //collapse	当在表格元素中使用时, 此值可删除一行或一列, 但是它不会影响表格的布局 被行或列占据的空间会留给其他内容使用 如果此值被用在其他的元素上, 会呈现为 'hidden' 
-    style('visibility');
+    style('visibility', 'this.dom.style.visibility = value === "hidden" ? "hidden" : "visible";');
 
     //控件透明度
     //number	0(完全透明)到1(完全不透明)之间数值
@@ -2657,8 +2690,10 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
         if (dom)
         {
-            if (this.arrange && arrange_controls.indexOf(this) < 0)
+            if (this.arrange && !this.__arrange_attach)
             {
+                this.__arrange_attach = true;
+                
                 arrange_controls.push(this);
                 
                 if (!arrange_timeout)
@@ -2675,23 +2710,24 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     //移除附加
     self.detach = function () {
         
-        var dom = this.dom,
-            cache = arrange_controls.indexOf(this);
-        
-        if (cache >= 0)
+        if (this.__arrange_attach)
         {
-            arrange_controls.splice(cache, 1);
-        }
-    
-        if (dom && (cache = dom.parentNode))
-        {
-            cache.removeChild(dom);
+            var dom = this.dom;
+
+            this.__arrange_attach = false;
+            
+            arrange_controls.remove(this);
+
+            if (dom && dom.parentNode)
+            {
+                dom.parentNode.removeChild(dom);
+            }
         }
     };
     
     
-    //注册排列
-    self.registry_arrange = function () {
+    //更新排列
+    self.update = function () {
         
         var target = this.__parent;
         
@@ -2746,7 +2782,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
             
             control.measure(box, width, height, true, true);
             control.locate(box, 0, 0, width, height);
-            control.after_locate();
+            control.onlocate(box);
             control.arrange();
         }
     };
@@ -2785,6 +2821,18 @@ flyingon.IContainerControl = function (self) {
         return this.__children || (this.__children = []);
     });
 
+    
+    
+    self.__location_change = function (name, value) {
+      
+        switch (name)
+        {
+            case 'overflowX':
+            case 'overflowY':
+                this.dom.style[name] = value;
+                break;
+        }
+    };
 
 
     //添加子控件
@@ -2796,7 +2844,7 @@ flyingon.IContainerControl = function (self) {
             
             if (this.__arrange_dirty !== 2)
             {
-                this.registry_arrange();
+                this.update();
             }
             
             (this.__children || (this.__children = [])).push(control);
@@ -2835,7 +2883,7 @@ flyingon.IContainerControl = function (self) {
             
             if (this.__arrange_dirty !== 2)
             {
-                this.registry_arrange();
+                this.update();
             }
             
             children.splice(index, 0, control);
@@ -2862,7 +2910,7 @@ flyingon.IContainerControl = function (self) {
                 
                 if (this.__arrange_dirty !== 2)
                 {
-                    this.registry_arrange();
+                    this.update();
                 }
                 
                 children.splice(i, 1);
@@ -2889,7 +2937,7 @@ flyingon.IContainerControl = function (self) {
             {
                 if (this.__arrange_dirty !== 2)
                 {
-                    this.registry_arrange();
+                    this.update();
                 }
                 
                 if (control.dom.parentNode === this.dom)
@@ -2919,7 +2967,7 @@ flyingon.IContainerControl = function (self) {
         {       
             if (this.__arrange_dirty !== 2)
             {
-                this.registry_arrange();
+                this.update();
             }
             
             if (control.dom.parentNode === this.dom)
@@ -3033,42 +3081,65 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            layout.init(self, self.clientRect, children);
+            //获取可见子项
+            var items = [],
+                item;
+            
+            for (var i = 0, _ = children.length; i < _; i++)
+            {
+                if ((item = children[i]).visible())
+                {
+                    items.push(item);
+                }
+            }
+            
+            if (layout.scroll)
+            {
+                layout.hscroll = self.overflowX() || 'auto';
+                layout.vscroll = self.overflowY() || 'auto';
+            }
+            
+            layout.init(self, self.clientRect(), items);
+            
+            //排列后处理
+            self.onarrange(layout);
         }
     };
 
 
     //测量自动大小
-    self.measure_auto = function (box, auto_width, auto_height) {
+    self.onmeasure = function (box, auto_width, auto_height) {
 
 
     };
+    
+    
+    self.onarrange = function (layout) {
+      
+        var padding = this.__boxModel.padding,
+            style = this.dom.children[0].style;
+        
+        style.width = (layout.contentWidth + padding.right) + 'px';
+        style.height = (layout.contentHeight + padding.bottom) + 'px';
+    };
 
     
-    self.after_locate = function () {
+    self.onlocate = function (box) {
       
-        var dom = this.dom,
-            style = dom.style;
+        var style = this.dom.style,
+            width = this.offsetWidth,
+            height = this.offsetHeight;
+        
+        if (!this.box_sizing_border && box)
+        {
+            width -= box.border.width;
+            height -= box.border.height;
+        }
         
         style.left = this.offsetLeft + 'px';
         style.top = this.offsetTop + 'px';
-
-        if (this.box_sizing_border)
-        {
-            style.width = this.offsetWidth + 'px';
-            style.height = this.offsetHeight + 'px';
-        }
-        else
-        {
-            var clientRect = this.clientRect;
-            
-            style.width = clientRect.width + 'px';
-            style.height = clientRect.height + 'px';
-        }
-        
-        style = dom.children[0].style;
-        style.width = this.clientRect.width + 'px';
-        style.height = this.clientRect.height + 'px';
+        style.width = width + 'px';
+        style.height = height + 'px';
     };
     
     

@@ -110,18 +110,62 @@
         
         flyingon.layout('flyingon-Panel', {
            
-            //type: 'line',
+            type: 'line',
             spacingX: 10,
             spacingY: 10,
             alignY: 'middle',
-            vertical: false
+            vertical: false,
+            
+            sublayouts: [
+                
+                {
+                    length: 10,
+                    width: 300,
+                    
+                    layout: {
+                     
+                        type: 'flow',
+                        spacingX: 2,
+                        spacingY: 2
+                    }
+                },
+                
+                {
+                    length: 0.5,
+                    width: 300,
+                    
+                    layout: {
+                     
+                        type: 'flow',
+                        spacingX: 2,
+                        spacingY: 2
+                    }
+                },
+                
+                {
+                    //length: 10,
+                    width: 300,
+                    
+                    layout: {
+                     
+                        type: 'flow',
+                        spacingX: 2,
+                        spacingY: 2,
+                        
+                        subitems: {
+                         
+                            width: 200
+                        }
+                    }
+                }
+            ]
         });
         
         
         var container = new flyingon.Panel().sets({
         
             layout: 'flyingon-Panel',
-            width: 600,
+            width: 1000,
             height: 400,
             overflowX: 'auto',
             overflowY: 'auto'

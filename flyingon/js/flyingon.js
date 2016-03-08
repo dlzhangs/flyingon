@@ -1558,9 +1558,9 @@ $class('IObject', function (self) {
         {
             this.__defaults[name] = defaultValue;
 
-            attributes.dataType = typeof defaultValue;
-
-            if (attributes.dataType === 'number' && ('' + defaultValue).indexOf('.') < 0)
+            if (!attributes.dataType &&
+                (attributes.dataType = typeof defaultValue) === 'number' && 
+                ('' + defaultValue).indexOf('.') < 0)
             {
                 attributes.dataType = 'int';
             }

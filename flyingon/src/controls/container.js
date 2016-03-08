@@ -27,6 +27,18 @@ flyingon.IContainerControl = function (self) {
         return this.__children || (this.__children = []);
     });
 
+    
+    
+    self.__location_change = function (name, value) {
+      
+        switch (name)
+        {
+            case 'overflowX':
+            case 'overflowY':
+                this.dom.style[name] = value;
+                break;
+        }
+    };
 
 
     //添加子控件
@@ -38,7 +50,7 @@ flyingon.IContainerControl = function (self) {
             
             if (this.__arrange_dirty !== 2)
             {
-                this.registry_arrange();
+                this.update();
             }
             
             (this.__children || (this.__children = [])).push(control);
@@ -77,7 +89,7 @@ flyingon.IContainerControl = function (self) {
             
             if (this.__arrange_dirty !== 2)
             {
-                this.registry_arrange();
+                this.update();
             }
             
             children.splice(index, 0, control);
@@ -104,7 +116,7 @@ flyingon.IContainerControl = function (self) {
                 
                 if (this.__arrange_dirty !== 2)
                 {
-                    this.registry_arrange();
+                    this.update();
                 }
                 
                 children.splice(i, 1);
@@ -131,7 +143,7 @@ flyingon.IContainerControl = function (self) {
             {
                 if (this.__arrange_dirty !== 2)
                 {
-                    this.registry_arrange();
+                    this.update();
                 }
                 
                 if (control.dom.parentNode === this.dom)
@@ -161,7 +173,7 @@ flyingon.IContainerControl = function (self) {
         {       
             if (this.__arrange_dirty !== 2)
             {
-                this.registry_arrange();
+                this.update();
             }
             
             if (control.dom.parentNode === this.dom)
@@ -275,42 +287,65 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            layout.init(self, self.clientRect, children);
+            //获取可见子项
+            var items = [],
+                item;
+            
+            for (var i = 0, _ = children.length; i < _; i++)
+            {
+                if ((item = children[i]).visible())
+                {
+                    items.push(item);
+                }
+            }
+            
+            if (layout.scroll)
+            {
+                layout.hscroll = self.overflowX() || 'auto';
+                layout.vscroll = self.overflowY() || 'auto';
+            }
+            
+            layout.init(self, self.clientRect(), items);
+            
+            //排列后处理
+            self.onarrange(layout);
         }
     };
 
 
     //测量自动大小
-    self.measure_auto = function (box, auto_width, auto_height) {
+    self.onmeasure = function (box, auto_width, auto_height) {
 
 
     };
+    
+    
+    self.onarrange = function (layout) {
+      
+        var padding = this.__boxModel.padding,
+            style = this.dom.children[0].style;
+        
+        style.width = (layout.contentWidth + padding.right) + 'px';
+        style.height = (layout.contentHeight + padding.bottom) + 'px';
+    };
 
     
-    self.after_locate = function () {
+    self.onlocate = function (box) {
       
-        var dom = this.dom,
-            style = dom.style;
+        var style = this.dom.style,
+            width = this.offsetWidth,
+            height = this.offsetHeight;
+        
+        if (!this.box_sizing_border && box)
+        {
+            width -= box.border.width;
+            height -= box.border.height;
+        }
         
         style.left = this.offsetLeft + 'px';
         style.top = this.offsetTop + 'px';
-
-        if (this.box_sizing_border)
-        {
-            style.width = this.offsetWidth + 'px';
-            style.height = this.offsetHeight + 'px';
-        }
-        else
-        {
-            var clientRect = this.clientRect;
-            
-            style.width = clientRect.width + 'px';
-            style.height = clientRect.height + 'px';
-        }
-        
-        style = dom.children[0].style;
-        style.width = this.clientRect.width + 'px';
-        style.height = this.clientRect.height + 'px';
+        style.width = width + 'px';
+        style.height = height + 'px';
     };
     
     

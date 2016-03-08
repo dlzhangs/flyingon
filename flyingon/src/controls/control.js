@@ -42,7 +42,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
             
             style = dom.style;
 
-            if (cache && name !== cache)
+            if (cache && name !== (cache = cache.replace('.', '-')))
             {
                 name += ' ' + cache;
             }
@@ -189,27 +189,30 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     
     //扩展可布局对象接口
     flyingon.ILocatable(self, true);
+    
 
-
-    self.after_locate = function () {
+    self.__location_change = function (name, value) {
       
-        var style = this.dom.style;
+        this.dom.style[name] = value;
+    };
+    
+
+    self.onlocate = function (box) {
+      
+        var style = this.dom.style,
+            width = this.offsetWidth,
+            height = this.offsetHeight;
+        
+        if (!this.box_sizing_border && box)
+        {
+            width -= box.border.width + box.padding.width;
+            height -= box.border.height + box.padding.height;
+        }
         
         style.left = this.offsetLeft + 'px';
         style.top = this.offsetTop + 'px';
-        
-        if (this.box_sizing_border)
-        {
-            style.width = this.offsetWidth + 'px';
-            style.height = this.offsetHeight + 'px';
-        }
-        else
-        {
-            var clientRect = this.clientRect;
-            
-            style.width = clientRect.width + 'px';
-            style.height = clientRect.height + 'px';
-        }
+        style.width = width + 'px';
+        style.height = height + 'px';
     };
     
     
@@ -237,13 +240,6 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
 
 
-    
-    //水平滚动条 hidden|scroll|auto
-    style('overflow-x', '(this.dom_overflow || this.dom).style.overflowX = value;');
-    
-    //竖直滚动条 hidden|scroll|auto
-    style('overflow-y', '(this.dom_overflow || this.dom).style.overflowY = value;');
-    
     
     //控件层叠顺序
     //number	整数值 
@@ -285,8 +281,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     //控件可见性
     //visible	默认值 元素是可见的 
     //hidden	元素是不可见的 
-    //collapse	当在表格元素中使用时, 此值可删除一行或一列, 但是它不会影响表格的布局 被行或列占据的空间会留给其他内容使用 如果此值被用在其他的元素上, 会呈现为 'hidden' 
-    style('visibility');
+    style('visibility', 'this.dom.style.visibility = value === "hidden" ? "hidden" : "visible";');
 
     //控件透明度
     //number	0(完全透明)到1(完全不透明)之间数值
@@ -430,8 +425,10 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
         if (dom)
         {
-            if (this.arrange && arrange_controls.indexOf(this) < 0)
+            if (this.arrange && !this.__arrange_attach)
             {
+                this.__arrange_attach = true;
+                
                 arrange_controls.push(this);
                 
                 if (!arrange_timeout)
@@ -448,23 +445,24 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     //移除附加
     self.detach = function () {
         
-        var dom = this.dom,
-            cache = arrange_controls.indexOf(this);
-        
-        if (cache >= 0)
+        if (this.__arrange_attach)
         {
-            arrange_controls.splice(cache, 1);
-        }
-    
-        if (dom && (cache = dom.parentNode))
-        {
-            cache.removeChild(dom);
+            var dom = this.dom;
+
+            this.__arrange_attach = false;
+            
+            arrange_controls.remove(this);
+
+            if (dom && dom.parentNode)
+            {
+                dom.parentNode.removeChild(dom);
+            }
         }
     };
     
     
-    //注册排列
-    self.registry_arrange = function () {
+    //更新排列
+    self.update = function () {
         
         var target = this.__parent;
         
@@ -519,7 +517,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
             
             control.measure(box, width, height, true, true);
             control.locate(box, 0, 0, width, height);
-            control.after_locate();
+            control.onlocate(box);
             control.arrange();
         }
     };
