@@ -190,27 +190,42 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     //扩展可布局对象接口
     flyingon.ILocatable(self, true);
     
+    
+        
+    self.locationProperty('overflowX', '', {
+       
+        set: 'this.__style_change("overflowX", value);'
+    });
+    
+    
+    self.locationProperty('overflowY', '', {
+       
+        set: 'this.__style_change("overflowY", value);'
+    });
+    
 
-    self.__location_change = function (name, value) {
+    self.__style_change = function (name, value) {
       
         this.dom.style[name] = value;
     };
     
 
-    self.onlocate = function (box) {
+    self.onlocate = function (box, x, y) {
       
         var style = this.dom.style,
             width = this.offsetWidth,
-            height = this.offsetHeight;
+            height = this.offsetHeight,
+            border,
+            padding;
         
         if (!this.box_sizing_border && box)
         {
-            width -= box.border.width + box.padding.width;
-            height -= box.border.height + box.padding.height;
+            width -= (border = box.border).width + (padding = box.padding).width;
+            height -= border.height + padding.height;
         }
         
-        style.left = this.offsetLeft + 'px';
-        style.top = this.offsetTop + 'px';
+        style.left = x + 'px';
+        style.top = y + 'px';
         style.width = width + 'px';
         style.height = height + 'px';
     };
@@ -511,13 +526,12 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         
         if (dom)
         {
-            var box = control.boxModel(),
-                width = dom.clientWidth,
-                height = dom.clientHeight;
+            var width = dom.clientWidth,
+                height = dom.clientHeight,
+                box = control.boxModel(width, height);
             
             control.measure(box, width, height, true, true);
             control.locate(box, 0, 0, width, height);
-            control.onlocate(box);
             control.arrange();
         }
     };

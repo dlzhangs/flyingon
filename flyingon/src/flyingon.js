@@ -1210,6 +1210,12 @@ flyingon.absoluteUrl = (function () {
 
         var Class, base, prototype, namespace, data, cache;
 
+        
+        if (constructor_list || static_list)
+        {
+            throw new $errortext('flyingon', 'class cascade');
+        }
+        
 
         //处理参数
         if (typeof name !== 'string') //不传name则创建匿名类

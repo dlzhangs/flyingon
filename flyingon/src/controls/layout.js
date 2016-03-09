@@ -238,19 +238,7 @@ flyingon.ILocatable = function (self, control) {
      
         set: 'this.dom.style.display = value ? "" : "none";'
     });
-    
         
-    self.locationProperty('overflowX', '', {
-       
-        set: 'this.__location_change("overflowX", value);'
-    });
-    
-    
-    self.locationProperty('overflowY', '', {
-       
-        set: 'this.__location_change("overflowY", value);'
-    });
-    
     
     //控件横向对齐方式
     //left      左边对齐
@@ -297,17 +285,17 @@ flyingon.ILocatable = function (self, control) {
 
     self.locationProperty('border', '0', {
     
-        set: 'this.dom.style.borderWidth = value;\n\t'
+        set: 'this.dom.style.borderWidth = value > 0 ? value + "px" : value;\n\t'
     });
 
     self.locationProperty('padding', '0', {
      
-        set: 'this.__location_change("padding", value);'
+        set: 'this.__style_change("padding", value > 0 ? value + "px" : value);'
     });
     
 
     //特殊的定位属性值变更方法
-    self.__location_change = function (name, value) {
+    self.__style_change = function (name, value) {
       
     };
 
@@ -336,6 +324,34 @@ flyingon.ILocatable = function (self, control) {
     };
     
     
+    //默认盒模型
+    var box_default = {
+        
+        visible: false,
+        alignX: 'center',
+        alignY: 'middle',
+        offsetX: 0,
+        offsetY: 0, 
+        left: 0,
+        top: 0,
+        width: 'default',
+        height: 'default',
+        minWidth: 0,
+        maxWidth: 0,
+        minHeight: 0,
+        maxHeight: 0
+    };
+    
+    box_default.margin = box_default.border = box_default.padding = {
+            
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 0,
+        height: 0
+    };
+    
     
     //获取盒模型
     self.boxModel = function (width, height) {
@@ -348,36 +364,37 @@ flyingon.ILocatable = function (self, control) {
         
         if (values)
         {
-            box.visible = (value = values.visible) != null ? value : storage.visible;
+            if (box.visible = (value = values.visible) != null ? value : storage.visible)
+            {
+                box.alignX = values.alignX || storage.alignX;
+                box.alignY = values.alignY || storage.alignY;
 
-            box.alignX = values.alignX || storage.alignX;
-            box.alignY = values.alignY || storage.alignY;
-            
-            box.offsetX = fn((value = values.offsetX) != null ? value : storage.offsetX, width);
-            box.offsetY = fn((value = values.offsetY) != null ? value : storage.offsetY, height);
-            
-            box.left = fn((value = values.left) != null ? value : storage.left, width);
-            box.top = fn((value = values.top) != null ? value : storage.top, height);
-            
-            box.width = (value = values.width) != null ? value : storage.width;
-            box.height = (value = values.height) != null ? value : storage.height;
-            
-            box.minWidth = fn((value = values.minWidth) != null ? value : storage.minWidth, width);
-            box.maxWidth = fn((value = values.maxWidth) != null ? value : storage.maxWidth, width);
-            box.minHeight = fn((value = values.minHeight) != null ? value : storage.minHeight, height);
-            box.maxHeight = fn((value = values.maxHeight) != null ? value : storage.maxHeight, height);
-            
-            fn = pixel_sides;
-            
-            //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
-            box.margin = fn((value = values.margin) != null ? value : storage.margin, width);
-            box.border = fn((value = values.border) != null ? value : storage.border, width);
-            box.padding = fn((value = values.padding) != null ? value : storage.padding, width);
+                box.offsetX = fn((value = values.offsetX) != null ? value : storage.offsetX, width);
+                box.offsetY = fn((value = values.offsetY) != null ? value : storage.offsetY, height);
+
+                box.left = fn((value = values.left) != null ? value : storage.left, width);
+                box.top = fn((value = values.top) != null ? value : storage.top, height);
+
+                box.width = (value = values.width) != null ? value : storage.width;
+                box.height = (value = values.height) != null ? value : storage.height;
+
+                box.minWidth = fn((value = values.minWidth) != null ? value : storage.minWidth, width);
+                box.maxWidth = fn((value = values.maxWidth) != null ? value : storage.maxWidth, width);
+                box.minHeight = fn((value = values.minHeight) != null ? value : storage.minHeight, height);
+                box.maxHeight = fn((value = values.maxHeight) != null ? value : storage.maxHeight, height);
+
+                fn = pixel_sides;
+
+                //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
+                box.margin = fn((value = values.margin) != null ? value : storage.margin, width);
+                box.border = fn((value = values.border) != null ? value : storage.border, width);
+                box.padding = fn((value = values.padding) != null ? value : storage.padding, width);
+                
+                return box;
+            }
         }
-        else
+        else if (box.visible = storage.visible)
         {
-            box.visible = storage.visible;
-
             box.alignX = storage.alignX;
             box.alignY = storage.alignY;
             
@@ -400,19 +417,19 @@ flyingon.ILocatable = function (self, control) {
             box.margin = fn(storage.margin, width);
             box.border = fn(storage.border, width);
             box.padding = fn(storage.padding, width);
+            
+            return box;
         }
-
-        return box;
+        
+        return box_default;
     };
     
     
     //测量大小
-    self.measure = function (box, client_width, client_height, width_default, height_default) {
+    self.measure = function (box, available_width, available_height, less_width_to_default, less_height_to_default) {
         
         var width = box.width, 
-            height = box.height, 
-            auto_width, 
-            auto_height;
+            height = box.height;
 
         //处理宽度
         switch (width)
@@ -426,22 +443,22 @@ flyingon.ILocatable = function (self, control) {
                 break;
 
             case 'auto': //根据内容自动调整大小
-                width = auto_width = width_default = true;
+                width = less_width_to_default = true;
                 break;
                 
             default:
-                width = pixel(width, client_width);
+                width = pixel(width, available_width);
                 break;
         }
 
         //充满可用宽度
         if (width === true)
         {
-            if ((client_width -= box.margin.width) > 0) //有可用空间
+            if ((available_width -= box.margin.width) > 0) //有可用空间
             {
-                width = client_width;
+                width = available_width;
             }
-            else if (width_default) //可用空间不足时使用默认宽度
+            else if (less_width_to_default) //可用空间不足时使用默认宽度
             {
                 width = this.defaultWidth;
             }
@@ -473,22 +490,22 @@ flyingon.ILocatable = function (self, control) {
                 break;
 
             case 'auto': //根据内容自动调整大小
-                height = auto_height = height_default = true;
+                height = less_height_to_default = true;
                 break;
 
             default:  //其它值
-                height = pixel(height, client_height);
+                height = pixel(height, available_height);
                 break;
         }
 
         //充满可用高度
         if (height === true)
         {
-            if ((client_height -= box.margin.height) > 0) //有可用空间
+            if ((available_height -= box.margin.height) > 0) //有可用空间
             {
-                height = client_height;
+                height = available_height;
             }
-            else if (height_default) //可用空间不足时使用默认高度
+            else if (less_height_to_default) //可用空间不足时使用默认高度
             {
                 height = this.defaultHeight;
             }
@@ -503,22 +520,17 @@ flyingon.ILocatable = function (self, control) {
         {
             height = box.minHeight;
         }
-        else if (box.maxHeight > 0  && height > box.maxHeight)
+        else if (box.maxHeight > 0 && height > box.maxHeight)
         {
             height = box.maxHeight;
         }
 
-        this.offsetWidth = width;
-        this.offsetHeight = height;
-        
-        this.onmeasure(box, auto_width, auto_height);
-        
-        return this;
+        this.onmeasure(box, this.offsetWidth = width, this.offsetHeight = height);
     };
     
     
     //测量后处理
-    self.onmeasure = function (box, auto_width, auto_height) {
+    self.onmeasure = function (box, width, height) {
         
     };
         
@@ -556,23 +568,27 @@ flyingon.ILocatable = function (self, control) {
             }
         }
 
-        this.offsetLeft = x;
-        this.offsetTop = y;
-        
-        return this;
+        this.onlocate(box, this.offsetLeft = x, this.offsetTop = y);
     };
     
     
-    self.clientRect = function (box) {
+    //定位后处理
+    self.onlocate = function (box, x, y) {
         
-        var border = (box || (box = this.__boxModel)).border,
+    };
+    
+    
+    self.clientRect = function (left, top) {
+        
+        var box = this.__boxModel || this.boxModel(),
+            border = box.border,
             padding = box.padding,
             value;
 
         return {
           
-            left: padding.left,
-            top: padding.top,
+            left: (left || 0) + padding.left,
+            top: (top || 0) + padding.top,
             right: padding.right,
             bottom: padding.bottom,
             width: (value = this.offsetWidth - border.width - padding.width) >= 0 ? value : 0,
@@ -612,19 +628,21 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
     });
     
     
-    var clientRect = self.clientRect;
-    
-    self.clientRect = function (box) {
+    self.onlocate = function (box, x, y) {
         
-        var data = clientRect.call(this, box || (box = this.__boxModel)),
-            border = box.border;
+        var layout = this.__layout_,
+            border = this.__boxModel.border,
+            clientRect = this.clientRect(x + border.left, y + border.top),
+            items = this.__allot;
         
-        data.left += this.offsetLeft + border.left;
-        data.top += this.offsetTop + border.top;
-
-        return data;
+        layout.init(this, clientRect, items[0], items[1], items[2]);
     };
     
+    
+    self.onarrange = function (layout) {
+        
+    };
+   
     
     self.serialize = function (writer) {
         
@@ -854,16 +872,16 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
                     layout = values[index] = flyingon.findLayout(layout);
                 }
             }
-
-            (layout || this).__arrange(container, clientRect, items, start, end);
+            
+            arrange(layout || this, container, clientRect, items, start, end);
         }
     };
     
       
     //内部排列方法
-    self.__arrange = function (container, clientRect, items, start, end) {
+    function arrange(layout, container, clientRect, items, start, end) {
 
-        var sublayouts = this.__sublayouts_,
+        var sublayouts = layout.__sublayouts_,
             subitems,
             cache;
         
@@ -872,28 +890,24 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         {
             if (sublayouts === true)
             {
-                sublayouts = this.__sublayouts_ = init_sublayouts(this.__sublayouts);
+                sublayouts = layout.__sublayouts_ = init_sublayouts(layout.__sublayouts);
             }
  
-            //排列子布局
-            this.arrange(container, clientRect, sublayouts, 0, cache = sublayouts.length - 1, this.vertical());
+            //分配置子布局子项
+            allot_sublayouts(sublayouts, items, start, end);
             
-            if ((cache = this.mirror()) !== 'none')
-            {
-                arrange_mirror(clientRect, cache, sublayouts, 0, cache);
-            }
-            
-            //按顺序处理每一个子布局
-            arrange_sublayouts(container, sublayouts, items, start, end);
+            items = sublayouts;
+            start = 0;
+            end = items.length - 1;
         }
         else
         {
             //处理强制子项值
-            if (subitems = this.__subitems_)
+            if (subitems = layout.__subitems_)
             {
                 if (subitems === true)
                 {
-                    subitems = this.__subitems_ = init_subitems(this.__subitems);
+                    subitems = layout.__subitems_ = init_subitems(layout.__subitems);
                 }
 
                 cache = subitems.each;
@@ -903,63 +917,19 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
                     items[i].__location_values = cache && cache(i, items[i], container) || subitems;
                 }
             }
-            
-            //排列
-            this.arrange(container, clientRect, items, start, end, this.vertical());
-            
-            //镜像处理
-            if ((cache = this.mirror()) !== 'none')
-            {
-                arrange_mirror(clientRect, cache, items, start, end);
-            }
-            
-            //定位后处理
-            for (var i = start; i <= end; i++)
-            {
-                (cache = items[i]).onlocate(cache.__boxModel);
-            }
         }
-    };
-    
-    
-    //水平排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+        
+        //排列
+        layout.arrange(container, clientRect, items, start, end, layout.vertical());
 
-    };
-    
-    
-    //镜象排列
-    function arrange_mirror(clientRect, mirror, items, start, end) {
-
-        var width = clientRect.width, 
-            height = clientRect.height, 
-            item;
-
-        switch (mirror)
+        //镜像处理
+        if ((cache = layout.mirror()) !== 'none')
         {
-            case "x":
-                for (var i = start; i <= end; i++)
-                {
-                    (item = items[i]).offsetTop = height - item.offsetTop - item.offsetHeight;
-                }
-                break;
-
-            case "y":
-                for (var i = start; i <= end; i++)
-                {
-                    (item = items[i]).offsetLeft = width - item.offsetLeft - item.offsetWidth;
-                }
-                break;
-
-            case "center":
-                for (var i = start; i <= end; i++)
-                {
-                    item = items[i];
-                    item.offsetLeft = width - item.offsetLeft - item.offsetWidth;
-                    item.offsetTop = height - item.offsetTop - item.offsetHeight;
-                }
-                break;
+            arrange_mirror(clientRect, cache, items, start, end);
         }
+
+        //定位后处理
+        container.onarrange(layout);
     };
     
     
@@ -1003,7 +973,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         return writer.join('');
     };
 
-
+    
     //初始化子布局
     function init_sublayouts(values) {
         
@@ -1028,19 +998,19 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
     };
     
     
-    //排列子布局
-    function arrange_sublayouts(container, sublayouts, items, start, end) {
+    //分配子布局子项
+    function allot_sublayouts(sublayouts, items, start, end) {
         
         var i1 = 0,
             i2 = sublayouts.length - 1,
             all = end - start,
-            target,
+            layout,
             length;
         
         //先排列前面部分的子项
         while (i1 <= i2)
         {
-            length = (target = sublayouts[i1]).length();
+            length = (layout = sublayouts[i1]).length();
             
             if (length < 0)
             {
@@ -1051,8 +1021,8 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
                 break;
             }
             
-            target.__layout_.init(container, target.clientRect(), items, start, start += length);
-            
+            layout.__allot = [items, start, start += length];
+
             if (start >= end)
             {
                 return;
@@ -1064,7 +1034,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         //再排列后面部分的子项
         while (i2 > i1)
         {
-            length = (target = sublayouts[i2]).length();
+            length = (layout = sublayouts[i2]).length();
             
             if (length < 0)
             {
@@ -1075,8 +1045,8 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
                 break;
             }
             
-            target.__layout_.init(container, target.clientRect(), items, end - length, end);
-            
+            layout.__allot = [items, end - length, end];
+
             if (start >= (end -= length))
             {
                 return;
@@ -1091,11 +1061,11 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         //最后排列中间的余量
         while (i1 <= i2)
         {
-            length = (target = sublayouts[i1]).length();
+            length = (layout = sublayouts[i1]).length();
             length = length > 0 ? Math.ceil(length * all) : (end - start);
             
-            target.__layout_.init(container, target.clientRect(), items, start, start += length);
-            
+            layout.__allot = [items, start, start += length];
+
             if (start >= end)
             {
                 return;
@@ -1105,7 +1075,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         }
     };
     
-    
+        
     //初始化强制子项
     function init_subitems(values) {
         
@@ -1135,6 +1105,48 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         
         return subitems;
     };
+    
+    
+    //镜象排列
+    function arrange_mirror(clientRect, mirror, items, start, end) {
+
+        var width = clientRect.width, 
+            height = clientRect.height, 
+            item;
+
+        switch (mirror)
+        {
+            case "x":
+                for (var i = start; i <= end; i++)
+                {
+                    (item = items[i]).offsetTop = height - item.offsetTop - item.offsetHeight;
+                }
+                break;
+
+            case "y":
+                for (var i = start; i <= end; i++)
+                {
+                    (item = items[i]).offsetLeft = width - item.offsetLeft - item.offsetWidth;
+                }
+                break;
+
+            case "center":
+                for (var i = start; i <= end; i++)
+                {
+                    item = items[i];
+                    item.offsetLeft = width - item.offsetLeft - item.offsetWidth;
+                    item.offsetTop = height - item.offsetTop - item.offsetHeight;
+                }
+                break;
+        }
+    };
+    
+    
+    //水平排列布局
+    self.arrange = function (container, clientRect, items, start, end, vertical) {
+
+    };
+    
     
         
     

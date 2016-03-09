@@ -29,14 +29,11 @@ flyingon.IContainerControl = function (self) {
 
     
     
-    self.__location_change = function (name, value) {
+    self.__style_change = function (name, value) {
       
-        switch (name)
+        if (name !== 'padding')
         {
-            case 'overflowX':
-            case 'overflowY':
-                this.dom.style[name] = value;
-                break;
+            this.dom.style[name] = value;
         }
     };
 
@@ -329,26 +326,7 @@ flyingon.IContainerControl = function (self) {
         style.height = (layout.contentHeight + padding.bottom) + 'px';
     };
 
-    
-    self.onlocate = function (box) {
-      
-        var style = this.dom.style,
-            width = this.offsetWidth,
-            height = this.offsetHeight;
         
-        if (!this.box_sizing_border && box)
-        {
-            width -= box.border.width;
-            height -= box.border.height;
-        }
-        
-        style.left = this.offsetLeft + 'px';
-        style.top = this.offsetTop + 'px';
-        style.width = width + 'px';
-        style.height = height + 'px';
-    };
-    
-    
     self.serialize = function (writer) {
         
         var children;
