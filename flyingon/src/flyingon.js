@@ -1213,7 +1213,7 @@ flyingon.absoluteUrl = (function () {
         
         if (constructor_list || static_list)
         {
-            throw new $errortext('flyingon', 'class cascade');
+            throw $errortext('flyingon', 'class in');
         }
         
 

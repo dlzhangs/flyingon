@@ -816,7 +816,7 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
             top: value, 
             right: value, 
             bottom: value, 
-            width: value, 
+            width: value = value << 1, 
             height: value,
             cache: true
         };
@@ -825,30 +825,31 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
     
     function pixel_sides(sides, width) {
         
-        var target = {};
+        var target = {},
+            fn = pixel;
         
         switch (sides.length)
         {
             case 1:
-                target.left = target.top = target.right = target.bottom = pixel(sides[0], width);
+                target.left = target.top = target.right = target.bottom = fn(sides[0], width);
                 break;
 
             case 2:
-                target.left = target.right = pixel(sides[1], width);
-                target.top = target.bottom = pixel(sides[0], width);
+                target.left = target.right = fn(sides[1], width);
+                target.top = target.bottom = fn(sides[0], width);
                 break;
 
             case 3:
-                target.left = target.right = pixel(sides[1], width);
-                target.top = pixel(sides[0], width);
-                target.bottom = pixel(sides[2], width);
+                target.left = target.right = fn(sides[1], width);
+                target.top = fn(sides[0], width);
+                target.bottom = fn(sides[2], width);
                 break;
 
             default:
-                target.left = pixel(sides[3], width);
-                target.top = pixel(sides[0], width);
-                target.right = pixel(sides[1], width);
-                target.bottom = pixel(sides[2], width);
+                target.left = fn(sides[3], width);
+                target.top = fn(sides[0], width);
+                target.right = fn(sides[1], width);
+                target.bottom = fn(sides[2], width);
                 break;
         }
 
@@ -872,7 +873,6 @@ flyingon.ILocatable = function (self, control) {
         extend = flyingon.extend,
         pixel = flyingon.pixel,
         pixel_sides = flyingon.pixel_sides,
-        
         location_attributes = 'var target = this.__parent || this.__arrange_attach && this;\n\t'
             + 'if (target && target.__arrange_dirty !== 2)\n\t'
             + '{\n\t\t'
@@ -967,12 +967,12 @@ flyingon.ILocatable = function (self, control) {
 
     self.locationProperty('padding', '0', {
      
-        set: 'this.__style_change("padding", value > 0 ? value + "px" : value);'
+        set: 'this.__change_style("padding", value > 0 ? value + "px" : value);'
     });
     
 
     //特殊的定位属性值变更方法
-    self.__style_change = function (name, value) {
+    self.__change_style = function (name, value) {
       
     };
 
@@ -1295,7 +1295,7 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
     
     
     //指定默认大小
-    this.defaultWidth = this.defaultHeight = 200;
+    self.defaultWidth = self.defaultHeight = 200;
     
     
     //布局
@@ -1307,12 +1307,20 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
     
     self.onlocate = function (box, x, y) {
         
-        var layout = this.__layout_,
-            border = this.__boxModel.border,
-            clientRect = this.clientRect(x + border.left, y + border.top),
-            items = this.__allot;
+        var items = this.__allot;
         
-        layout.init(this, clientRect, items[0], items[1], items[2]);
+        if (items)
+        {
+            var layout = this.__layout_,
+                border = this.__boxModel.border,
+                clientRect = this.clientRect(x + border.left, y + border.top);
+
+            layout.init(this, clientRect, false, false, items[0], items[1], items[2]);
+            
+            this.offsetWidth = this.contentWidth;
+            this.offsetHeight = this.contentHeight;
+            this.__allot = null;
+        }
     };
     
     
@@ -1510,7 +1518,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
     
     
     //初始化排列
-    self.init = function (container, clientRect, items, start, end) {
+    self.init = function (container, clientRect, hscroll, vscroll, items, start, end) {
         
         var index = items.length;
         
@@ -1549,14 +1557,14 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
                     layout = values[index] = flyingon.findLayout(layout);
                 }
             }
-            
-            arrange(layout || this, container, clientRect, items, start, end);
+
+            arrange(layout || this, container, clientRect, hscroll, vscroll, items, start, end);
         }
     };
     
       
     //内部排列方法
-    function arrange(layout, container, clientRect, items, start, end) {
+    function arrange(layout, container, clientRect, hscroll, vscroll, items, start, end) {
 
         var sublayouts = layout.__sublayouts_,
             subitems,
@@ -1595,9 +1603,9 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
                 }
             }
         }
-        
+                
         //排列
-        layout.arrange(container, clientRect, items, start, end, layout.vertical());
+        layout.arrange(container, clientRect, hscroll, vscroll, items, start, end, layout.vertical());
 
         //镜像处理
         if ((cache = layout.mirror()) !== 'none')
@@ -1820,12 +1828,10 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
     
     
     //水平排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
 
     };
     
-    
-        
     
     //序列化方法
     self.serialize = function (writer) {
@@ -1887,89 +1893,95 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
 
     self.type = 'line';
     
-    //是否需要处理滚动条
-    self.scroll = true;
-        
         
     //排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
 
-        var width = clientRect.width,
-            height = clientRect.height;
+        var x = clientRect.left,
+            y = clientRect.top,
+            width = clientRect.width,
+            height = clientRect.height,
+            right = 0,
+            bottom = 0,
+            spacingX,
+            spacingY,
+            item,
+            box,
+            margin,
+            cache;
         
         if (vertical)
         {
-            var y = clientRect.top,
-                bottom = y + height,
-                spacingY = this.pixel(this.spacingY(), height);
-        
-            //如果有竖直滚动条则减去滚动条宽度
-            if (this.hscroll === 'visible')
-            {
-                clientRect.width = (width -= this.vscroll_width);
-            }
+            bottom = y + height;
+            spacingY = this.pixel(this.spacingY(), height);
             
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                var item = items[i],
-                    box = item.boxModel(),
-                    margin = box.margin;
-
-                item.measure(box, width, height, false, true);
-                item.locate(box, margin.left, y += margin.top, width);
-                
-                y += item.offsetHeight + margin.bottom + spacingY;
-
-                //出现滚动条后重排
-                if (y > bottom && this.vscroll === 'auto')
+                if ((box = (item = items[i]).boxModel()).visible)
                 {
-                    this.vscroll = true;
-                    return this.arrange(container, clientRect, items, start, end, true);
+                    margin = box.margin;
+                    
+                    item.measure(box, width, height, false, true);
+                    item.locate(box, x + margin.left, y += margin.top, width);
+
+                    if (right < (cache = item.offsetLeft + item.offsetWidth + margin.right))
+                    {
+                        right = cache;
+                    }
+                    
+                    y += item.offsetHeight + margin.bottom + spacingY;
+
+                    //出现滚动条后重排
+                    if (vscroll && y > bottom)
+                    {
+                        clientRect.width -= this.vscroll_width;
+                        
+                        this.arrange(container, clientRect, false, false, items, start, end, true);
+                        return;
+                    }
                 }
             }
             
-            this.contentWidth = width;
-            this.contentHeight = y + clientRect.bottom;
+            bottom = y;
         }
         else
         {
-            var x = clientRect.left,
-                right = x + width,
-                spacingX = this.pixel(this.spacingX(), width);
-        
-            //如果有水平滚动条则减去滚动条高度
-            if (this.hscroll === true)
-            {
-                clientRect.height -= (height -= this.hscroll_height);
-            }
-            
-            //禁止出现竖直滚动条
-            this.vscroll = false;
-            
+            right = x + width;
+            spacingX = this.pixel(this.spacingX(), width);
+                    
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                var item = items[i],
-                    box = item.boxModel(),
-                    margin = box.margin;
-
-                item.measure(box, width, height, true);
-                item.locate(box, x += margin.left, margin.top, 0, height);
-                
-                x += item.offsetWidth + margin.right + spacingX;
-
-                //出现滚动条后重排
-                if (x > right && this.hscroll === 'auto') //超行需调整客户区后重排
+                if ((box = (item = items[i]).boxModel()).visible)
                 {
-                    this.hscroll = true;
-                    return this.arrange(container, clientRect, items, start, end);
+                    margin = box.margin;
+                    
+                    item.measure(box, width, height, true);
+                    item.locate(box, x += margin.left, margin.top, 0, height);
+
+                    x += item.offsetWidth + margin.right + spacingX;
+
+                    //出现滚动条后重排
+                    if (hscroll && x > right) //超行需调整客户区后重排
+                    {
+                        clientRect.height -= this.hscroll_height;
+                        
+                        this.arrange(container, clientRect, false, false, items, start, end);
+                        return;
+                    }
+                    
+                    if (bottom < (cache = item.offsetTop + item.offsetHeight + margin.bottom))
+                    {
+                        bottom = cache;
+                    }
                 }
             }
-            
-            this.contentWidth = x;
-            this.contentHeight = height + clientRect.right;
         }
+              
+        //设置内容区大小
+        container.contentWidth = right + clientRect.right;
+        container.contentHeight = bottom + clientRect.bottom;
     };
     
     
@@ -2006,7 +2018,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
         
     
     //排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
 
         var pixel = this.pixel,
             x = clientRect.left,
@@ -2017,135 +2029,117 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
             bottom = y + height,
             spacingX = pixel(this.spacingX(), width),
             spacingY = pixel(this.spacingY(), height),
-            size = 0,
+            maxWidth = 0,
+            maxHeight = 0,
+            line,
             auto,
-            value;
+            item,
+            box,
+            margin,
+            cache;
                
         if (vertical)
         {
-            width = size = pixel(this.lineWidth(), width);
-            auto = !width
-                    
-            //如果有水平滚动条则减去滚动条宽度
-            if (this.hscroll === true)
-            {
-                clientRect.height = (height -= this.hscroll_height);
-            }
-            
-            //禁止竖直滚动条
-            this.vscroll = false;
-            
+            width = line = pixel(this.lineWidth(), width);
+            auto = !width;
+                  
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                var item = items[i],
-                    box = item.boxModel(),
+                if ((box = (item = items[i]).boxModel()).visible)
+                {
                     margin = box.margin;
-
-                item.measure(box, width, 0, auto, true);
-                
-                value = item.offsetHeight + margin.bottom + spacingY;
-                
-                //换行
-                if (y + value > bottom || y > 0 && item.newline())
-                {
-                    y = clientRect.top;
-                    x += size + spacingX;
-                    size = width;
                     
-                    //出现滚动条后重排
-                    if (x > right && this.hscroll === 'auto')
+                    item.measure(box, width, 0, auto, true);
+
+                    cache = item.offsetHeight + margin.bottom + spacingY;
+
+                    //换行
+                    if (y + cache > bottom || y > 0 && item.newline())
                     {
-                        this.hscroll = true;
-                        return this.arrange(container, clientRect, items, start, end, true);
+                        y = clientRect.top;
+                        x += line + spacingX;
+                        line = width;
+
+                        //出现滚动条后重排
+                        if (x > right && this.hscroll === 'auto')
+                        {
+                            this.hscroll = true;
+                            this.arrange(container, clientRect, items, start, end, true);
+                            return;
+                        }
                     }
-                }
-                
-                item.locate(box, x + margin.left, y += margin.top, width);
-                y += value;
-                
-                if (!width && size < (value = item.offsetWidth + margin.width))
-                {
-                    size = value;
+
+                    item.locate(box, x + margin.left, y += margin.top, width);
+                    y += cache;
+
+                    if (!width && line < (cache = item.offsetWidth + margin.width))
+                    {
+                        line = cache;
+                    }
                 }
             }
         }
         else
         {
-            height = size = pixel(this.lineHeight(), height);
-            auto = !height;
-            
-            //禁止水平滚动条
-            this.hscroll = false;
-            
-            //如果有竖直滚动条则减去滚动条宽度
-            if (this.vscroll === true)
-            {
-                clientRect.width = (width -= this.vscroll_width);
-            }
+            auto = !(line = pixel(this.lineHeight(), height));
+            height = 0;
             
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                var item = items[i],
-                    box = item.boxModel(),
+                if ((box = (item = items[i]).boxModel()).visible)
+                {
                     margin = box.margin;
-
-                item.measure(box, 0, height, true, auto);
-                
-                value = item.offsetWidth + margin.right + spacingX;
-                
-                //换行
-                if (x + value > right || x > 0 && item.newline())
-                {
-                    x = clientRect.left;
-                    y += size + spacingY;
-                    size = height;
                     
-                    //出现滚动条后重排
-                    if (y > bottom && this.vscroll === 'auto')
+                    item.measure(box, 0, line, true, auto);
+
+                    cache = item.offsetWidth + margin.right;
+
+                    //换行
+                    if (x + margin.left + cache > right || x > 0 && item.newline())
                     {
-                        this.vscroll = true;
-                        return this.arrange(container, clientRect, items, start, end);
+                        x = clientRect.left;
+                        y += (line || height) + spacingY;
+                        height = 0;
                     }
-                }
-                
-                item.locate(box, x += margin.left, y + margin.top, 0, height);
-                x += value;
-                
-                if (!height && size < (value = item.offsetHeight + margin.height))
-                {
-                    size = value;
+                    
+                    item.locate(box, x += margin.left, y + margin.top, 0, line);
+
+                    if (maxWidth < (cache += x))
+                    {
+                        maxWidth = cache;
+                    }
+                    
+                    x = cache + spacingX;
+                    
+                    if (maxHeight < (cache = item.offsetTop + item.offsetHeight + margin.bottom))
+                    {
+                        maxHeight = cache;
+                        
+                        //出现滚动条后重排
+                        if (vscroll && cache > bottom)
+                        {
+                            clientRect.width -= this.vscroll_width;
+
+                            this.arrange(container, clientRect, false, false, items, start, end);
+                            return;
+                        }
+                    }
+                    
+                    if (auto && height < (cache = item.offsetHeight + margin.height))
+                    {
+                        height = cache;
+                    }
                 }
             }
         }
-    };
-
-});
-
-
-
-//三栏布局类
-$class('Column3Layout', flyingon.Layout, function (self, base) {
-
-    
-    self.type = 'column3';
-    
-
-    //拆分布局位置(此值仅对3栏布局(column3)有效)
-    //before    前面位置
-    //after     后面位置
-    //center    中间位置
-    self.locationProperty('column3', 'before');
-    
-    
-    //排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
-
         
+        container.contentWidth = maxWidth + clientRect.right;
+        container.contentHeight = maxHeight + clientRect.bottom;
     };
-    
 
+    
 });
 
 
@@ -2167,7 +2161,7 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
 
     
     //排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
 
         
     };
@@ -2213,7 +2207,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     
     //排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
 
         
     };
@@ -2245,7 +2239,7 @@ $class('TableLayout', flyingon.Layout, function (self, base) {
 
     
     //排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
 
         
     };
@@ -2255,15 +2249,15 @@ $class('TableLayout', flyingon.Layout, function (self, base) {
 
 
 
-//单元格布局类
-$class('CellLayout', flyingon.Layout, function (self, base) {
+//绝对定位布局类
+$class('AbsoluteLayout', flyingon.Layout, function (self, base) {
 
 
-    self.type = 'cell';
+    self.type = 'absolute';
     
     
     //排列布局
-    self.arrange = function (container, clientRect, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
 
         
     };
@@ -2471,17 +2465,17 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         
     self.locationProperty('overflowX', '', {
        
-        set: 'this.__style_change("overflowX", value);'
+        set: 'this.__change_style("overflowX", value);'
     });
     
     
     self.locationProperty('overflowY', '', {
        
-        set: 'this.__style_change("overflowY", value);'
+        set: 'this.__change_style("overflowY", value);'
     });
     
 
-    self.__style_change = function (name, value) {
+    self.__change_style = function (name, value) {
       
         this.dom.style[name] = value;
     };
@@ -2849,7 +2843,7 @@ flyingon.IContainerControl = function (self) {
 
     
     
-    self.__style_change = function (name, value) {
+    self.__change_style = function (name, value) {
       
         if (name !== 'padding')
         {
@@ -3104,46 +3098,43 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            //获取可见子项
-            var items = [],
-                item;
-            
-            for (var i = 0, _ = children.length; i < _; i++)
+            var clientRect = self.clientRect(),
+                hscroll,
+                vscroll;
+
+            switch (self.overflowX())
             {
-                if ((item = children[i]).visible())
-                {
-                    items.push(item);
-                }
+                case 'scroll':
+                    clientRect.height -= layout.hscroll_height;
+                    break;
+                    
+                case 'auto':
+                    hscroll = true;
+                    break;
             }
             
-            if (layout.scroll)
+            switch (self.overflowY())
             {
-                layout.hscroll = self.overflowX() || 'auto';
-                layout.vscroll = self.overflowY() || 'auto';
+                case 'scroll':
+                    clientRect.width -= layout.vscroll_width;
+                    break;
+                    
+                case 'auto':
+                    vscroll = true;
+                    break;
             }
-            
-            layout.init(self, self.clientRect(), items);
-            
-            //排列后处理
-            self.onarrange(layout);
+                  
+            layout.init(self, clientRect, hscroll, vscroll, children);
         }
     };
 
-
-    //测量自动大小
-    self.onmeasure = function (box, auto_width, auto_height) {
-
-
-    };
-    
     
     self.onarrange = function (layout) {
       
-        var padding = this.__boxModel.padding,
-            style = this.dom.children[0].style;
+        var style = this.dom.children[0].style;
         
-        style.width = (layout.contentWidth + padding.right) + 'px';
-        style.height = (layout.contentHeight + padding.bottom) + 'px';
+        style.width = this.contentWidth + 'px';
+        style.height = this.contentHeight + 'px';
     };
 
         

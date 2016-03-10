@@ -194,17 +194,17 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         
     self.locationProperty('overflowX', '', {
        
-        set: 'this.__style_change("overflowX", value);'
+        set: 'this.__change_style("overflowX", value);'
     });
     
     
     self.locationProperty('overflowY', '', {
        
-        set: 'this.__style_change("overflowY", value);'
+        set: 'this.__change_style("overflowY", value);'
     });
     
 
-    self.__style_change = function (name, value) {
+    self.__change_style = function (name, value) {
       
         this.dom.style[name] = value;
     };

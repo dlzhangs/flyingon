@@ -29,7 +29,7 @@ flyingon.IContainerControl = function (self) {
 
     
     
-    self.__style_change = function (name, value) {
+    self.__change_style = function (name, value) {
       
         if (name !== 'padding')
         {
@@ -284,46 +284,43 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            //获取可见子项
-            var items = [],
-                item;
-            
-            for (var i = 0, _ = children.length; i < _; i++)
+            var clientRect = self.clientRect(),
+                hscroll,
+                vscroll;
+
+            switch (self.overflowX())
             {
-                if ((item = children[i]).visible())
-                {
-                    items.push(item);
-                }
+                case 'scroll':
+                    clientRect.height -= layout.hscroll_height;
+                    break;
+                    
+                case 'auto':
+                    hscroll = true;
+                    break;
             }
             
-            if (layout.scroll)
+            switch (self.overflowY())
             {
-                layout.hscroll = self.overflowX() || 'auto';
-                layout.vscroll = self.overflowY() || 'auto';
+                case 'scroll':
+                    clientRect.width -= layout.vscroll_width;
+                    break;
+                    
+                case 'auto':
+                    vscroll = true;
+                    break;
             }
-            
-            layout.init(self, self.clientRect(), items);
-            
-            //排列后处理
-            self.onarrange(layout);
+                  
+            layout.init(self, clientRect, hscroll, vscroll, children);
         }
     };
 
-
-    //测量自动大小
-    self.onmeasure = function (box, auto_width, auto_height) {
-
-
-    };
-    
     
     self.onarrange = function (layout) {
       
-        var padding = this.__boxModel.padding,
-            style = this.dom.children[0].style;
+        var style = this.dom.children[0].style;
         
-        style.width = (layout.contentWidth + padding.right) + 'px';
-        style.height = (layout.contentHeight + padding.bottom) + 'px';
+        style.width = this.contentWidth + 'px';
+        style.height = this.contentHeight + 'px';
     };
 
         
