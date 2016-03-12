@@ -36,6 +36,26 @@ flyingon.IContainerControl = function (self) {
             this.dom.style[name] = value;
         }
     };
+    
+        
+    self.onlocate = function (box, x, y) {
+      
+        var style = this.dom.style,
+            width = this.offsetWidth,
+            height = this.offsetHeight,
+            border;
+
+        if (!this.box_sizing_border && box)
+        {
+            width -= (border = box.border).width;
+            height -= border.height;
+        }
+        
+        style.left = x + 'px';
+        style.top = y + 'px';
+        style.width = width + 'px';
+        style.height = height + 'px';
+    };
 
 
     //添加子控件
@@ -311,6 +331,14 @@ flyingon.IContainerControl = function (self) {
             }
                   
             layout.init(self, clientRect, hscroll, vscroll, children);
+            
+            //渲染子项
+            for (var i = children.length - 1; i >= 0; i--)
+            {
+                children[i].render();
+            }
+            
+            console.log('render');
         }
     };
 

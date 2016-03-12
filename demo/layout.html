@@ -19,29 +19,40 @@
             
         flyingon.layout('flyingon-Panel', {
            
-            type: 'flow',
+            type: 'dock',
             spacingX: 10,
             spacingY: 10,
-            alignY: 'middle',
-            vertical: false/*,
-            
+            //lineWidth: 150,
+            //lineHeight: 40,
+            vertical: true,
+
             sublayouts: [
                 
                 {
                     length: 10,
-                    width: 300,
+                    width: 200,
+                    height: 'auto',
+                    dock: 'left',
                     
                     layout: {
                      
-                        type: 'flow',
+                        type: 'line',
                         spacingX: 2,
-                        spacingY: 2
+                        spacingY: 2,
+                        vertical: true,
+                        
+                        subitems: {
+                         
+                            width: 'fill'
+                        }
                     }
                 },
                 
                 {
                     length: 0.5,
-                    width: 300,
+                    width: 'fill',
+                    height: 'auto',
+                    dock: 'fill',
                     
                     layout: {
                      
@@ -53,21 +64,25 @@
                 
                 {
                     //length: 10,
-                    width: 300,
+                    width: 200,
+                    height: 'auto',
+                    dock: 'right',
                     
                     layout: {
                      
-                        type: 'flow',
+                        type: 'line',
                         spacingX: 2,
                         spacingY: 2,
+                        vertical: true,
                         
                         subitems: {
                          
-                            width: 200
+                            width: 'fill',
+                            height: 40
                         }
                     }
                 }
-            ]*/
+            ]
         });
         
         
@@ -80,14 +95,14 @@
             overflowY: 'auto',
             border: 1,
             borderStyle: 'solid',
-            padding: 10
+            padding: 2
         });
         
-        for (var i = 0; i < 100; i++)
+        for (var i = 0; i < 200; i++)
         {
             container.append(new flyingon.Control().sets({
                 
-                //margin: 5,
+                margin: 2,
                 border: '1px',
                 borderStyle: 'solid'
             }));            

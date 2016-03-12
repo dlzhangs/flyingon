@@ -210,22 +210,23 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
     
 
-    self.onlocate = function (box, x, y) {
+    self.render = function () {
       
         var style = this.dom.style,
             width = this.offsetWidth,
             height = this.offsetHeight,
+            box,
             border,
             padding;
         
-        if (!this.box_sizing_border && box)
+        if (!this.box_sizing_border && (box = this.__boxModel))
         {
             width -= (border = box.border).width + (padding = box.padding).width;
             height -= border.height + padding.height;
         }
         
-        style.left = x + 'px';
-        style.top = y + 'px';
+        style.left = this.offsetLeft + 'px';
+        style.top = this.offsetTop + 'px';
         style.width = width + 'px';
         style.height = height + 'px';
     };
@@ -497,7 +498,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     
     
     function arrange_delay() {
-        
+        var date = new Date();
         var controls = arrange_controls;
         
         for (var i = controls.length - 1; i >= 0; i--)
@@ -515,7 +516,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
                     break;
             }
         }
-        
+        alert(new Date() - date);
         arrange_timeout = 0;
     };
     
