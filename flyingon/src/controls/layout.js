@@ -424,13 +424,16 @@ flyingon.ILocatable = function (self, control) {
     
     
     //测量大小
-    self.measure = function (box, 
-        available_width, 
-        available_height, 
-        less_width_to_default, 
-        less_height_to_default, 
-        default_width_to_fill,
-        default_height_to_fill) {
+    self.measure = function (
+        box, //盒模型
+        available_width, //可用宽度 
+        available_height, //可用高度
+        rearrange, //是否重排, 重排时auto使用内容大小
+        less_width_to_default, //宽度不足时是否使用默认宽度
+        less_height_to_default, //高度不足时是否使用默认高度
+        default_width_to_fill, //默认宽度是否转为充满
+        default_height_to_fill //默认高度是否转为充满
+    ) {
         
         var width = box.width, 
             height = box.height;
@@ -447,7 +450,7 @@ flyingon.ILocatable = function (self, control) {
                 break;
 
             case 'auto': //根据内容自动调整大小
-                if (this.__rearrange) //重排时直接使用内容宽度
+                if (rearrange) //重排时直接使用内容宽度
                 {
                     width = this.contentWidth;
                 }
@@ -501,7 +504,7 @@ flyingon.ILocatable = function (self, control) {
                 break;
 
             case 'auto': //根据内容自动调整大小
-                if (this.__rearrange)  //重排时直接使用内容高度
+                if (rearrange)  //重排时直接使用内容高度
                 {
                     height = this.contentHeight;
                 }
@@ -1213,34 +1216,16 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
     
     
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
     };
     
-    
-    //重排布局
-    self.rearrange = function (container, clientRect, items, start, end, vertical) {
         
-        //标记重排状态
-        for (var i = start; i <= end; i++)
-        {
-            items[i].__rearrange = true;
-        }
-        
-        this.arrange(container, clientRect, false, false, items, start, end, vertical);
-        
-        //退出生排状态
-        for (var i = start; i <= end; i++)
-        {
-            items[i].__rearrange = false;
-        }
-    };
-    
-    
     //排列检测
     self.arrange_check = function (maxWidth, maxHeight, data) {
         
-        var clientRect = data[1],
+        var container = data[0],
+            clientRect = data[1],
             arrange;
         
         //如果超出范围则重排
@@ -1258,7 +1243,7 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         
         if (arrange === true)
         {
-            this.rearrange(data[0], clientRect, data[4], data[5], data[6], data[7]);
+            this.arrange(container, clientRect, false, false, data[4], data[5], data[6], data[7], true);
         }
         else
         {
@@ -1330,7 +1315,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
     
         
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
         var x = clientRect.left,
             y = clientRect.top,
@@ -1404,7 +1389,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
                     {
                         clientRect.height -= this.hscroll_height;
 
-                        this.rearrange(container, clientRect, items, start, end);
+                        this.arrange(container, clientRect, false, false, items, start, end, true);
                         return;
                     }
                     
@@ -1457,7 +1442,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
         
     
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
         var pixel = this.pixel,
             x = clientRect.left,
@@ -1517,7 +1502,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
                         {
                             clientRect.height -= this.hscroll_height;
 
-                            this.rearrange(container, clientRect, items, start, end, true);
+                            this.arrange(container, clientRect, false, false, items, start, end, true, true);
                             return;
                         }
                     }
@@ -1569,7 +1554,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
                         {
                             clientRect.width -= this.vscroll_width;
 
-                            this.rearrange(container, clientRect, items, start, end);
+                            this.arrange(container, clientRect, false, false, items, start, end, false, true);
                             return;
                         }
                     }
@@ -1608,7 +1593,7 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
 
     
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
         var pixel = this.pixel,
             x = clientRect.left,
@@ -1745,7 +1730,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
         
     };
@@ -1777,7 +1762,7 @@ $class('TableLayout', flyingon.Layout, function (self, base) {
 
     
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
         
     };
@@ -1795,7 +1780,7 @@ $class('CascadeLayout', flyingon.Layout, function (self, base) {
     
     
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
         var x = clientRect.left,
             y = clientRect.top,
@@ -1842,7 +1827,7 @@ $class('AbsoluteLayout', flyingon.Layout, function (self, base) {
     
     
     //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical) {
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
 
         var x = clientRect.left,
             y = clientRect.top,

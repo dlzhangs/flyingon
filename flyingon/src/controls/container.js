@@ -234,6 +234,29 @@ flyingon.IContainerControl = function (self) {
         return this;
     };
     
+    
+    //测量后处理
+    self.onmeasure = function (box, width, height) {
+        
+        var auto_width = box.width === 'auto',
+            auto_height = box.height === 'auto';
+        
+        if (auto_width || auto_height)
+        {
+            this.arrange();
+            
+            if (auto_width)
+            {
+                this.offsetWidth = this.contentWidth;
+            }
+            
+            if (auto_height)
+            {
+                this.offsetHeight = this.contentHeight;
+            }
+        }
+    };
+    
 
     //排列子控件
     self.arrange = function () {
@@ -332,18 +355,33 @@ flyingon.IContainerControl = function (self) {
                   
             layout.init(self, clientRect, hscroll, vscroll, children);
             
+            //排列子项
+            arrange_children(self, children);
+            
             //渲染子项
             for (var i = children.length - 1; i >= 0; i--)
             {
                 children[i].render();
             }
-            
-            console.log('render');
         }
     };
-
     
-    self.onarrange = function (layout) {
+    
+    function arrange_children(self, children) {
+      
+        var control;
+        
+        for (var i = 0, _ = children.length; i < _; i++)
+        {
+            if ((control = children[i]).arrange)
+            {
+                control.arrange();
+            }
+        }
+    };
+    
+    
+    self.onarrange = function () {
       
         var style = this.dom.children[0].style;
         
@@ -351,7 +389,7 @@ flyingon.IContainerControl = function (self) {
         style.height = this.contentHeight + 'px';
     };
 
-        
+    
     self.serialize = function (writer) {
         
         var children;

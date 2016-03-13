@@ -95,17 +95,39 @@
             overflowY: 'auto',
             border: 1,
             borderStyle: 'solid',
-            padding: 2
+            padding: 2,
+            
+            layout: {
+             
+                type: 'flow',
+                spacingX: 2,
+                spacingY: 2
+            }
         });
         
-        for (var i = 0; i < 200; i++)
+        for (var i = 0; i < 10; i++)
         {
-            container.append(new flyingon.Control().sets({
-                
-                margin: 2,
+            var panel = new flyingon.Panel().sets({
+               
+                width: 800,
                 border: '1px',
-                borderStyle: 'solid'
-            }));            
+                borderStyle: 'solid',
+                overflowX: 'auto',
+                overflowY: 'auto',
+                layout: 'flyingon-Panel'
+            });
+                
+            for (var j = 0; j < 200; j++)
+            {
+                panel.append(new flyingon.Control().sets({
+
+                    margin: 2,
+                    border: '1px',
+                    borderStyle: 'solid'
+                })); 
+            }
+            
+            container.append(panel);
         }
         
         container.attach(document.body);
