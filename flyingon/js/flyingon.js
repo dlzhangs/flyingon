@@ -1891,6 +1891,11 @@ $class('IObject', function (self) {
             else
             {
                 (events[type] || (events[type] = [])).push(fn);
+                
+                if (fn = this.__event_on)
+                {
+                    fn.call(this, type);
+                }
             }
         }
 
@@ -2008,28 +2013,36 @@ $class('IObject', function (self) {
                     }
                 }
             }
-            else if (fn)
+            else 
             {
-                if (events = events[type])
+                if (fn)
                 {
-                    for (var i = events.length - 1; i >= 0; i--)
+                    if (events = events[type])
                     {
-                        if (events[i] === fn)
+                        for (var i = events.length - 1; i >= 0; i--)
                         {
-                            events.splice(i, 1);
+                            if (events[i] === fn)
+                            {
+                                events.splice(i, 1);
+                            }
+                        }
+
+                        if (!events.length)
+                        {
+                            events[type] = null;
                         }
                     }
-
-                    if (!events.length)
-                    {
-                        events[type] = null;
-                    }
                 }
-            }
-            else if (items = events[type])
-            {
-                items.length = 0;
-                events[type] = null;
+                else if (items = events[type])
+                {
+                    items.length = 0;
+                    events[type] = null;
+                }
+                
+                if (fn = this.__event_off)
+                {
+                    fn.call(this, type);
+                }
             }
         }
 
@@ -2476,13 +2489,6 @@ $class('Event', function (self) {
     });
 
 
-    //是否取消冒泡
-    self.cancelBubble = false;
-
-    //是否阻止默认动作
-    self.defaultPrevented = false;
-
-
     //事件类型
     self.type = null;
 
@@ -2490,6 +2496,13 @@ $class('Event', function (self) {
     //触发事件目标对象
     self.target = null;
 
+
+    //是否取消冒泡
+    self.cancelBubble = false;
+
+    
+    //是否阻止默认动作
+    self.defaultPrevented = false;
 
 
     //阻止事件冒泡
@@ -2510,42 +2523,6 @@ $class('Event', function (self) {
     self.stopImmediatePropagation = function () {
 
         this.cancelBubble = this.defaultPrevented = true;
-    };
-
-
-    //阻止dom事件冒泡
-    self.dom_stopPropagation = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.cancelBubble = true;
-        }
-    };
-
-
-    //禁止默认dom事件
-    self.dom_preventDefault = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.defaultPrevented = true;
-        }
-    };
-
-
-    //阻止dom事件冒泡及禁止默认dom事件
-    self.dom_stopImmediatePropagation = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.cancelBubble = e.defaultPrevented = true;
-        }
     };
 
 

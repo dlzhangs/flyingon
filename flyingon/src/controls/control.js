@@ -4,16 +4,10 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
     
 
-    //控件集合
-    var controls = flyingon.controls = flyingon.create(null),
-        id = 1;
-    
-    
-
     $constructor(function () {
 
         //根据dom模板创建关联的dom元素
-        controls[(this.dom = this.dom_template.cloneNode(true)).flyingon_id = id++] = this;
+        (this.dom = this.dom_template.cloneNode(true)).control = this;
     });
 
     
@@ -419,21 +413,147 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     
     
     
-    //从父控件中移除
-    self.remove = function () {
-    
-        var parent = this.__parent;
+    /*
+
+    W3C事件规范:
+
+    A: 鼠标事件 mousedown -> mouseup -> click -> mousedown -> mouseup -> click -> dblclick
+    注: IE8以下会忽略第二个mousedown和click事件
+
+    1. mousedown 冒泡 鼠标按下时触发
+    2. mousemove 冒泡 鼠标在元素内部移动时重复的触发
+    3. mouseup 冒泡 释放鼠标按键时触发
+    4. click 冒泡 单击鼠标按键或回车键时触发
+    5. dblclick 冒泡 双击鼠标按键时触发
+    6. mouseover 冒泡 鼠标移入一个元素(包含子元素)的内部时触发
+    7. mouseout 冒泡 鼠标移入另一个元素(包含子元素)内部时触发
+    8. mouseenter 不冒泡 鼠标移入一个元素(不包含子元素)内部时触发
+    9. mouseleave 不冒泡 鼠标移入另一个元素(不包含子元素)内部时触发
+
+
+    B: 键盘事件
+
+    1. keydown 冒泡 按下键盘上的任意键时触发 如果按住不放会重复触发
+    2. keypress 冒泡 按下键盘上的字符键时触发 如果按住不放会重复触发
+    3. keyup 冒泡 释放键盘上的按键时触发
+
+
+    C: 焦点事件
+
+    1. focus 不冒泡 元素获得焦点时触发
+    2. blur 不冒泡 元素失去焦点时触发
+    3. focusin 冒泡 元素获得焦点时触发
+    4. focusout 冒泡 元素失去焦点时触发
+
+    */
+
+    var events = flyingon.create(null), //dom事件集合
         
-        if (parent)
+        arrange_controls = [], //待排列的控件集合
+        
+        arrange_timeout; //排列定时器
+    
+    
+    function event_control(e) {
+      
+        var target = e.target,
+            control;
+        
+        do
         {
-            parent.remove(this);
+            if (control = target.control)
+            {
+                return control;
+            }
         }
+        while (target = target.parentNode);
     };
     
     
+    events.mousedown = function (e) {
         
-    var arrange_controls = [],
-        arrange_timeout;
+    };
+    
+    events.mousemove = function (e) {
+        
+    };
+    
+    events.mouseup = function (e) {
+        
+    };
+    
+    events.click = function (e) {
+        
+    };
+    
+    events.dblclick = function (e) {
+        
+    };
+    
+    events.mouseover = function (e) {
+        
+    };
+    
+    events.mouseout = function (e) {
+        
+    };
+    
+    events.mouseenter = function (e) {
+        
+    };
+    
+    events.mouseleave = function (e) {
+        
+    };
+    
+    events.keydown = function (e) {
+        
+    };
+    
+    events.keypress = function (e) {
+        
+    };
+    
+    events.keyup = function (e) {
+        
+    };
+    
+    events.focus = function (e) {
+        
+    };
+    
+    events.blur = function (e) {
+        
+    };
+    
+    events.focusin = function (e) {
+        
+    };
+    
+    events.focusout = function (e) {
+        
+    };
+    
+    
+    self.event_on_scroll = function (type) {
+        
+    };
+    
+    
+    self.event_off_scroll = function (type) {
+        
+    };
+    
+    
+    function bind_event(dom, fn) {
+      
+        var keys = events;
+        
+        for (var type in keys)
+        {
+            fn(dom, type, keys[type]);
+        }
+    };
     
     
     //附加控件至指定的dom
@@ -453,7 +573,8 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
                 }
             }
             
-            dom.appendChild(this.dom);
+            dom.appendChild(dom = this.dom);
+            bind_event(dom, flyingon.dom_on);
         }
     };
     
@@ -473,6 +594,8 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
             {
                 dom.parentNode.removeChild(dom);
             }
+            
+            bind_event(dom, flyingon.dom_off);
         }
     };
     
@@ -537,6 +660,26 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         }
     };
 
+    
+        
+    self.dispose = function () {
+    
+        var events = this.__event_list;
+        
+        this.detach();
+        
+        if (events)
+        {
+            for (var type in events)
+            {
+                this.__event_off(type);
+            }
+        }
+
+        this.dom = this.dom.control = this.__parent = null;
+        return base.dispose.call(this);
+    };
+    
 
 });
 

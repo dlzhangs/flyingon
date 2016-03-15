@@ -150,31 +150,19 @@ flyingon.IContainerControl = function (self) {
 
 
     //移除子控件或从父控件中移除
-    self.remove = function (control) {
+    self.remove = function (control, dispose) {
             
-        var parent, children, index;
-
-        if (control)
+        var children, index;
+        
+        if (control && (children = this.__children) && (index = children.indexOf(control)) >= 0)
         {
-            if ((children = this.__children) && (index = children.indexOf(control)) >= 0)
+            remove(control, dispose);
+            children.splice(index, 1);
+
+            if (this.__arrange_dirty !== 2)
             {
-                if (this.__arrange_dirty !== 2)
-                {
-                    this.update();
-                }
-                
-                if (control.dom.parentNode === this.dom)
-                {
-                    this.dom.removeChild(control.dom);
-                }
-
-                children.splice(index, 1);
-                control.__parent = null;
+                this.update();
             }
-        }
-        else if (parent = this.__parent)
-        {
-            parent.remove(this);
         }
 
         return this;
@@ -182,24 +170,19 @@ flyingon.IContainerControl = function (self) {
 
 
     //移除指定位置的子控件
-    self.removeAt = function (index) {
+    self.removeAt = function (index, dispose) {
 
         var children, control;
 
         if ((children = this.__children) && (control = children[index]))
         {       
+            remove(control, dispose);
+            children.splice(index, 1);
+            
             if (this.__arrange_dirty !== 2)
             {
                 this.update();
             }
-            
-            if (control.dom.parentNode === this.dom)
-            {
-                this.dom.removeChild(control.dom);
-            }
-            
-            children.splice(index, 1);
-            control.__parent = null;
         }
 
         return this;
@@ -207,31 +190,48 @@ flyingon.IContainerControl = function (self) {
 
 
     //清除子控件
-    self.clear = function () {
+    self.clear = function (dispose) {
       
-        var children = this.__children;
+        var children = this.__children,
+            length;
         
-        if (children)
+        if (children && (length = children.length) > 0)
         {
-            var dom_parent = this.dom.children[0];
-            
-            for (var i = children.length - 1; i >= 0; i--)
+            for (var i = length - 1; i >= 0; i--)
             {
-                var control = children[i],
-                    dom = control.dom;
-                
-                control.__parent = null;
-                
-                if (dom.parentNode === dom_parent)
-                {
-                    dom_parent.removeChild(dom);
-                }
+                remove(children[i], dispose);
             }
             
             children.length = 0;
+            
+            if (this.__arrange_dirty !== 2)
+            {
+                this.update();
+            }
         }
         
         return this;
+    };
+    
+    
+    function remove(control, dispose) {
+      
+        var dom = control.dom,
+            parent = dom.parent;
+        
+        if (parent)
+        {
+            parent.removeChild(dom);
+        }
+            
+        if (dispose)
+        {
+            control.dispose();
+        }
+        else
+        {
+            control.__parent = null;
+        }
     };
     
     
@@ -297,7 +297,7 @@ flyingon.IContainerControl = function (self) {
     
     function arrange(self, children) {
         
-        var layout = this.__layout;
+        var layout = self.__layout;
             
         //初始化dom
         if (self.__dom_dirty)

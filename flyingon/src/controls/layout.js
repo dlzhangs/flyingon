@@ -98,7 +98,9 @@
     //转换4边尺寸为像素值(margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比)
     flyingon.pixel_sides = function (value, width) {
         
-        if (values = sides_list[value])
+        var values = sides_list[value];
+        
+        if (values)
         {
             //直接取缓存
             if (values.cache)
@@ -1342,7 +1344,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
                 {
                     margin = box.margin;
                     
-                    item.measure(box, width, height, false, true);
+                    item.measure(box, width, bottom > y ? bottom - y : height, rearrange, false, true);
 
                     cache = item.locate(box, x + margin.left, y += margin.top, width);
 
@@ -1378,7 +1380,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
                 {
                     margin = box.margin;
                     
-                    item.measure(box, width, height, true);
+                    item.measure(box, right > x ? right - x : width, height, rearrange, true);
                     
                     cache = item.locate(box, x += margin.left, y + margin.top, 0, height);
 
@@ -1474,7 +1476,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
                 {
                     margin = box.margin;
                     
-                    item.measure(box, line, 0, auto, true);
+                    item.measure(box, line, bottom > y ? bottom - y : height, rearrange, auto, true);
 
                     //换行
                     if (y + item.offsetHeight + margin.height > bottom || y > 0 && item.locationValue('newline'))
@@ -1526,7 +1528,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
                 {
                     margin = box.margin;
                     
-                    item.measure(box, 0, line, true, auto);
+                    item.measure(box, right > x ? right - x : width, line, rearrange, true, auto);
 
                     //换行
                     if (x + item.offsetWidth + margin.width > right || x > 0 && item.locationValue('newline'))
@@ -1621,25 +1623,25 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
                 switch (item.locationValue('dock'))
                 {
                     case 'left':
-                        item.measure(box, width, height, true, false, false, true);
+                        item.measure(box, width, height, rearrange, true, false, false, true);
                         cache = item.locate(box, x, y, 0, height);
                         width = right - (x = cache.right + spacingX);
                         break;
 
                     case 'top':
-                        item.measure(box, width, height, false, true, true, false);
+                        item.measure(box, width, height, rearrange, false, true, true);
                         cache = item.locate(box, x, y, width, 0);
                         height = bottom - (y = cache.bottom + spacingY);
                         break;
 
                     case 'right':
-                        item.measure(box, width, height, true, false, false, true);
+                        item.measure(box, width, height, rearrange, true, false, false, true);
                         cache = item.locate(box, right -= item.offsetWidth + margin.width, y, 0, height);
                         width = (right = item.offsetLeft - spacingX) - x;
                         break;
 
                     case 'bottom':
-                        item.measure(box, width, height, true, false, true, false);
+                        item.measure(box, width, height, rearrange, true, false, true);
                         cache = item.locate(box, x, bottom -= item.offsetHeight + margin.height, width, 0);
                         height = (bottom = item.offsetTop - spacingY) - y;
                         break;
@@ -1664,13 +1666,13 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
         //排列充满项
         if (list)
         {
-            for (i = 0, _ = list.length; i < _; i++)
+            for (var i = 0, _ = list.length; i < _; i++)
             {
                 item = list[i++];
                 box = list[i++];
                 margin = list[i];
 
-                item.measure(box, width, height, false, false, true, true);
+                item.measure(box, width, height, rearrange, false, false, true, true);
                 cache = item.locate(box, x, y, width, height);
                 
                 if (maxWidth < cache.right)
@@ -1689,84 +1691,6 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
         this.arrange_check(maxWidth, maxHeight, arguments);
     };
         
-    
-});
-
-
-
-//网格布局类
-$class('GridLayout', flyingon.Layout, function (self, base) {
-
-
-    self.type = 'grid';
-    
-    
-    //均匀网格布局行数(此值仅对网格布局(grid)及单元格布局(cell)有效)
-    //number	整数值 
-    //string    自定义行 如:'20 30% 20* *'表示4行 第一行固定宽度为20 第2行使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
-    self.arrangeProperty('layoutRows', 3);
-
-    //均匀网格布局列数(此值仅对网格布局(grid)及单元格布局(cell)有效)
-    //number	整数值 
-    //string    自定义列 如:'20 30% 20* *'表示4列 第一列固定宽度为20 第2列使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
-    self.arrangeProperty('layoutColumns', 3);
-
-
-    //横跨行数(此值仅在当前布局类型为网格布局(grid)时有效)
-    //number	整数值(负整数表示横跨至倒数第几列)
-    self.locationProperty('rowSpan', 0);
-
-    //纵跨列数(此值仅在当前布局类型为网格布局(grid)时有效)
-    //number	整数值(负整数表示横跨至倒数第几列)
-    self.locationProperty('columnSpan', 0);
-
-    //指定列索引(此值仅在当前布局类型为网格布局(grid)时有效)
-    //number	整数值(0:不固定 正整数:指定使用第几列 负整数:指定使用倒数第几列)
-    self.locationProperty('columnIndex', 0);
-
-    //跳空网格数(此值仅在当前布局类型为网格布局(grid)时有效)
-    //number	整数值
-    self.locationProperty('spacingCells', 0);
-
-    
-    //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
-
-        
-    };
-    
-    
-});
-
-
-
-//表格布局类
-$class('TableLayout', flyingon.Layout, function (self, base) {
-
-
-    self.type = 'table';
-    
-    
-    //表格布局定义(此值仅对表格布局(table)有效)
-    //行列格式: row[column ...] ... row,column可选值: 
-    //整数            固定行高或列宽 
-    //数字+%          总宽度或高度的百分比 
-    //数字+*          剩余空间的百分比, 数字表示权重, 省略时权重默认为100
-    //数字+css单位    指定单位的行高或列宽
-    //列可嵌套表或表组 表或表组可指定参数
-    //参数集: (name1=value1, ...)   多个参数之间用逗号分隔
-    //嵌套表: {(参数集) row[column ...] ...} 参数集可省略
-    //嵌套表组: <(参数集) { ... } ...> 参数集可省略 多个嵌套表之间用空格分隔
-    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* * {(spacingWidth=50% spacingHeight=50%) *[* * *] *[* * *] *[* * *]} *] *[* * *]'
-    self.arrangeProperty('layoutTable', '*[* * *] *[* * *] *[* * *]', 'last-value');
-
-    
-    //排列布局
-    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
-
-        
-    };
-    
     
 });
 
@@ -1795,7 +1719,7 @@ $class('CascadeLayout', flyingon.Layout, function (self, base) {
             {
                 margin = box.margin;
                 
-                item.measure(box, width, height);
+                item.measure(box, width, height, rearrange);
                 cache = item.locate(box, x + margin.left, y + margin.top, width, height);
                 
                 if (maxWidth < cache.right)
@@ -1838,7 +1762,7 @@ $class('AbsoluteLayout', flyingon.Layout, function (self, base) {
         {
             if ((box = (item = items[i]).boxModel()).visible)
             {
-                item.measure(box, 0, 0, true, true);
+                item.measure(box, 0, 0, rearrange, true, true);
                 cache = item.locate(box, item.locationValue('left'), item.locationValue('top'));
                 
                 if (maxWidth < cache.right)
@@ -1861,4 +1785,102 @@ $class('AbsoluteLayout', flyingon.Layout, function (self, base) {
 });
 
 
+
+//布局解析函数
+//示例: *[* * *] *[* {(spacingX=50% spacingY=50%)*[* ..2] ..2} *] *[* * *]
+(function (Layout) {
+    
+    
+    
+    var regex = /\w+|[*%\[\]{}()=]|../g;
+    
+    
+    
+    function parse(items, tokeys, index) {
+        
+        
+    };
+
+
+        
+    
+})(flyingon.Layout);
+
+    
+
+//网格布局类
+$class('GridLayout', flyingon.Layout, function (self, base) {
+
+
+    self.type = 'grid';
+
+
+    //均匀网格布局行数(此值仅对网格布局(grid)及单元格布局(cell)有效)
+    //number	整数值 
+    //string    自定义行 如:'20 30% 20* *'表示4行 第一行固定宽度为20 第2行使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
+    self.arrangeProperty('layoutRows', 3);
+
+    //均匀网格布局列数(此值仅对网格布局(grid)及单元格布局(cell)有效)
+    //number	整数值 
+    //string    自定义列 如:'20 30% 20* *'表示4列 第一列固定宽度为20 第2列使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
+    self.arrangeProperty('layoutColumns', 3);
+
+
+    //横跨行数(此值仅在当前布局类型为网格布局(grid)时有效)
+    //number	整数值(负整数表示横跨至倒数第几列)
+    self.locationProperty('rowSpan', 0);
+
+    //纵跨列数(此值仅在当前布局类型为网格布局(grid)时有效)
+    //number	整数值(负整数表示横跨至倒数第几列)
+    self.locationProperty('columnSpan', 0);
+
+    //指定列索引(此值仅在当前布局类型为网格布局(grid)时有效)
+    //number	整数值(0:不固定 正整数:指定使用第几列 负整数:指定使用倒数第几列)
+    self.locationProperty('columnIndex', 0);
+
+    //跳空网格数(此值仅在当前布局类型为网格布局(grid)时有效)
+    //number	整数值
+    self.locationProperty('spacingCells', 0);
+
+
+    //排列布局
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
+
+
+    };
+
+
+});
+
+
+
+//表格布局类
+$class('TableLayout', flyingon.Layout, function (self, base) {
+
+
+    self.type = 'table';
+
+
+    //表格布局定义(此值仅对表格布局(table)有效)
+    //行列格式: row[column ...] ... row,column可选值: 
+    //整数            固定行高或列宽 
+    //数字+%          总宽度或高度的百分比 
+    //数字+*          剩余空间的百分比, 数字表示权重, 省略时权重默认为100
+    //数字+css单位    指定单位的行高或列宽
+    //列可嵌套表或表组 表或表组可指定参数
+    //参数集: (name1=value1, ...)   多个参数之间用逗号分隔
+    //嵌套表: {(参数集) row[column ...] ...} 参数集可省略
+    //嵌套表组: <(参数集) { ... } ...> 参数集可省略 多个嵌套表之间用空格分隔
+    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* * {(spacingWidth=50% spacingHeight=50%) *[* * *] *[* * *] *[* * *]} *] *[* * *]'
+    self.arrangeProperty('layoutTable', '*[* * *] *[* * *] *[* * *]', 'last-value');
+
+
+    //排列布局
+    self.arrange = function (container, clientRect, hscroll, vscroll, items, start, end, vertical, rearrange) {
+
+
+    };
+
+
+});
 

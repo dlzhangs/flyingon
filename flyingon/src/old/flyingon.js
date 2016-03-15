@@ -1,4 +1,4 @@
-﻿/*
+/*
 * flyingon javascript library v0.0.1.0
 * https://github.com/freeoasoft/flyingon
 *
@@ -1668,43 +1668,6 @@ var flyingon = window.flyingon = flyingon || {};
 
             this.cancelBubble = true;
             this.defaultPrevented = true;
-        };
-
-
-        //阻止dom事件冒泡
-        this.dom_stopPropagation = function () {
-
-            var e = this.dom_event;
-
-            if (e)
-            {
-                e.cancelBubble = true;
-            }
-        };
-
-
-        //禁止默认dom事件
-        this.dom_preventDefault = function () {
-
-            var e = this.dom_event;
-
-            if (e)
-            {
-                e.defaultPrevented = true;
-            }
-        };
-
-
-        //阻止dom事件冒泡及禁止默认dom事件
-        this.dom_stopImmediatePropagation = function () {
-
-            var e = this.dom_event;
-
-            if (e)
-            {
-                e.cancelBubble = true;
-                e.defaultPrevented = true;
-            }
         };
 
 

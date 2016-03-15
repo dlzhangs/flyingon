@@ -44,19 +44,25 @@ Function.prototype.bind || (Function.prototype.bind = function (context) {
 
     if (arguments.length > 1)
     {
-        var list = [].slice.call(arguments, 1);
+        var list = [].slice.call(arguments, 1),
+            push = list.push;
 
         return function () {
 
             var data = list.slice(0);
-            data.push.apply(data, arguments);
-            return fn.apply(context, data);
+            
+            if (arguments.length > 0)
+            {
+                push.apply(data, arguments);
+            }
+            
+            return fn.apply(context || this, data);
         };
     }
 
     return function () {
 
-        return fn.apply(context, arguments);
+        return fn.apply(context || this, arguments);
     };
 });
 
