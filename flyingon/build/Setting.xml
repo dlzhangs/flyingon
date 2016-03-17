@@ -25,7 +25,9 @@
         <file>..\src\controls\control.js</file>
         <file>..\src\controls\container.js</file>
         <file>..\src\controls\panel.js</file>
-
+        <file>..\src\controls\topcontrol.js</file>
+        <file>..\src\controls\page.js</file>
+        
     </combine>
     
     <combine output="..\js\flyingon.ui.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">

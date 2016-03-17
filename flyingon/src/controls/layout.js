@@ -195,12 +195,7 @@ flyingon.ILocatable = function (self, control) {
         extend_list = ILocatable.__extend_list,
         extend = flyingon.extend,
         pixel = flyingon.pixel,
-        pixel_sides = flyingon.pixel_sides,
-        location_attributes = 'var target = this.__parent || this.__arrange_attach && this;\n\t'
-            + 'if (target && target.__arrange_dirty !== 2)\n\t'
-            + '{\n\t\t'
-                + 'target.update();\n\t'
-            + '}';;
+        pixel_sides = flyingon.pixel_sides;
 
     
     //记录被扩展的目标
@@ -220,7 +215,8 @@ flyingon.ILocatable = function (self, control) {
             attributes = attributes || {};
             attributes.group = 'location';
             attributes.query = true;
-            attributes.set = ((set = attributes.set) ? set + '\n\t' : '') + location_attributes;
+            attributes.set = ((set = attributes.set) ? set + '\n\t' : '') 
+                + 'if (!this.__update_dirty) this.update();';
         }
         
         this.defineProperty(name, defaultValue, attributes);
@@ -549,6 +545,7 @@ flyingon.ILocatable = function (self, control) {
         }
 
         this.onmeasure(box, this.offsetWidth = width, this.offsetHeight = height);
+        this.__update_dirty = false;
     };
     
     

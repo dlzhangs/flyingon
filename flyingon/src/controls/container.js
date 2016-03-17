@@ -57,18 +57,17 @@ flyingon.IContainerControl = function (self) {
         style.height = height + 'px';
     };
 
+    
+    //子控件类型
+    self.control_type = flyingon.Control;
+    
 
     //添加子控件
     self.append = function (control) {
 
-        if (control && control.__parent !== this)
+        if (control && check_control(this, control))
         {
             this.__dom_dirty = true;
-            
-            if (this.__arrange_dirty !== 2)
-            {
-                this.update();
-            }
             
             (this.__children || (this.__children = [])).push(control);
             control.__parent = this;
@@ -81,7 +80,7 @@ flyingon.IContainerControl = function (self) {
     //在指定位置插入子控件
     self.insert = function (index, control) {
 
-        if (control && control.__parent !== this)
+        if (control && check_control(this, control))
         {
             var dom = this.dom,
                 children = this.__children || (this.__children = []);
@@ -104,16 +103,35 @@ flyingon.IContainerControl = function (self) {
                 this.__dom_dirty = true;
             }
             
-            if (this.__arrange_dirty !== 2)
-            {
-                this.update();
-            }
-            
             children.splice(index, 0, control);
             control.__parent = this;
         }
 
         return this;
+    };
+    
+    
+    function check_control(self, control) {
+        
+        if (control.__parent !== self)
+        {
+            if (control['flyingon.ITopControl'])
+            {
+                throw $errortext('flyingon', 'ITopControl append');
+            }
+            
+            if (control instanceof self.control_type)
+            {
+                if (control.__arrange_dirty !== 2)
+                {
+                    control.update();
+                }
+            
+                return true;
+            }
+            
+            throw $errortext('flyingon', 'children type').replace('{0}', self.control_type.xtype);
+        }
     };
     
     
@@ -257,6 +275,10 @@ flyingon.IContainerControl = function (self) {
         }
     };
     
+    
+    //默认需排列
+    self.__arrange_dirty = 2;
+    
 
     //排列子控件
     self.arrange = function () {
@@ -271,8 +293,6 @@ flyingon.IContainerControl = function (self) {
                 {
                     arrange(this, children);
                 }
-                
-                this.__arrange_dirty = 0;
                 break;
 
             case 1:
@@ -288,10 +308,10 @@ flyingon.IContainerControl = function (self) {
                         }
                     }
                 }
-                
-                this.__arrange_dirty = 0;
                 break;
         }
+        
+        this.__arrange_dirty = 0;
     };
     
     
@@ -357,12 +377,6 @@ flyingon.IContainerControl = function (self) {
             
             //排列子项
             arrange_children(self, children);
-            
-            //渲染子项
-            for (var i = children.length - 1; i >= 0; i--)
-            {
-                children[i].render();
-            }
         }
     };
     
@@ -373,9 +387,14 @@ flyingon.IContainerControl = function (self) {
         
         for (var i = 0, _ = children.length; i < _; i++)
         {
-            if ((control = children[i]).arrange)
+            if (control = children[i])
             {
-                control.arrange();
+                if (control.arrange)
+                {
+                    control.arrange();
+                }
+             
+                control.render();
             }
         }
     };
@@ -387,6 +406,25 @@ flyingon.IContainerControl = function (self) {
         
         style.width = this.contentWidth + 'px';
         style.height = this.contentHeight + 'px';
+    };
+    
+    
+    //更新布局
+    self.update = function (dirty) {
+        
+        var parent = this.__parent;
+        
+        if (!dirty)
+        {
+            this.__update_dirty = true;
+        }
+        
+        this.__arrange_dirty = +dirty || 2;
+        
+        if (parent && !parent.__arrange_dirty)
+        {
+            parent.update(1);
+        }
     };
 
     

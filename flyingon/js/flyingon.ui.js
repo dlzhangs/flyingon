@@ -1898,7 +1898,8 @@ $class('IObject', function (self) {
             {
                 (events[type] || (events[type] = [])).push(fn);
                 
-                if (fn = this.__event_on)
+                //注册自定义事件
+                if (fn = this['__event_on_' + type])
                 {
                     fn.call(this, type);
                 }
@@ -2045,9 +2046,10 @@ $class('IObject', function (self) {
                     events[type] = null;
                 }
                 
-                if (fn = this.__event_off)
+                //注销自定义事件
+                if (fn = this['__event_off_' + type])
                 {
-                    fn.call(this, type);
+                    fn.call(this);
                 }
             }
         }
@@ -4132,12 +4134,7 @@ flyingon.ILocatable = function (self, control) {
         extend_list = ILocatable.__extend_list,
         extend = flyingon.extend,
         pixel = flyingon.pixel,
-        pixel_sides = flyingon.pixel_sides,
-        location_attributes = 'var target = this.__parent || this.__arrange_attach && this;\n\t'
-            + 'if (target && target.__arrange_dirty !== 2)\n\t'
-            + '{\n\t\t'
-                + 'target.update();\n\t'
-            + '}';;
+        pixel_sides = flyingon.pixel_sides;
 
     
     //记录被扩展的目标
@@ -4157,7 +4154,8 @@ flyingon.ILocatable = function (self, control) {
             attributes = attributes || {};
             attributes.group = 'location';
             attributes.query = true;
-            attributes.set = ((set = attributes.set) ? set + '\n\t' : '') + location_attributes;
+            attributes.set = ((set = attributes.set) ? set + '\n\t' : '') 
+                + 'if (!this.__update_dirty) this.update();';
         }
         
         this.defineProperty(name, defaultValue, attributes);
@@ -4486,6 +4484,7 @@ flyingon.ILocatable = function (self, control) {
         }
 
         this.onmeasure(box, this.offsetWidth = width, this.offsetHeight = height);
+        this.__update_dirty = false;
     };
     
     
@@ -5877,58 +5876,51 @@ $class("MouseEvent", [Object, flyingon.UIEvent], function () {
 
 
 
-    $constructor(function (type, dom_event, pressdown) {
-
-        this.type = type;
-
-        //触事件的dom对象
-        this.dom = pressdown ? pressdown.dom : dom_event.target;
+    $constructor(function (event) {
 
         //关联的原始dom事件
-        this.dom_event = dom_event;
+        this.dom_event = event;
+
+        //事件类型
+        this.type = event.type;
+
+        //触事件的dom对象
+        this.dom = event.target;
 
         //是否按下ctrl键
-        this.ctrlKey = dom_event.ctrlKey;
+        this.ctrlKey = event.ctrlKey;
 
         //是否按下shift键
-        this.shiftKey = dom_event.shiftKey;
+        this.shiftKey = event.shiftKey;
 
         //是否按下alt键
-        this.altKey = dom_event.altKey;
+        this.altKey = event.altKey;
 
         //是否按下meta键
-        this.metaKey = dom_event.metaKey;
+        this.metaKey = event.metaKey;
 
         //事件触发时间
-        this.timeStamp = dom_event.timeStamp;
+        this.timeStamp = event.timeStamp;
 
         //鼠标按键处理
         //IE678 button: 1->4->2 W3C button: 0->1->2
         //本系统统一使用which 左中右 1->2->3
-        if (!(this.which = dom_event.which))
+        if (!(this.which = event.which))
         {
-            this.which = type & 1 ? 1 : (type & 2 ? 3 : 2);
+            this.which = event.button & 1 ? 1 : (event.button & 2 ? 3 : 2);
         }
         
         //包含滚动距离的偏移位置
-        this.pageX = dom_event.pageX;
-        this.pageY = dom_event.pageY;
+        this.pageX = event.pageX;
+        this.pageY = event.pageY;
 
         //不包含滚动距离的偏移位置
-        this.clientX = dom_event.clientX;
-        this.clientY = dom_event.clientY;
+        this.clientX = event.clientX;
+        this.clientY = event.clientY;
 
         //相对屏幕左上角的偏移位置
-        this.screenX = dom_event.screenX;
-        this.screenY = dom_event.screenY;
-
-        //关联的按下时dom事件
-        if (this.pressdown = pressdown)
-        {
-            //从按下时起鼠标移动距离
-            this.distanceX = dom_event.clientX - pressdown.clientX;
-            this.distanceY = dom_event.clientY - pressdown.clientY;
-        }
+        this.screenX = event.screenX;
+        this.screenY = event.screenY;
 
     });
 
@@ -5943,33 +5935,34 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
 
 
 
-    $constructor(function (type, dom_event) {
-
-        this.type = type;
-
-        //触事件的dom对象
-        this.dom = dom_event.target;
+    $constructor(function (event) {
 
         //关联的原始dom事件
-        this.dom_event = dom_event;
+        this.dom_event = event;
+
+        //事件类型
+        this.type = event.type;
+
+        //触事件的dom对象
+        this.dom = event.target;
 
         //是否按下ctrl键
-        this.ctrlKey = dom_event.ctrlKey;
+        this.ctrlKey = event.ctrlKey;
 
         //是否按下shift键
-        this.shiftKey = dom_event.shiftKey;
+        this.shiftKey = event.shiftKey;
 
         //是否按下alt键
-        this.altKey = dom_event.altKey;
+        this.altKey = event.altKey;
 
         //是否按下meta键
-        this.metaKey = dom_event.metaKey;
+        this.metaKey = event.metaKey;
 
         //事件触发时间
-        this.timeStamp = dom_event.timeStamp;
+        this.timeStamp = event.timeStamp;
 
         //键码
-        this.which = dom_event.which || event.charCode || event.keyCode;
+        this.which = event.which || event.charCode || event.keyCode;
 
     });
 
@@ -6428,7 +6421,13 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
     */
 
-    var events = flyingon.create(null), //dom事件集合
+    var body = document.body,
+    
+        on = flyingon.dom_on,
+        
+        MouseEvent = flyingon.MouseEvent,
+        
+        KeyEvent = flyingon.KeyEvent,
         
         arrange_controls = [], //待排列的控件集合
         
@@ -6451,212 +6450,100 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
     
     
-    events.mousedown = function (e) {
+    function mouse_event(e) {
         
-    };
-    
-    events.mousemove = function (e) {
+        var control = event_control(e);
         
-    };
-    
-    events.mouseup = function (e) {
-        
-    };
-    
-    events.click = function (e) {
-        
-    };
-    
-    events.dblclick = function (e) {
-        
-    };
-    
-    events.mouseover = function (e) {
-        
-    };
-    
-    events.mouseout = function (e) {
-        
-    };
-    
-    events.mouseenter = function (e) {
-        
-    };
-    
-    events.mouseleave = function (e) {
-        
-    };
-    
-    events.keydown = function (e) {
-        
-    };
-    
-    events.keypress = function (e) {
-        
-    };
-    
-    events.keyup = function (e) {
-        
-    };
-    
-    events.focus = function (e) {
-        
-    };
-    
-    events.blur = function (e) {
-        
-    };
-    
-    events.focusin = function (e) {
-        
-    };
-    
-    events.focusout = function (e) {
-        
-    };
-    
-    
-    self.event_on_scroll = function (type) {
-        
-    };
-    
-    
-    self.event_off_scroll = function (type) {
-        
-    };
-    
-    
-    function bind_event(dom, fn) {
-      
-        var keys = events;
-        
-        for (var type in keys)
+        if (control)
         {
-            fn(dom, type, keys[type]);
+            control.trigger(new MouseEvent(e));
         }
     };
     
     
-    //附加控件至指定的dom
-    self.attach = function (dom) {
-
-        if (dom)
-        {
-            if (this.arrange && !this.__arrange_attach)
-            {
-                this.__arrange_attach = true;
-                
-                arrange_controls.push(this);
-                
-                if (!arrange_timeout)
-                {
-                    arrange_timeout = setTimeout(arrange_delay, 10); //10毫秒后定时刷新
-                }
-            }
-            
-            dom.appendChild(dom = this.dom);
-            bind_event(dom, flyingon.dom_on);
-        }
-    };
-    
-    
-    //移除附加
-    self.detach = function () {
+    function key_event(e) {
         
-        if (this.__arrange_attach)
+        var control = event_control(e);
+        
+        if (control)
         {
-            var dom = this.dom;
-
-            this.__arrange_attach = false;
-            
-            arrange_controls.remove(this);
-
-            if (dom && dom.parentNode)
-            {
-                dom.parentNode.removeChild(dom);
-            }
-            
-            bind_event(dom, flyingon.dom_off);
+            control.trigger(new KeyEvent(e));
         }
     };
     
+        
+    on(body, 'mousedown', mouse_event);
     
-    //更新排列
+    on(body, 'mousemove', mouse_event);
+    
+    on(body, 'mouseup', mouse_event);
+    
+    on(body, 'click', mouse_event);
+    
+    on(body, 'dblclick', mouse_event);
+    
+    on(body, 'mouseover', mouse_event);
+    
+    on(body, 'mouseout', mouse_event);
+    
+    on(body, 'mouseenter', mouse_event);
+    
+    on(body, 'mouseleave', mouse_event);
+    
+    
+    on(body, 'keydown', key_event);
+    
+    on(body, 'keypress', key_event);
+    
+    on(body, 'keyup', key_event);
+    
+    
+    /*
+    on(body, 'focus', function (e) {
+        
+    };
+    
+    on(body, 'blur', function (e) {
+        
+    };
+    
+    on(body, 'focusin', function (e) {
+        
+    };
+    
+    on(body, 'focusout', function (e) {
+        
+    };
+    */
+    
+    
+    self.__event_on_scroll = function () {
+        
+    };
+    
+    
+    self.__event_off_scroll = function () {
+        
+    };
+    
+        
+    //更新
     self.update = function () {
         
-        var target = this.__parent;
+        var parent = this.__parent;
         
-        this.__arrange_dirty = 2;
+        this.__update_dirty = true;
         
-        while (target && !target.__arrange_dirty)
+        if (parent && !parent.__arrange_dirty)
         {
-            target.__arrange_dirty = 1;
-            target = target.__parent;
-        }
-        
-        if (!arrange_timeout)
-        {
-            arrange_timeout = setTimeout(arrange_delay, 10); //10毫秒后定时刷新
+            parent.update(2);
         }
     };
     
-    
-    function arrange_delay() {
-        var date = new Date();
-        var controls = arrange_controls;
-        
-        for (var i = controls.length - 1; i >= 0; i--)
-        {
-            var control = controls[i];
-            
-            switch (control.__arrange_dirty)
-            {
-                case 2: //自身需要重新排列
-                    arrange_attach(control);
-                    break;
-                    
-                case 1: //子控件需要重新排列
-                    control.arrange();
-                    break;
-            }
-        }
-        alert(new Date() - date);
-        arrange_timeout = 0;
-    };
-    
-    
-    function arrange_attach(control) {
-        
-        var dom = control.dom.parentNode;
-        
-        if (dom)
-        {
-            var width = dom.clientWidth,
-                height = dom.clientHeight,
-                box = control.boxModel(width, height);
-            
-            control.measure(box, width, height, true, true);
-            control.locate(box, 0, 0, width, height);
-            control.arrange();
-        }
-    };
-
-    
+ 
         
     self.dispose = function () {
     
-        var events = this.__event_list;
-        
-        this.detach();
-        
-        if (events)
-        {
-            for (var type in events)
-            {
-                this.__event_off(type);
-            }
-        }
-
         this.dom = this.dom.control = this.__parent = null;
         return base.dispose.call(this);
     };
@@ -6725,18 +6612,17 @@ flyingon.IContainerControl = function (self) {
         style.height = height + 'px';
     };
 
+    
+    //子控件类型
+    self.control_type = flyingon.Control;
+    
 
     //添加子控件
     self.append = function (control) {
 
-        if (control && control.__parent !== this)
+        if (control && check_control(this, control))
         {
             this.__dom_dirty = true;
-            
-            if (this.__arrange_dirty !== 2)
-            {
-                this.update();
-            }
             
             (this.__children || (this.__children = [])).push(control);
             control.__parent = this;
@@ -6749,7 +6635,7 @@ flyingon.IContainerControl = function (self) {
     //在指定位置插入子控件
     self.insert = function (index, control) {
 
-        if (control && control.__parent !== this)
+        if (control && check_control(this, control))
         {
             var dom = this.dom,
                 children = this.__children || (this.__children = []);
@@ -6772,16 +6658,35 @@ flyingon.IContainerControl = function (self) {
                 this.__dom_dirty = true;
             }
             
-            if (this.__arrange_dirty !== 2)
-            {
-                this.update();
-            }
-            
             children.splice(index, 0, control);
             control.__parent = this;
         }
 
         return this;
+    };
+    
+    
+    function check_control(self, control) {
+        
+        if (control.__parent !== self)
+        {
+            if (control['flyingon.ITopControl'])
+            {
+                throw $errortext('flyingon', 'ITopControl append');
+            }
+            
+            if (control instanceof self.control_type)
+            {
+                if (control.__arrange_dirty !== 2)
+                {
+                    control.update();
+                }
+            
+                return true;
+            }
+            
+            throw $errortext('flyingon', 'children type').replace('{0}', self.control_type.xtype);
+        }
     };
     
     
@@ -6925,6 +6830,10 @@ flyingon.IContainerControl = function (self) {
         }
     };
     
+    
+    //默认需排列
+    self.__arrange_dirty = 2;
+    
 
     //排列子控件
     self.arrange = function () {
@@ -6939,8 +6848,6 @@ flyingon.IContainerControl = function (self) {
                 {
                     arrange(this, children);
                 }
-                
-                this.__arrange_dirty = 0;
                 break;
 
             case 1:
@@ -6956,10 +6863,10 @@ flyingon.IContainerControl = function (self) {
                         }
                     }
                 }
-                
-                this.__arrange_dirty = 0;
                 break;
         }
+        
+        this.__arrange_dirty = 0;
     };
     
     
@@ -7025,12 +6932,6 @@ flyingon.IContainerControl = function (self) {
             
             //排列子项
             arrange_children(self, children);
-            
-            //渲染子项
-            for (var i = children.length - 1; i >= 0; i--)
-            {
-                children[i].render();
-            }
         }
     };
     
@@ -7041,9 +6942,14 @@ flyingon.IContainerControl = function (self) {
         
         for (var i = 0, _ = children.length; i < _; i++)
         {
-            if ((control = children[i]).arrange)
+            if (control = children[i])
             {
-                control.arrange();
+                if (control.arrange)
+                {
+                    control.arrange();
+                }
+             
+                control.render();
             }
         }
     };
@@ -7055,6 +6961,25 @@ flyingon.IContainerControl = function (self) {
         
         style.width = this.contentWidth + 'px';
         style.height = this.contentHeight + 'px';
+    };
+    
+    
+    //更新布局
+    self.update = function (dirty) {
+        
+        var parent = this.__parent;
+        
+        if (!dirty)
+        {
+            this.__update_dirty = true;
+        }
+        
+        this.__arrange_dirty = +dirty || 2;
+        
+        if (parent && !parent.__arrange_dirty)
+        {
+            parent.update(1);
+        }
     };
 
     
@@ -7114,4 +7039,116 @@ $class('Panel', flyingon.Control, function (self, base) {
 
 });
     
+
+
+//顶级控件接口
+flyingon.ITopControl = function (self) {
+    
+    
+    var update_list = [],
+        delay;
+        
+    
+    //接口标记
+    self['flyingon.ITopControl'] = true;
+    
+    
+    //延时更新
+    function update_delay() {
+        
+        var controls = update_list;
+        
+        for (var i = controls.length - 1; i >= 0; i--)
+        {
+            update(controls[i]);
+        }
+        
+        controls.length = 0;
+        delay = 0;
+    };
+    
+    
+    //更新控件
+    function update(control) {
+      
+        if (control.__update_dirty)
+        {
+            var dom = control.dom.parentNode,
+                width = dom.clientWidth,
+                height = dom.clientHeight,
+                box = control.boxModel(width, height);
+
+            control.measure(box, width, height, false);
+            control.locate(box, 0, 0, width, height);
+        }
+
+        if (control.__arrange_dirty)
+        {
+            control.arrange();
+        }
+    };
+    
+    
+    //显示
+    self.show = function (dom) {
+
+        (dom || document.body).appendChild(this.dom);
+        update(this);
+
+        return this;
+    };
+    
+    
+    //关闭
+    self.close = function () {
+        
+        var dom = this.dom;
+        
+        if (this.__arrange_dirty)
+        {
+            update_list.remove(this);
+        }
+        
+        if (dom && dom.parentNode)
+        {
+            dom.parentNode.removeChild(dom);
+        }
+        
+        return this;
+    };
+    
+
+    
+    self.update = function (dirty) {
+      
+        var arrange = this.__arrange_dirty;
+        
+        if (!dirty)
+        {
+            this.__update_dirty = true;
+        }
+        
+        this.__arrange_dirty = dirty || 2;
+
+        if (!arrange)
+        {
+            update_list.push(this);
+            delay || (delay = setTimeout(update_delay, 10)); //10毫秒后定时刷新
+        }
+
+        return this;
+    };
+    
+    
+};
+
+
+$class('Page', flyingon.Panel, function (self, base) {
+    
+  
+    //扩展顶级控件接口
+    flyingon.ITopControl(self);
+    
+    
+});
 

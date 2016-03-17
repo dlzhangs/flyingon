@@ -1892,7 +1892,8 @@ $class('IObject', function (self) {
             {
                 (events[type] || (events[type] = [])).push(fn);
                 
-                if (fn = this.__event_on)
+                //注册自定义事件
+                if (fn = this['__event_on_' + type])
                 {
                     fn.call(this, type);
                 }
@@ -2039,9 +2040,10 @@ $class('IObject', function (self) {
                     events[type] = null;
                 }
                 
-                if (fn = this.__event_off)
+                //注销自定义事件
+                if (fn = this['__event_off_' + type])
                 {
-                    fn.call(this, type);
+                    fn.call(this);
                 }
             }
         }

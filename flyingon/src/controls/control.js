@@ -447,7 +447,13 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
     */
 
-    var events = flyingon.create(null), //dom事件集合
+    var body = document.body,
+    
+        on = flyingon.dom_on,
+        
+        MouseEvent = flyingon.MouseEvent,
+        
+        KeyEvent = flyingon.KeyEvent,
         
         arrange_controls = [], //待排列的控件集合
         
@@ -470,212 +476,100 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
     
     
-    events.mousedown = function (e) {
+    function mouse_event(e) {
         
-    };
-    
-    events.mousemove = function (e) {
+        var control = event_control(e);
         
-    };
-    
-    events.mouseup = function (e) {
-        
-    };
-    
-    events.click = function (e) {
-        
-    };
-    
-    events.dblclick = function (e) {
-        
-    };
-    
-    events.mouseover = function (e) {
-        
-    };
-    
-    events.mouseout = function (e) {
-        
-    };
-    
-    events.mouseenter = function (e) {
-        
-    };
-    
-    events.mouseleave = function (e) {
-        
-    };
-    
-    events.keydown = function (e) {
-        
-    };
-    
-    events.keypress = function (e) {
-        
-    };
-    
-    events.keyup = function (e) {
-        
-    };
-    
-    events.focus = function (e) {
-        
-    };
-    
-    events.blur = function (e) {
-        
-    };
-    
-    events.focusin = function (e) {
-        
-    };
-    
-    events.focusout = function (e) {
-        
-    };
-    
-    
-    self.event_on_scroll = function (type) {
-        
-    };
-    
-    
-    self.event_off_scroll = function (type) {
-        
-    };
-    
-    
-    function bind_event(dom, fn) {
-      
-        var keys = events;
-        
-        for (var type in keys)
+        if (control)
         {
-            fn(dom, type, keys[type]);
+            control.trigger(new MouseEvent(e));
         }
     };
     
     
-    //附加控件至指定的dom
-    self.attach = function (dom) {
-
-        if (dom)
-        {
-            if (this.arrange && !this.__arrange_attach)
-            {
-                this.__arrange_attach = true;
-                
-                arrange_controls.push(this);
-                
-                if (!arrange_timeout)
-                {
-                    arrange_timeout = setTimeout(arrange_delay, 10); //10毫秒后定时刷新
-                }
-            }
-            
-            dom.appendChild(dom = this.dom);
-            bind_event(dom, flyingon.dom_on);
-        }
-    };
-    
-    
-    //移除附加
-    self.detach = function () {
+    function key_event(e) {
         
-        if (this.__arrange_attach)
+        var control = event_control(e);
+        
+        if (control)
         {
-            var dom = this.dom;
-
-            this.__arrange_attach = false;
-            
-            arrange_controls.remove(this);
-
-            if (dom && dom.parentNode)
-            {
-                dom.parentNode.removeChild(dom);
-            }
-            
-            bind_event(dom, flyingon.dom_off);
+            control.trigger(new KeyEvent(e));
         }
     };
     
+        
+    on(body, 'mousedown', mouse_event);
     
-    //更新排列
+    on(body, 'mousemove', mouse_event);
+    
+    on(body, 'mouseup', mouse_event);
+    
+    on(body, 'click', mouse_event);
+    
+    on(body, 'dblclick', mouse_event);
+    
+    on(body, 'mouseover', mouse_event);
+    
+    on(body, 'mouseout', mouse_event);
+    
+    on(body, 'mouseenter', mouse_event);
+    
+    on(body, 'mouseleave', mouse_event);
+    
+    
+    on(body, 'keydown', key_event);
+    
+    on(body, 'keypress', key_event);
+    
+    on(body, 'keyup', key_event);
+    
+    
+    /*
+    on(body, 'focus', function (e) {
+        
+    };
+    
+    on(body, 'blur', function (e) {
+        
+    };
+    
+    on(body, 'focusin', function (e) {
+        
+    };
+    
+    on(body, 'focusout', function (e) {
+        
+    };
+    */
+    
+    
+    self.__event_on_scroll = function () {
+        
+    };
+    
+    
+    self.__event_off_scroll = function () {
+        
+    };
+    
+        
+    //更新
     self.update = function () {
         
-        var target = this.__parent;
+        var parent = this.__parent;
         
-        this.__arrange_dirty = 2;
+        this.__update_dirty = true;
         
-        while (target && !target.__arrange_dirty)
+        if (parent && !parent.__arrange_dirty)
         {
-            target.__arrange_dirty = 1;
-            target = target.__parent;
-        }
-        
-        if (!arrange_timeout)
-        {
-            arrange_timeout = setTimeout(arrange_delay, 10); //10毫秒后定时刷新
+            parent.update(2);
         }
     };
     
-    
-    function arrange_delay() {
-        var date = new Date();
-        var controls = arrange_controls;
-        
-        for (var i = controls.length - 1; i >= 0; i--)
-        {
-            var control = controls[i];
-            
-            switch (control.__arrange_dirty)
-            {
-                case 2: //自身需要重新排列
-                    arrange_attach(control);
-                    break;
-                    
-                case 1: //子控件需要重新排列
-                    control.arrange();
-                    break;
-            }
-        }
-        alert(new Date() - date);
-        arrange_timeout = 0;
-    };
-    
-    
-    function arrange_attach(control) {
-        
-        var dom = control.dom.parentNode;
-        
-        if (dom)
-        {
-            var width = dom.clientWidth,
-                height = dom.clientHeight,
-                box = control.boxModel(width, height);
-            
-            control.measure(box, width, height, true, true);
-            control.locate(box, 0, 0, width, height);
-            control.arrange();
-        }
-    };
-
-    
+ 
         
     self.dispose = function () {
     
-        var events = this.__event_list;
-        
-        this.detach();
-        
-        if (events)
-        {
-            for (var type in events)
-            {
-                this.__event_off(type);
-            }
-        }
-
         this.dom = this.dom.control = this.__parent = null;
         return base.dispose.call(this);
     };

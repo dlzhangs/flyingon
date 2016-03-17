@@ -84,9 +84,8 @@
         });
         
         
-        var container = new flyingon.Panel().sets({
+        var page = new flyingon.Page().sets({
         
-            layout: 'flyingon-Panel',
             width: 1000,
             height: 400,
             overflowX: 'auto',
@@ -125,10 +124,10 @@
                 })); 
             }
             
-            container.append(panel);
+            page.append(panel);
         }
         
-        container.attach(document.body);
+        page.show();
 
       
     </script>

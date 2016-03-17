@@ -52,58 +52,51 @@ $class("MouseEvent", [Object, flyingon.UIEvent], function () {
 
 
 
-    $constructor(function (type, dom_event, pressdown) {
-
-        this.type = type;
-
-        //触事件的dom对象
-        this.dom = pressdown ? pressdown.dom : dom_event.target;
+    $constructor(function (event) {
 
         //关联的原始dom事件
-        this.dom_event = dom_event;
+        this.dom_event = event;
+
+        //事件类型
+        this.type = event.type;
+
+        //触事件的dom对象
+        this.dom = event.target;
 
         //是否按下ctrl键
-        this.ctrlKey = dom_event.ctrlKey;
+        this.ctrlKey = event.ctrlKey;
 
         //是否按下shift键
-        this.shiftKey = dom_event.shiftKey;
+        this.shiftKey = event.shiftKey;
 
         //是否按下alt键
-        this.altKey = dom_event.altKey;
+        this.altKey = event.altKey;
 
         //是否按下meta键
-        this.metaKey = dom_event.metaKey;
+        this.metaKey = event.metaKey;
 
         //事件触发时间
-        this.timeStamp = dom_event.timeStamp;
+        this.timeStamp = event.timeStamp;
 
         //鼠标按键处理
         //IE678 button: 1->4->2 W3C button: 0->1->2
         //本系统统一使用which 左中右 1->2->3
-        if (!(this.which = dom_event.which))
+        if (!(this.which = event.which))
         {
-            this.which = type & 1 ? 1 : (type & 2 ? 3 : 2);
+            this.which = event.button & 1 ? 1 : (event.button & 2 ? 3 : 2);
         }
         
         //包含滚动距离的偏移位置
-        this.pageX = dom_event.pageX;
-        this.pageY = dom_event.pageY;
+        this.pageX = event.pageX;
+        this.pageY = event.pageY;
 
         //不包含滚动距离的偏移位置
-        this.clientX = dom_event.clientX;
-        this.clientY = dom_event.clientY;
+        this.clientX = event.clientX;
+        this.clientY = event.clientY;
 
         //相对屏幕左上角的偏移位置
-        this.screenX = dom_event.screenX;
-        this.screenY = dom_event.screenY;
-
-        //关联的按下时dom事件
-        if (this.pressdown = pressdown)
-        {
-            //从按下时起鼠标移动距离
-            this.distanceX = dom_event.clientX - pressdown.clientX;
-            this.distanceY = dom_event.clientY - pressdown.clientY;
-        }
+        this.screenX = event.screenX;
+        this.screenY = event.screenY;
 
     });
 
@@ -118,33 +111,34 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
 
 
 
-    $constructor(function (type, dom_event) {
-
-        this.type = type;
-
-        //触事件的dom对象
-        this.dom = dom_event.target;
+    $constructor(function (event) {
 
         //关联的原始dom事件
-        this.dom_event = dom_event;
+        this.dom_event = event;
+
+        //事件类型
+        this.type = event.type;
+
+        //触事件的dom对象
+        this.dom = event.target;
 
         //是否按下ctrl键
-        this.ctrlKey = dom_event.ctrlKey;
+        this.ctrlKey = event.ctrlKey;
 
         //是否按下shift键
-        this.shiftKey = dom_event.shiftKey;
+        this.shiftKey = event.shiftKey;
 
         //是否按下alt键
-        this.altKey = dom_event.altKey;
+        this.altKey = event.altKey;
 
         //是否按下meta键
-        this.metaKey = dom_event.metaKey;
+        this.metaKey = event.metaKey;
 
         //事件触发时间
-        this.timeStamp = dom_event.timeStamp;
+        this.timeStamp = event.timeStamp;
 
         //键码
-        this.which = dom_event.which || event.charCode || event.keyCode;
+        this.which = event.which || event.charCode || event.keyCode;
 
     });
 
