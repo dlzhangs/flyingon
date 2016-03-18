@@ -4,7 +4,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <title></title>
 </head>
-<body style="height:400px;">
+<body style="padding:10px;">
 
     <script type="text/javascript" src="../flyingon/js/flyingon.ui.js"></script>
     
@@ -86,6 +86,7 @@
         
         var page = new flyingon.Page().sets({
         
+            id: 'page',
             width: 1000,
             height: 400,
             overflowX: 'auto',
@@ -100,32 +101,40 @@
                 spacingX: 2,
                 spacingY: 2
             }
+            
+        }).on('click', function (e) {
+            
+            alert(e.target.id());
         });
         
+
         for (var i = 0; i < 10; i++)
         {
             var panel = new flyingon.Panel().sets({
                
+                id: 'panel' + i,
                 width: 'fill',
-                border: '1px',
+                border: 1,
                 borderStyle: 'solid',
                 overflowX: 'auto',
                 overflowY: 'auto',
                 layout: 'flyingon-Panel'
             });
-                
+
             for (var j = 0; j < 200; j++)
             {
                 panel.append(new flyingon.Control().sets({
 
+                    id: 'control' + i + j,
                     margin: 2,
                     border: '1px',
                     borderStyle: 'solid'
                 })); 
             }
-            
+
             page.append(panel);
         }
+
         
         page.show();
 

@@ -1525,14 +1525,47 @@ flyingon.absoluteUrl = (function () {
 
 
 
-//IObject接口
-$class('IObject', function (self) {
+//组件基类
+$class('Component', function (self) {
 
 
 
-    var global_events = flyingon.global_events = flyingon.create(null); //全局事件集合
-                
+    var global_events = flyingon.global_events = flyingon.create(null), //全局事件集合
+        
+        regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; //绑定表达式解析器 
+                    
 
+    
+    //初始化原型
+    (self.__prototype_init = function (base, superclass) {
+        
+        var extend = flyingon.extend,
+            cache;
+        
+        if (superclass)
+        {
+            this.__defaults = flyingon.create(base && base.__defaults || null);
+            this.__properties = flyingon.create(base && base.__properties || null);
+            
+            this.deserialize_list = extend(flyingon.create(null), base && base.deserialize_list);
+        }
+        else
+        {
+            cache = [this.__defaults, this.__properties, this.deserialize_list];
+            
+            for (var name in base)
+            {
+                this[name] = base[name];
+            }
+            
+            this.__defaults = extend(cache[0] || flyingon.create(null), this.__defaults);
+            this.__properties = extend(cache[1] || flyingon.create(null), this.__properties);
+            
+            this.deserialize_list = extend(cache[2] || flyingon.create(null), this.deserialize_list);
+        }
+          
+    }).call(self, null, true);
+    
     
     //定义属性及set_XXX方法
     self.defineProperty = function (name, defaultValue, attributes) {
@@ -1732,9 +1765,29 @@ $class('IObject', function (self) {
     //属性值变更方法
     self.__onpropertychange = function (name, value, oldValue) {
     
-        var fn = this.onpropertychange;
-        return fn && fn.call(this, name, value, oldValue);
+        var fn, cache;
+        
+        if ((fn = this.onpropertychange) && fn.call(this, name, value, oldValue) === false)
+        {
+            return false;
+        }
+                
+        //从源对象同步数据至目标对象
+        if (cache = this.__to_bindings)
+        {
+            this.syncBinding(name, value);
+        }
+        
+        //从目标对象回推数据至源对象
+        if ((cache = this.__bindings) && (cache = cache[name]) && cache.twoway)
+        {
+            cache.source.set(cache.expression || cache.name, value);
+        }
     };
+    
+    
+    //组件id
+    self.defineProperty('id', '');
     
     
     //获取指定名称的值(数据绑定用)
@@ -1830,40 +1883,6 @@ $class('IObject', function (self) {
     };
 
     
-    //初始化原型
-    (self.__prototype_init = function (base, superclass) {
-        
-        var extend = flyingon.extend,
-            cache;
-        
-        if (superclass)
-        {
-            this.__defaults = flyingon.create(base && base.__defaults || null);
-            this.__properties = flyingon.create(base && base.__properties || null);
-            
-            this.deserialize_list = extend(flyingon.create(null), base && base.deserialize_list);
-        }
-        else
-        {
-            cache = [this.__defaults, this.__properties, this.deserialize_list];
-            
-            for (var name in base)
-            {
-                this[name] = base[name];
-            }
-            
-            this.__defaults = extend(cache[0] || flyingon.create(null), this.__defaults);
-            this.__properties = extend(cache[1] || flyingon.create(null), this.__properties);
-            
-            this.deserialize_list = extend(cache[2] || flyingon.create(null), this.deserialize_list);
-        }
-          
-    }).call(self, null, true);
-    
-    
-    //设置不序列化xtype属性
-    self.deserialize_list.xtype = true;
-
     
     //绑定事件处理 注:type不带on
     //global: 是否全局事件
@@ -2127,6 +2146,11 @@ $class('IObject', function (self) {
         {
             writer.write_properties(cache);
         }
+        
+        if (cache = this.__bindings)
+        {
+            writer.write_property('bindings', cache);
+        }
     };
     
         
@@ -2157,73 +2181,106 @@ $class('IObject', function (self) {
     };
 
             
+    //设置不序列化xtype属性
+    self.deserialize_list.xtype = true;
 
-    //以当前对象的参照复制生成新对象
-    self.clone = function () {
 
-        var target = new this.Class(),
-            storage = this.__storage;
+            
+    self.deserialize_list.bindings = function (reader, values) {
 
-        if (storage)
+        for (var name in values)
         {
-            var values = target.__storage = flyingon.create(this.__defaults);
+            deserialize_binding(this, reader, name, values[name]);
+        }
+    };
+    
+    
+    //数据绑定类
+    function Binding(target, name, source, expression, twoway) {
 
-            for (var name in storage)
+        var bindings = target.__bindings || (target.__bindings = {}),
+            fields = this.fields = [],
+            cache;
+        
+        this.target = target;
+        this.name = name;
+        this.source = source;
+
+        //一个目标属性只能绑定一个
+        if (cache = bindings[name])
+        {
+            cache.dispose(); 
+        }
+
+        //关联目标绑定
+        bindings[name] = this;
+        
+        if (this.expression = expression)
+        {
+            //表达式, 只支持简单表达式, 不支持语句
+            expression = expression.replace(regex_binding, function (text, name) {
+
+                if (name)
+                {
+                    if (!fields[name])
+                    {
+                        fields[name] = true;
+                        fields.push(name);
+                    }
+
+                    return 'source.get("' + name + '")';
+                }
+
+                cache = false; //表达式标记
+                return text;
+            });
+
+            if (cache === false || !(this.expression = fields[0]))
             {
-                values[name] = storage[name];
-            }
+                twoway = false; //表达式不支持双向绑定
+                this.get = new Function('source', 'return ' + expression);
+            } 
         }
-
-        return target;
-    };
-
-    
-    //销毁对象
-    self.dispose = function () {
-
-        if (this.__events)
+        else
         {
-            this.off();
+            (this.fields = {})[expression] = true;
         }
-    };
 
-
-});
-
-
-//组件接口
-$class('IComponent', [Object, flyingon.IObject], function (self) {
+        this.twoway = twoway; //是否支持双向绑定 false:仅单向绑定
         
-    
-    var regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; 
-    
-    
-    //组件id
-    self.defineProperty('id', '');
-    
-    
-    //属性值变更方法
-    self.__onpropertychange = function (name, value, oldValue) {
-    
-        var fn, cache;
-        
-        if ((fn = this.onpropertychange) && fn.call(this, name, value, oldValue) === false)
+        if (fields.length)
         {
-            return false;
-        }
-                
-        //从源对象同步数据至目标对象
-        if (cache = this.__to_bindings)
-        {
-            this.syncBinding(name, value);
-        }
-        
-        //从目标对象回推数据至源对象
-        if ((cache = this.__bindings) && (cache = cache[name]) && cache.twoway)
-        {
-            cache.source.set(cache.expression || cache.name, value);
+            (bindings = source.__to_bindings || (source.__to_bindings = [])).push(this);
         }
     };
+    
+        
+    //反序列化数据绑定
+    function deserialize_binding(target, reader, name, binding) {
+        
+        reader.read_reference(binding.source, function (source) {
+
+            target.addBinding(name, source, binding.expression, binding.twoway);
+        });
+    };
+    
+    
+    //序列化数据绑定
+    Binding.prototype.serialize = function (writer) {
+        
+        writer.write_reference('source', this.source);
+        
+        if (this.expression)
+        {
+            writer.write_property('expression', this.expression);
+        }
+        
+        if (this.twoway !== true)
+        {
+            writer.write_property('twoway', this.twoway);
+        }
+    };
+    
     
     
     //同步数据绑定 从源对象同步数据至目标对象
@@ -2320,126 +2377,28 @@ $class('IComponent', [Object, flyingon.IObject], function (self) {
         }
     };
     
-
-        
-    self.deserialize_list.bindings = function (reader, values) {
-
-        for (var name in values)
-        {
-            deserialize_binding(this, reader, name, values[name]);
-        }
-    };
-    
-        
-    //反序列化数据绑定
-    function deserialize_binding(target, reader, name, binding) {
-        
-        reader.read_reference(binding.source, function (source) {
-
-            target.addBinding(name, source, binding.expression, binding.twoway);
-        });
-    };
     
     
-    //数据绑定类
-    function Binding(target, name, source, expression, twoway) {
+    //以当前对象的参照复制生成新对象
+    self.clone = function () {
 
-        var bindings = target.__bindings || (target.__bindings = {}),
-            fields = this.fields = [],
-            cache;
-        
-        this.target = target;
-        this.name = name;
-        this.source = source;
+        var target = new this.Class(),
+            storage = this.__storage;
 
-        //一个目标属性只能绑定一个
-        if (cache = bindings[name])
+        if (storage)
         {
-            cache.dispose(); 
-        }
+            var values = target.__storage = flyingon.create(this.__defaults);
 
-        //关联目标绑定
-        bindings[name] = this;
-        
-        if (this.expression = expression)
-        {
-            //表达式, 只支持简单表达式, 不支持语句
-            expression = expression.replace(regex_binding, function (text, name) {
-
-                if (name)
-                {
-                    if (!fields[name])
-                    {
-                        fields[name] = true;
-                        fields.push(name);
-                    }
-
-                    return 'source.get("' + name + '")';
-                }
-
-                cache = false; //表达式标记
-                return text;
-            });
-
-            if (cache === false || !(this.expression = fields[0]))
+            for (var name in storage)
             {
-                twoway = false; //表达式不支持双向绑定
-                this.get = new Function('source', 'return ' + expression);
-            } 
-        }
-        else
-        {
-            (this.fields = {})[expression] = true;
+                values[name] = storage[name];
+            }
         }
 
-        this.twoway = twoway; //是否支持双向绑定 false:仅单向绑定
-        
-        if (fields.length)
-        {
-            (bindings = source.__to_bindings || (source.__to_bindings = [])).push(this);
-        }
+        return target;
     };
     
-    
-    //序列化数据绑定
-    Binding.prototype.serialize = function (writer) {
-        
-        writer.write_reference('source', this.source);
-        
-        if (this.expression)
-        {
-            writer.write_property('expression', this.expression);
-        }
-        
-        if (this.twoway !== true)
-        {
-            writer.write_property('twoway', this.twoway);
-        }
-    };
-    
-    
-    //序列化方法
-    self.serialize = function (writer) {
 
-        var cache;
-        
-        if (cache = this.xtype)
-        {
-            writer.write_property('xtype', cache);
-        }
-        
-        if (cache = this.__storage)
-        {
-            writer.write_properties(cache);
-        }
-        
-        if (cache = this.__bindings)
-        {
-            writer.write_property('bindings', cache);
-        }
-    };
-    
-    
     //销毁对象
     self.dispose = function () {
 
@@ -2475,13 +2434,8 @@ $class('IComponent', [Object, flyingon.IObject], function (self) {
 });
 
 
-//组件基类
-$class('Component', [Object, flyingon.IComponent], function (self) {
-    
-});
 
-
-//事件类型基类
+//事件基类
 $class('Event', function (self) {
 
 
@@ -2890,7 +2844,7 @@ $class('SerializeWriter', function (self) {
 
 
 //异步处理接口
-$class('IAsync', function (self) {
+$class('Async', function (self) {
 
 
 
@@ -2996,7 +2950,7 @@ $class('IAsync', function (self) {
 
     
 //Ajax类
-$class('Ajax', [Object, flyingon.IAsync], function (self) {
+$class('Ajax', [Object, flyingon.Async], function (self) {
 
 
 

@@ -286,16 +286,10 @@ flyingon.ILocatable = function (self, control) {
 
     self.locationProperty('padding', '0', {
      
-        set: 'this.__change_style("padding", value > 0 ? value + "px" : value);'
+        set: 'this.dom.style.padding = value > 0 ? value + "px" : value;'
     });
     
 
-    //特殊的定位属性值变更方法
-    self.__change_style = function (name, value) {
-      
-    };
-
-    
     if (extend_list)
     {
         for (var name in extend_list)
@@ -352,7 +346,7 @@ flyingon.ILocatable = function (self, control) {
     //获取盒模型
     self.boxModel = function (width, height) {
       
-        var box = this.__boxModel || (this.__boxModel = {}),
+        var box = this.__boxModel,
             storage = this.__storage || this.__defaults,
             values = this.__location_values,
             fn = pixel,
@@ -360,8 +354,13 @@ flyingon.ILocatable = function (self, control) {
         
         if (values)
         {
-            if (box.visible = (value = values.visible) != null ? value : storage.visible)
+            if ((value = values.visible) != null ? value : storage.visible)
             {
+                if (!box || !box.visible)
+                {
+                    box = this.__boxModel = { visible: true };
+                }
+                
                 box.alignX = values.alignX || storage.alignX;
                 box.alignY = values.alignY || storage.alignY;
 
@@ -389,8 +388,13 @@ flyingon.ILocatable = function (self, control) {
                 return box;
             }
         }
-        else if (box.visible = storage.visible)
+        else if (storage.visible)
         {
+            if (!box || !box.visible)
+            {
+                box = this.__boxModel = { visible: true };
+            }
+            
             box.alignX = storage.alignX;
             box.alignY = storage.alignY;
             
@@ -417,7 +421,7 @@ flyingon.ILocatable = function (self, control) {
             return box;
         }
         
-        return box_default;
+        return this.__boxModel = box_default;
     };
     
     
@@ -615,21 +619,20 @@ flyingon.ILocatable = function (self, control) {
     };
     
     
-    self.clientRect = function (left, top) {
+    self.clientRect = function () {
         
         var box = this.__boxModel || this.boxModel(),
             border = box.border,
             padding = box.padding,
-            value;
+            width = this.offsetWidth - border.width - padding.width,
+            height = this.offsetHeight - border.height - padding.height;
 
         return {
           
-            left: (left || 0) + padding.left,
-            top: (top || 0) + padding.top,
-            right: padding.right,
-            bottom: padding.bottom,
-            width: (value = this.offsetWidth - border.width - padding.width) >= 0 ? value : 0,
-            height: (value = this.offsetHeight - border.height - padding.height) >= 0 ? value : 0
+            left: 0,
+            top: 0,
+            width: width >= 0 ? width : 0,
+            height: height >= 0 ? height : 0
         };
     };
     
@@ -639,7 +642,7 @@ flyingon.ILocatable = function (self, control) {
 
 
 //子布局
-$class('Sublayout', [Object, flyingon.IObject], function (self) {
+$class('Sublayout', [Object, flyingon.Component], function (self) {
        
     
     //子项数
@@ -673,8 +676,11 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
         {
             var layout = this.__layout_,
                 border = this.__boxModel.border,
-                clientRect = this.clientRect(x + border.left, y + border.top);
+                clientRect = this.clientRect();
 
+            clientRect.left = x + border.left;
+            clientRect.top = y + border.top;
+            
             layout.init(this, clientRect, false, false, items[0], items[1], items[2]);
             
             this.offsetWidth = this.contentWidth - x;
@@ -738,7 +744,7 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
 
 
 //布局基类
-$class('Layout', [Object, flyingon.IObject], function (self) {
+$class('Layout', [Object, flyingon.Component], function (self) {
 
     
 
@@ -757,8 +763,10 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         {
             layouts[name] = [values, null];
         }
-        
-        return flyingon.include_var('layout', name, values); //获取或设置当前布局
+        else
+        {
+            return flyingon.include_var('layout', name, values); //获取或设置当前布局
+        }
     };
     
     
@@ -1337,7 +1345,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(width, height)).visible)
                 {
                     margin = box.margin;
                     
@@ -1373,7 +1381,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(width, height)).visible)
                 {
                     margin = box.margin;
                     
@@ -1403,8 +1411,8 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
         }
               
         //设置内容区大小
-        container.contentWidth = right + clientRect.right;
-        container.contentHeight = bottom + clientRect.bottom;
+        container.contentWidth = right;
+        container.contentHeight = bottom;
     };
     
     
@@ -1446,8 +1454,10 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
         var pixel = this.pixel,
             x = clientRect.left,
             y = clientRect.top,
-            width = clientRect.width,
-            height = clientRect.height,
+            clientWidth = clientRect.width,
+            clientHeight = clientRect.height,
+            width = clientWidth,
+            height = clientHeight,
             right = x + width,
             bottom = y + height,
             spacingX = pixel(this.spacingX(), width),
@@ -1469,7 +1479,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(clientWidth, clientHeight)).visible)
                 {
                     margin = box.margin;
                     
@@ -1521,7 +1531,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(clientWidth, clientHeight)).visible)
                 {
                     margin = box.margin;
                     
@@ -1566,8 +1576,8 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
             }
         }
         
-        container.contentWidth = maxWidth + clientRect.right;
-        container.contentHeight = maxHeight + clientRect.bottom;
+        container.contentWidth = maxWidth;
+        container.contentHeight = maxHeight;
     };
 
     
@@ -1597,8 +1607,10 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
         var pixel = this.pixel,
             x = clientRect.left,
             y = clientRect.top,
-            width = clientRect.width,
-            height = clientRect.height,
+            clientWidth = clientRect.width,
+            clientHeight = clientRect.height,
+            width = clientWidth,
+            height = clientHeight,
             right = x + width,
             bottom = y + height,
             spacingX = pixel(this.spacingX(), width),
@@ -1613,7 +1625,7 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
 
         for (var i = start; i <= end; i++)
         {
-            if ((box = (item = items[i]).boxModel()).visible)
+            if ((box = (item = items[i]).boxModel(clientWidth, clientHeight)).visible)
             {
                 margin = box.margin;
 
@@ -1712,7 +1724,7 @@ $class('CascadeLayout', flyingon.Layout, function (self, base) {
 
         for (var i = start; i <= end; i++)
         {
-            if ((box = (item = items[i]).boxModel()).visible)
+            if ((box = (item = items[i]).boxModel(width, height)).visible)
             {
                 margin = box.margin;
                 
@@ -1752,15 +1764,17 @@ $class('AbsoluteLayout', flyingon.Layout, function (self, base) {
 
         var x = clientRect.left,
             y = clientRect.top,
+            width = clientRect.width,
+            height = clientRect.height,
             maxWidth = 0,
             maxHeight = 0;
 
         for (var i = start; i <= end; i++)
         {
-            if ((box = (item = items[i]).boxModel()).visible)
+            if ((box = (item = items[i]).boxModel(width, height)).visible)
             {
                 item.measure(box, 0, 0, rearrange, true, true);
-                cache = item.locate(box, item.locationValue('left'), item.locationValue('top'));
+                cache = item.locate(box, x + item.locationValue('left'), y + item.locationValue('top'));
                 
                 if (maxWidth < cache.right)
                 {

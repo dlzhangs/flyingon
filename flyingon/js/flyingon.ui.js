@@ -1531,14 +1531,47 @@ flyingon.absoluteUrl = (function () {
 
 
 
-//IObject接口
-$class('IObject', function (self) {
+//组件基类
+$class('Component', function (self) {
 
 
 
-    var global_events = flyingon.global_events = flyingon.create(null); //全局事件集合
-                
+    var global_events = flyingon.global_events = flyingon.create(null), //全局事件集合
+        
+        regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; //绑定表达式解析器 
+                    
 
+    
+    //初始化原型
+    (self.__prototype_init = function (base, superclass) {
+        
+        var extend = flyingon.extend,
+            cache;
+        
+        if (superclass)
+        {
+            this.__defaults = flyingon.create(base && base.__defaults || null);
+            this.__properties = flyingon.create(base && base.__properties || null);
+            
+            this.deserialize_list = extend(flyingon.create(null), base && base.deserialize_list);
+        }
+        else
+        {
+            cache = [this.__defaults, this.__properties, this.deserialize_list];
+            
+            for (var name in base)
+            {
+                this[name] = base[name];
+            }
+            
+            this.__defaults = extend(cache[0] || flyingon.create(null), this.__defaults);
+            this.__properties = extend(cache[1] || flyingon.create(null), this.__properties);
+            
+            this.deserialize_list = extend(cache[2] || flyingon.create(null), this.deserialize_list);
+        }
+          
+    }).call(self, null, true);
+    
     
     //定义属性及set_XXX方法
     self.defineProperty = function (name, defaultValue, attributes) {
@@ -1738,9 +1771,29 @@ $class('IObject', function (self) {
     //属性值变更方法
     self.__onpropertychange = function (name, value, oldValue) {
     
-        var fn = this.onpropertychange;
-        return fn && fn.call(this, name, value, oldValue);
+        var fn, cache;
+        
+        if ((fn = this.onpropertychange) && fn.call(this, name, value, oldValue) === false)
+        {
+            return false;
+        }
+                
+        //从源对象同步数据至目标对象
+        if (cache = this.__to_bindings)
+        {
+            this.syncBinding(name, value);
+        }
+        
+        //从目标对象回推数据至源对象
+        if ((cache = this.__bindings) && (cache = cache[name]) && cache.twoway)
+        {
+            cache.source.set(cache.expression || cache.name, value);
+        }
     };
+    
+    
+    //组件id
+    self.defineProperty('id', '');
     
     
     //获取指定名称的值(数据绑定用)
@@ -1836,40 +1889,6 @@ $class('IObject', function (self) {
     };
 
     
-    //初始化原型
-    (self.__prototype_init = function (base, superclass) {
-        
-        var extend = flyingon.extend,
-            cache;
-        
-        if (superclass)
-        {
-            this.__defaults = flyingon.create(base && base.__defaults || null);
-            this.__properties = flyingon.create(base && base.__properties || null);
-            
-            this.deserialize_list = extend(flyingon.create(null), base && base.deserialize_list);
-        }
-        else
-        {
-            cache = [this.__defaults, this.__properties, this.deserialize_list];
-            
-            for (var name in base)
-            {
-                this[name] = base[name];
-            }
-            
-            this.__defaults = extend(cache[0] || flyingon.create(null), this.__defaults);
-            this.__properties = extend(cache[1] || flyingon.create(null), this.__properties);
-            
-            this.deserialize_list = extend(cache[2] || flyingon.create(null), this.deserialize_list);
-        }
-          
-    }).call(self, null, true);
-    
-    
-    //设置不序列化xtype属性
-    self.deserialize_list.xtype = true;
-
     
     //绑定事件处理 注:type不带on
     //global: 是否全局事件
@@ -2133,6 +2152,11 @@ $class('IObject', function (self) {
         {
             writer.write_properties(cache);
         }
+        
+        if (cache = this.__bindings)
+        {
+            writer.write_property('bindings', cache);
+        }
     };
     
         
@@ -2163,73 +2187,106 @@ $class('IObject', function (self) {
     };
 
             
+    //设置不序列化xtype属性
+    self.deserialize_list.xtype = true;
 
-    //以当前对象的参照复制生成新对象
-    self.clone = function () {
 
-        var target = new this.Class(),
-            storage = this.__storage;
+            
+    self.deserialize_list.bindings = function (reader, values) {
 
-        if (storage)
+        for (var name in values)
         {
-            var values = target.__storage = flyingon.create(this.__defaults);
+            deserialize_binding(this, reader, name, values[name]);
+        }
+    };
+    
+    
+    //数据绑定类
+    function Binding(target, name, source, expression, twoway) {
 
-            for (var name in storage)
+        var bindings = target.__bindings || (target.__bindings = {}),
+            fields = this.fields = [],
+            cache;
+        
+        this.target = target;
+        this.name = name;
+        this.source = source;
+
+        //一个目标属性只能绑定一个
+        if (cache = bindings[name])
+        {
+            cache.dispose(); 
+        }
+
+        //关联目标绑定
+        bindings[name] = this;
+        
+        if (this.expression = expression)
+        {
+            //表达式, 只支持简单表达式, 不支持语句
+            expression = expression.replace(regex_binding, function (text, name) {
+
+                if (name)
+                {
+                    if (!fields[name])
+                    {
+                        fields[name] = true;
+                        fields.push(name);
+                    }
+
+                    return 'source.get("' + name + '")';
+                }
+
+                cache = false; //表达式标记
+                return text;
+            });
+
+            if (cache === false || !(this.expression = fields[0]))
             {
-                values[name] = storage[name];
-            }
+                twoway = false; //表达式不支持双向绑定
+                this.get = new Function('source', 'return ' + expression);
+            } 
         }
-
-        return target;
-    };
-
-    
-    //销毁对象
-    self.dispose = function () {
-
-        if (this.__events)
+        else
         {
-            this.off();
+            (this.fields = {})[expression] = true;
         }
-    };
 
-
-});
-
-
-//组件接口
-$class('IComponent', [Object, flyingon.IObject], function (self) {
+        this.twoway = twoway; //是否支持双向绑定 false:仅单向绑定
         
-    
-    var regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; 
-    
-    
-    //组件id
-    self.defineProperty('id', '');
-    
-    
-    //属性值变更方法
-    self.__onpropertychange = function (name, value, oldValue) {
-    
-        var fn, cache;
-        
-        if ((fn = this.onpropertychange) && fn.call(this, name, value, oldValue) === false)
+        if (fields.length)
         {
-            return false;
-        }
-                
-        //从源对象同步数据至目标对象
-        if (cache = this.__to_bindings)
-        {
-            this.syncBinding(name, value);
-        }
-        
-        //从目标对象回推数据至源对象
-        if ((cache = this.__bindings) && (cache = cache[name]) && cache.twoway)
-        {
-            cache.source.set(cache.expression || cache.name, value);
+            (bindings = source.__to_bindings || (source.__to_bindings = [])).push(this);
         }
     };
+    
+        
+    //反序列化数据绑定
+    function deserialize_binding(target, reader, name, binding) {
+        
+        reader.read_reference(binding.source, function (source) {
+
+            target.addBinding(name, source, binding.expression, binding.twoway);
+        });
+    };
+    
+    
+    //序列化数据绑定
+    Binding.prototype.serialize = function (writer) {
+        
+        writer.write_reference('source', this.source);
+        
+        if (this.expression)
+        {
+            writer.write_property('expression', this.expression);
+        }
+        
+        if (this.twoway !== true)
+        {
+            writer.write_property('twoway', this.twoway);
+        }
+    };
+    
     
     
     //同步数据绑定 从源对象同步数据至目标对象
@@ -2326,126 +2383,28 @@ $class('IComponent', [Object, flyingon.IObject], function (self) {
         }
     };
     
-
-        
-    self.deserialize_list.bindings = function (reader, values) {
-
-        for (var name in values)
-        {
-            deserialize_binding(this, reader, name, values[name]);
-        }
-    };
-    
-        
-    //反序列化数据绑定
-    function deserialize_binding(target, reader, name, binding) {
-        
-        reader.read_reference(binding.source, function (source) {
-
-            target.addBinding(name, source, binding.expression, binding.twoway);
-        });
-    };
     
     
-    //数据绑定类
-    function Binding(target, name, source, expression, twoway) {
+    //以当前对象的参照复制生成新对象
+    self.clone = function () {
 
-        var bindings = target.__bindings || (target.__bindings = {}),
-            fields = this.fields = [],
-            cache;
-        
-        this.target = target;
-        this.name = name;
-        this.source = source;
+        var target = new this.Class(),
+            storage = this.__storage;
 
-        //一个目标属性只能绑定一个
-        if (cache = bindings[name])
+        if (storage)
         {
-            cache.dispose(); 
-        }
+            var values = target.__storage = flyingon.create(this.__defaults);
 
-        //关联目标绑定
-        bindings[name] = this;
-        
-        if (this.expression = expression)
-        {
-            //表达式, 只支持简单表达式, 不支持语句
-            expression = expression.replace(regex_binding, function (text, name) {
-
-                if (name)
-                {
-                    if (!fields[name])
-                    {
-                        fields[name] = true;
-                        fields.push(name);
-                    }
-
-                    return 'source.get("' + name + '")';
-                }
-
-                cache = false; //表达式标记
-                return text;
-            });
-
-            if (cache === false || !(this.expression = fields[0]))
+            for (var name in storage)
             {
-                twoway = false; //表达式不支持双向绑定
-                this.get = new Function('source', 'return ' + expression);
-            } 
-        }
-        else
-        {
-            (this.fields = {})[expression] = true;
+                values[name] = storage[name];
+            }
         }
 
-        this.twoway = twoway; //是否支持双向绑定 false:仅单向绑定
-        
-        if (fields.length)
-        {
-            (bindings = source.__to_bindings || (source.__to_bindings = [])).push(this);
-        }
+        return target;
     };
     
-    
-    //序列化数据绑定
-    Binding.prototype.serialize = function (writer) {
-        
-        writer.write_reference('source', this.source);
-        
-        if (this.expression)
-        {
-            writer.write_property('expression', this.expression);
-        }
-        
-        if (this.twoway !== true)
-        {
-            writer.write_property('twoway', this.twoway);
-        }
-    };
-    
-    
-    //序列化方法
-    self.serialize = function (writer) {
 
-        var cache;
-        
-        if (cache = this.xtype)
-        {
-            writer.write_property('xtype', cache);
-        }
-        
-        if (cache = this.__storage)
-        {
-            writer.write_properties(cache);
-        }
-        
-        if (cache = this.__bindings)
-        {
-            writer.write_property('bindings', cache);
-        }
-    };
-    
-    
     //销毁对象
     self.dispose = function () {
 
@@ -2481,13 +2440,8 @@ $class('IComponent', [Object, flyingon.IObject], function (self) {
 });
 
 
-//组件基类
-$class('Component', [Object, flyingon.IComponent], function (self) {
-    
-});
 
-
-//事件类型基类
+//事件基类
 $class('Event', function (self) {
 
 
@@ -2896,7 +2850,7 @@ $class('SerializeWriter', function (self) {
 
 
 //异步处理接口
-$class('IAsync', function (self) {
+$class('Async', function (self) {
 
 
 
@@ -3002,7 +2956,7 @@ $class('IAsync', function (self) {
 
     
 //Ajax类
-$class('Ajax', [Object, flyingon.IAsync], function (self) {
+$class('Ajax', [Object, flyingon.Async], function (self) {
 
 
 
@@ -3417,7 +3371,7 @@ flyingon.isArray = Array.isArray || (function () {
         var key = name.replace(regex, fn);
 
         if (!(key in style) && 
-            !((key = prefix + name.charAt(0).toUpperCase() + name.substring(1)) in style))
+            !((key = prefix + key.charAt(0).toUpperCase() + key.substring(1)) in style))
         {
             key = '';
         }
@@ -3815,53 +3769,32 @@ flyingon.ready = (function () {
 //拖动基础方法
 flyingon.dragmove = function (context, event, begin, move, end, delay) {
 
-    var target = event.dom || event.target,
+    var dom = event.dom || event.target,
+        style = dom.style,
+        x0 = dom.offsetLeft,
+        y0 = dom.offsetTop,
         x1 = event.clientX,
         y1 = event.clientY,
-        left,
-        top,
-        dom;
+        on = flyingon.dom_on,
+        off = flyingon.dom_off;
 
     function start(e) {
         
         if (begin)
         {
-            e.dom = target;
-            dom = begin.call(context, e);
+            e.dom = dom;
+            begin.call(context, e);
         }
         
-        var cache = dom || (dom = target),
-            style = dom.style;
+        flyingon.dom_suspend(dom, 'click', true);
+        flyingon.css_value(document.body, 'user-select', 'none');
         
-        if (style.position !== 'absolute')
+        if (dom.setCapture)
         {
-            style.left = cache.offsetLeft + 'px';
-            style.top = cache.offsetTop + 'px';
-            
-            if (!style.width)
-            {
-                style.width = cache.offsetWidth + 'px';
-            }
-            
-            if (!style.height)
-            {
-                style.height = cache.offsetHeight + 'px';
-            }
-            
-            style.position = 'absolute';
+            dom.setCapture();
         }
         
-        left = cache.offsetLeft;
-        top = cache.offsetTop;
-
-        flyingon.dom_suspend(target, 'click', true);
-
-        if (target.setCapture)
-        {
-            target.setCapture();
-        }
-        
-        return dom;
+        start = null;
     };
     
     function mousemove(e) {
@@ -3869,58 +3802,54 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
         var x = e.clientX - x1,
             y = e.clientY - y1;
 
-        if (e.dom = dom || (x < -2 || x > 2 || y < -2 || y > 2) && start(e))
+        if (!start || (x < -2 || x > 2 || y < -2 || y > 2) && start(e))
         {
-            dom.style.left = (left + x) + 'px';
-            dom.style.top = (top + y) + 'px';
+            style.left = (x0 + x) + 'px';
+            style.top = (y0 + y) + 'px';
 
             if (move)
             {
+                e.dom = dom;
                 e.distanceX = x;
                 e.distanceY = y;
                 
                 move.call(context, e);
             }
 
-            e.stopPropagation();
-            e.preventDefault();
+            e.stopImmediatePropagation();
         }
     };
 
     function mouseup(e) {
 
-        flyingon.dom_off(document, 'mousemove', mousemove);
-        flyingon.dom_off(document, 'mouseup', mouseup);
+        off(document, 'mousemove', mousemove);
+        off(document, 'mouseup', mouseup);
 
-        if (e.dom = dom)
+        if (!start)
         {
-            if (target.setCapture)
+            flyingon.css_value(document.body, 'user-select', '');
+            
+            if (dom.setCapture)
             {
-                target.releaseCapture();
+                dom.releaseCapture();
             }
 
-            setTimeout(function () {
-
-                flyingon.dom_resume(target, 'click', true);
-
-            }, 0);
+            setTimeout(resume, 0);
             
             if (end)
             {
+                e.dom = dom;
                 e.distanceX = e.clientX - x1;
                 e.distanceY = e.clientY - y1;
                 
-                if (end.call(context, e) === false)
-                {
-                    return;
-                }
-            }
-
-            if ((target !== dom) && (target = dom.parentNode))
-            {
-                target.removeChild(dom);
+                end.call(context, e);
             }
         }
+    };
+    
+    function resume() {
+      
+        flyingon.dom_resume(dom, 'click', true);
     };
     
     if (delay === false)
@@ -3928,11 +3857,10 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
         start(event);
     }
 
-    flyingon.dom_on(document, 'mousemove', mousemove);
-    flyingon.dom_on(document, 'mouseup', mouseup);
+    on(document, 'mousemove', mousemove);
+    on(document, 'mouseup', mouseup);
     
-    event.stopPropagation();
-    event.preventDefault();
+    event.stopImmediatePropagation();
 };
 
 
@@ -4225,16 +4153,10 @@ flyingon.ILocatable = function (self, control) {
 
     self.locationProperty('padding', '0', {
      
-        set: 'this.__change_style("padding", value > 0 ? value + "px" : value);'
+        set: 'this.dom.style.padding = value > 0 ? value + "px" : value;'
     });
     
 
-    //特殊的定位属性值变更方法
-    self.__change_style = function (name, value) {
-      
-    };
-
-    
     if (extend_list)
     {
         for (var name in extend_list)
@@ -4291,7 +4213,7 @@ flyingon.ILocatable = function (self, control) {
     //获取盒模型
     self.boxModel = function (width, height) {
       
-        var box = this.__boxModel || (this.__boxModel = {}),
+        var box = this.__boxModel,
             storage = this.__storage || this.__defaults,
             values = this.__location_values,
             fn = pixel,
@@ -4299,8 +4221,13 @@ flyingon.ILocatable = function (self, control) {
         
         if (values)
         {
-            if (box.visible = (value = values.visible) != null ? value : storage.visible)
+            if ((value = values.visible) != null ? value : storage.visible)
             {
+                if (!box || !box.visible)
+                {
+                    box = this.__boxModel = { visible: true };
+                }
+                
                 box.alignX = values.alignX || storage.alignX;
                 box.alignY = values.alignY || storage.alignY;
 
@@ -4328,8 +4255,13 @@ flyingon.ILocatable = function (self, control) {
                 return box;
             }
         }
-        else if (box.visible = storage.visible)
+        else if (storage.visible)
         {
+            if (!box || !box.visible)
+            {
+                box = this.__boxModel = { visible: true };
+            }
+            
             box.alignX = storage.alignX;
             box.alignY = storage.alignY;
             
@@ -4356,7 +4288,7 @@ flyingon.ILocatable = function (self, control) {
             return box;
         }
         
-        return box_default;
+        return this.__boxModel = box_default;
     };
     
     
@@ -4554,21 +4486,20 @@ flyingon.ILocatable = function (self, control) {
     };
     
     
-    self.clientRect = function (left, top) {
+    self.clientRect = function () {
         
         var box = this.__boxModel || this.boxModel(),
             border = box.border,
             padding = box.padding,
-            value;
+            width = this.offsetWidth - border.width - padding.width,
+            height = this.offsetHeight - border.height - padding.height;
 
         return {
           
-            left: (left || 0) + padding.left,
-            top: (top || 0) + padding.top,
-            right: padding.right,
-            bottom: padding.bottom,
-            width: (value = this.offsetWidth - border.width - padding.width) >= 0 ? value : 0,
-            height: (value = this.offsetHeight - border.height - padding.height) >= 0 ? value : 0
+            left: 0,
+            top: 0,
+            width: width >= 0 ? width : 0,
+            height: height >= 0 ? height : 0
         };
     };
     
@@ -4578,7 +4509,7 @@ flyingon.ILocatable = function (self, control) {
 
 
 //子布局
-$class('Sublayout', [Object, flyingon.IObject], function (self) {
+$class('Sublayout', [Object, flyingon.Component], function (self) {
        
     
     //子项数
@@ -4612,8 +4543,11 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
         {
             var layout = this.__layout_,
                 border = this.__boxModel.border,
-                clientRect = this.clientRect(x + border.left, y + border.top);
+                clientRect = this.clientRect();
 
+            clientRect.left = x + border.left;
+            clientRect.top = y + border.top;
+            
             layout.init(this, clientRect, false, false, items[0], items[1], items[2]);
             
             this.offsetWidth = this.contentWidth - x;
@@ -4677,7 +4611,7 @@ $class('Sublayout', [Object, flyingon.IObject], function (self) {
 
 
 //布局基类
-$class('Layout', [Object, flyingon.IObject], function (self) {
+$class('Layout', [Object, flyingon.Component], function (self) {
 
     
 
@@ -4696,8 +4630,10 @@ $class('Layout', [Object, flyingon.IObject], function (self) {
         {
             layouts[name] = [values, null];
         }
-        
-        return flyingon.include_var('layout', name, values); //获取或设置当前布局
+        else
+        {
+            return flyingon.include_var('layout', name, values); //获取或设置当前布局
+        }
     };
     
     
@@ -5276,7 +5212,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(width, height)).visible)
                 {
                     margin = box.margin;
                     
@@ -5312,7 +5248,7 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(width, height)).visible)
                 {
                     margin = box.margin;
                     
@@ -5342,8 +5278,8 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
         }
               
         //设置内容区大小
-        container.contentWidth = right + clientRect.right;
-        container.contentHeight = bottom + clientRect.bottom;
+        container.contentWidth = right;
+        container.contentHeight = bottom;
     };
     
     
@@ -5385,8 +5321,10 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
         var pixel = this.pixel,
             x = clientRect.left,
             y = clientRect.top,
-            width = clientRect.width,
-            height = clientRect.height,
+            clientWidth = clientRect.width,
+            clientHeight = clientRect.height,
+            width = clientWidth,
+            height = clientHeight,
             right = x + width,
             bottom = y + height,
             spacingX = pixel(this.spacingX(), width),
@@ -5408,7 +5346,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(clientWidth, clientHeight)).visible)
                 {
                     margin = box.margin;
                     
@@ -5460,7 +5398,7 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
             //先按无滚动条的方式排列
             for (var i = start; i <= end; i++)
             {
-                if ((box = (item = items[i]).boxModel()).visible)
+                if ((box = (item = items[i]).boxModel(clientWidth, clientHeight)).visible)
                 {
                     margin = box.margin;
                     
@@ -5505,8 +5443,8 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
             }
         }
         
-        container.contentWidth = maxWidth + clientRect.right;
-        container.contentHeight = maxHeight + clientRect.bottom;
+        container.contentWidth = maxWidth;
+        container.contentHeight = maxHeight;
     };
 
     
@@ -5536,8 +5474,10 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
         var pixel = this.pixel,
             x = clientRect.left,
             y = clientRect.top,
-            width = clientRect.width,
-            height = clientRect.height,
+            clientWidth = clientRect.width,
+            clientHeight = clientRect.height,
+            width = clientWidth,
+            height = clientHeight,
             right = x + width,
             bottom = y + height,
             spacingX = pixel(this.spacingX(), width),
@@ -5552,7 +5492,7 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
 
         for (var i = start; i <= end; i++)
         {
-            if ((box = (item = items[i]).boxModel()).visible)
+            if ((box = (item = items[i]).boxModel(clientWidth, clientHeight)).visible)
             {
                 margin = box.margin;
 
@@ -5651,7 +5591,7 @@ $class('CascadeLayout', flyingon.Layout, function (self, base) {
 
         for (var i = start; i <= end; i++)
         {
-            if ((box = (item = items[i]).boxModel()).visible)
+            if ((box = (item = items[i]).boxModel(width, height)).visible)
             {
                 margin = box.margin;
                 
@@ -5691,15 +5631,17 @@ $class('AbsoluteLayout', flyingon.Layout, function (self, base) {
 
         var x = clientRect.left,
             y = clientRect.top,
+            width = clientRect.width,
+            height = clientRect.height,
             maxWidth = 0,
             maxHeight = 0;
 
         for (var i = start; i <= end; i++)
         {
-            if ((box = (item = items[i]).boxModel()).visible)
+            if ((box = (item = items[i]).boxModel(width, height)).visible)
             {
                 item.measure(box, 0, 0, rearrange, true, true);
-                cache = item.locate(box, item.locationValue('left'), item.locationValue('top'));
+                cache = item.locate(box, x + item.locationValue('left'), y + item.locationValue('top'));
                 
                 if (maxWidth < cache.right)
                 {
@@ -5973,8 +5915,20 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
 
 
 
+$class('Decrator', [Object, flyingon.Component], function (self) {
+    
+    
+});
+
+
+$class('ResizeThumb', flyingon.Decrator, function (self, base) {
+    
+    
+});
+
+
 //控件类
-$class('Control', [Object, flyingon.IComponent], function (self) {
+$class('Control', [Object, flyingon.Component], function (self) {
 
     
 
@@ -5998,7 +5952,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
         return function (html) {
 
-            var name = 'flyingon-Control',
+            var name = 'flyingon-Control ',
                 cache = this.xtype,
                 dom,
                 style;
@@ -6012,10 +5966,15 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
             if (cache && name !== (cache = cache.replace('.', '-')))
             {
-                name += ' ' + cache;
+                name += cache + ' ';
+            }
+            
+            if (cache = dom.className)
+            {
+                name += cache + ' ';
             }
 
-            dom.className = (cache = dom.className) ? cache + ' ' + name : name;
+            this.__default_class = dom.className = name;
 
             style.position = 'absolute';
             style.borderWidth = '0';
@@ -6070,24 +6029,24 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     self.defineProperty('className', '', {
 
         attributes: 'query',
-        set: 'value && (this.dom.className += " " + value);'
+        set: 'this.dom.className = this.__default_class + (value ? value + " " : "");'
     });
 
 
 
     //是否包含指定class
-    self.hasClass = function (className) {
+    self.hasClass = function (name) {
 
-        return className ? this.dom.className.indexOf(' ' + className) > 0 : false;
+        return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
     };
 
 
     //添加class
-    self.addClass = function (className) {
+    self.addClass = function (name) {
 
-        if (className)
+        if (name)
         {
-            this.dom.className += ' ' + className;
+            this.dom.className += name + ' ';
         }
 
         return this;
@@ -6095,12 +6054,12 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
 
     //移除class
-    self.removeClass = function (className) {
+    self.removeClass = function (name) {
 
-        if (className)
+        if (name)
         {
             var dom = this.dom;
-            dom.className = dom.className.replace(' ' + className, '');
+            dom.className = dom.className.replace(name + ' ', '');
         }
 
         return this;
@@ -6108,20 +6067,20 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
 
     //切换class 有则移除无则添加
-    self.toggleClass = function (className) {
+    self.toggleClass = function (name) {
 
-        if (className)
+        if (name)
         {
             var dom = this.dom,
-                name = dom.className;
+                className = dom.className;
 
-            if (name.indexOf(className = ' ' + className) > 0)
+            if (className.indexOf(name = name + ' ') >= 0)
             {
-                dom.className = name.replace(className, '');
+                dom.className = className.replace(name, '');
             }
             else
             {
-                dom.className += className;
+                dom.className += name;
             }
         }
 
@@ -6162,20 +6121,15 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         
     self.locationProperty('overflowX', '', {
        
-        set: 'this.__change_style("overflowX", value);'
+        set: 'this.dom.style.overflowX = value;'
     });
     
     
     self.locationProperty('overflowY', '', {
        
-        set: 'this.__change_style("overflowY", value);'
+        set: 'this.dom.style.overflowY = value;'
     });
     
-
-    self.__change_style = function (name, value) {
-      
-        this.dom.style[name] = value;
-    };
     
 
     self.render = function () {
@@ -6527,7 +6481,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
     
         
-    //更新
+    //更新布局
     self.update = function () {
         
         var parent = this.__parent;
@@ -6581,37 +6535,8 @@ flyingon.IContainerControl = function (self) {
 
         return this.__children || (this.__children = []);
     });
-
     
-    
-    self.__change_style = function (name, value) {
-      
-        if (name !== 'padding')
-        {
-            this.dom.style[name] = value;
-        }
-    };
-    
-        
-    self.onlocate = function (box, x, y) {
-      
-        var style = this.dom.style,
-            width = this.offsetWidth,
-            height = this.offsetHeight,
-            border;
-
-        if (!this.box_sizing_border && box)
-        {
-            width -= (border = box.border).width;
-            height -= border.height;
-        }
-        
-        style.left = x + 'px';
-        style.top = y + 'px';
-        style.width = width + 'px';
-        style.height = height + 'px';
-    };
-
+          
     
     //子控件类型
     self.control_type = flyingon.Control;
@@ -6830,18 +6755,15 @@ flyingon.IContainerControl = function (self) {
         }
     };
     
-    
-    //默认需排列
-    self.__arrange_dirty = 2;
-    
+
 
     //排列子控件
-    self.arrange = function () {
+    self.arrange = function (dirty) {
 
         var children = this.__children,
             length;
 
-        switch (this.__arrange_dirty)
+        switch (dirty || this.__arrange_dirty)
         {
             case 2:
                 if (children && children.length > 0)
@@ -6902,44 +6824,43 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            var clientRect = self.clientRect(),
-                hscroll,
-                vscroll;
-
-            switch (self.overflowX())
-            {
-                case 'scroll':
-                    clientRect.height -= layout.hscroll_height;
-                    break;
-                    
-                case 'auto':
-                    hscroll = true;
-                    break;
-            }
-            
-            switch (self.overflowY())
-            {
-                case 'scroll':
-                    clientRect.width -= layout.vscroll_width;
-                    break;
-                    
-                case 'auto':
-                    vscroll = true;
-                    break;
-            }
-                  
-            layout.init(self, clientRect, hscroll, vscroll, children);
-            
-            //排列子项
-            arrange_children(self, children);
+            self.arrange_children(layout, children);
         }
     };
     
     
-    function arrange_children(self, children) {
-      
-        var control;
-        
+    //排列子项
+    self.arrange_children = function (layout, children) {
+
+        var clientRect = this.clientRect(),
+            hscroll,
+            vscroll,
+            control;
+
+        switch (this.overflowX())
+        {
+            case 'scroll':
+                clientRect.height -= layout.hscroll_height;
+                break;
+
+            case 'auto':
+                hscroll = true;
+                break;
+        }
+
+        switch (this.overflowY())
+        {
+            case 'scroll':
+                clientRect.width -= layout.vscroll_width;
+                break;
+
+            case 'auto':
+                vscroll = true;
+                break;
+        }
+
+        layout.init(this, clientRect, hscroll, vscroll, children);
+                
         for (var i = 0, _ = children.length; i < _; i++)
         {
             if (control = children[i])
@@ -7056,68 +6977,48 @@ flyingon.ITopControl = function (self) {
     //延时更新
     function update_delay() {
         
-        var controls = update_list;
+        var list = update_list;
         
-        for (var i = controls.length - 1; i >= 0; i--)
+        for (var i = list.length - 1; i >= 0; i--)
         {
-            update(controls[i]);
+            list[i].refresh();
         }
         
-        controls.length = 0;
+        list.length = 0;
         delay = 0;
     };
     
     
-    //更新控件
-    function update(control) {
+    //刷新控件
+    self.refresh = function (dirty) {
       
-        if (control.__update_dirty)
-        {
-            var dom = control.dom.parentNode,
-                width = dom.clientWidth,
-                height = dom.clientHeight,
-                box = control.boxModel(width, height);
-
-            control.measure(box, width, height, false);
-            control.locate(box, 0, 0, width, height);
-        }
-
-        if (control.__arrange_dirty)
-        {
-            control.arrange();
-        }
-    };
-    
-    
-    //显示
-    self.show = function (dom) {
-
-        (dom || document.body).appendChild(this.dom);
-        update(this);
-
-        return this;
-    };
-    
-    
-    //关闭
-    self.close = function () {
-        
         var dom = this.dom;
         
-        if (this.__arrange_dirty)
+        if (dom && (dom = dom.parentNode))
         {
-            update_list.remove(this);
+            if (this.__update_dirty)
+            {
+                var style = this.dom.style,
+                    width = dom.clientWidth,
+                    height = dom.clientHeight,
+                    box = this.boxModel(width, height);
+
+                this.measure(box, width, height, false);
+                this.locate(box, 0, 0, width, height);
+                this.render();
+                
+                style.position = 'relative';
+                style.left = this.left();
+                style.top = this.top();
+            }
+
+            if (dirty || this.__arrange_dirty)
+            {
+                this.arrange(dirty);
+            }
         }
-        
-        if (dom && dom.parentNode)
-        {
-            dom.parentNode.removeChild(dom);
-        }
-        
-        return this;
     };
     
-
     
     self.update = function (dirty) {
       
@@ -7148,6 +7049,13 @@ $class('Page', flyingon.Panel, function (self, base) {
   
     //扩展顶级控件接口
     flyingon.ITopControl(self);
+    
+    
+    self.show = function (dom) {
+        
+        (dom || document.body).appendChild(this.dom);
+        this.refresh(2);
+    };
     
     
 });

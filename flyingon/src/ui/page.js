@@ -6,4 +6,11 @@ $class('Page', flyingon.Panel, function (self, base) {
     flyingon.ITopControl(self);
     
     
+    self.show = function (dom) {
+        
+        (dom || document.body).appendChild(this.dom);
+        this.refresh(2);
+    };
+    
+    
 });

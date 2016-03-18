@@ -59,14 +59,15 @@
             
             if (e.target !== controls)
             {
-                flyingon.dragmove(this, e, drag_begin, drag_move, drag_end, false);
+                e.dom = drag_dom(e);
+                flyingon.dragmove(this, e, null, null, drag_end, false);
             }
         });
 
-        function drag_begin(e) {
+        function drag_dom(e) {
             
             var body = document.body,
-                dom = e.dom.cloneNode(true),
+                dom = e.target.cloneNode(true),
                 style = dom.style;
             
             style.position = 'absolute';
@@ -81,18 +82,16 @@
             return dom;
         };
         
-        function drag_move(e) {
-            
-        };
-        
         function drag_end(e) {
             
             if (e.target === host)
             {
                 change_position(e.dom, e);
                 host.appendChild(e.dom);
-                
-                return false;
+            }
+            else
+            {
+                e.dom.parentNode.removeChild(e.dom);
             }
         };
         
@@ -113,6 +112,7 @@
             }
         });
     
+        
     </script>
 
 </body>

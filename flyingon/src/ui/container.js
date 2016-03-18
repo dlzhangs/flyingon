@@ -26,37 +26,8 @@ flyingon.IContainerControl = function (self) {
 
         return this.__children || (this.__children = []);
     });
-
     
-    
-    self.__change_style = function (name, value) {
-      
-        if (name !== 'padding')
-        {
-            this.dom.style[name] = value;
-        }
-    };
-    
-        
-    self.onlocate = function (box, x, y) {
-      
-        var style = this.dom.style,
-            width = this.offsetWidth,
-            height = this.offsetHeight,
-            border;
-
-        if (!this.box_sizing_border && box)
-        {
-            width -= (border = box.border).width;
-            height -= border.height;
-        }
-        
-        style.left = x + 'px';
-        style.top = y + 'px';
-        style.width = width + 'px';
-        style.height = height + 'px';
-    };
-
+          
     
     //子控件类型
     self.control_type = flyingon.Control;
@@ -275,18 +246,15 @@ flyingon.IContainerControl = function (self) {
         }
     };
     
-    
-    //默认需排列
-    self.__arrange_dirty = 2;
-    
+
 
     //排列子控件
-    self.arrange = function () {
+    self.arrange = function (dirty) {
 
         var children = this.__children,
             length;
 
-        switch (this.__arrange_dirty)
+        switch (dirty || this.__arrange_dirty)
         {
             case 2:
                 if (children && children.length > 0)
@@ -347,44 +315,43 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            var clientRect = self.clientRect(),
-                hscroll,
-                vscroll;
-
-            switch (self.overflowX())
-            {
-                case 'scroll':
-                    clientRect.height -= layout.hscroll_height;
-                    break;
-                    
-                case 'auto':
-                    hscroll = true;
-                    break;
-            }
-            
-            switch (self.overflowY())
-            {
-                case 'scroll':
-                    clientRect.width -= layout.vscroll_width;
-                    break;
-                    
-                case 'auto':
-                    vscroll = true;
-                    break;
-            }
-                  
-            layout.init(self, clientRect, hscroll, vscroll, children);
-            
-            //排列子项
-            arrange_children(self, children);
+            self.arrange_children(layout, children);
         }
     };
     
     
-    function arrange_children(self, children) {
-      
-        var control;
-        
+    //排列子项
+    self.arrange_children = function (layout, children) {
+
+        var clientRect = this.clientRect(),
+            hscroll,
+            vscroll,
+            control;
+
+        switch (this.overflowX())
+        {
+            case 'scroll':
+                clientRect.height -= layout.hscroll_height;
+                break;
+
+            case 'auto':
+                hscroll = true;
+                break;
+        }
+
+        switch (this.overflowY())
+        {
+            case 'scroll':
+                clientRect.width -= layout.vscroll_width;
+                break;
+
+            case 'auto':
+                vscroll = true;
+                break;
+        }
+
+        layout.init(this, clientRect, hscroll, vscroll, children);
+                
         for (var i = 0, _ = children.length; i < _; i++)
         {
             if (control = children[i])

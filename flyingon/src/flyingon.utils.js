@@ -155,7 +155,7 @@ flyingon.isArray = Array.isArray || (function () {
         var key = name.replace(regex, fn);
 
         if (!(key in style) && 
-            !((key = prefix + name.charAt(0).toUpperCase() + name.substring(1)) in style))
+            !((key = prefix + key.charAt(0).toUpperCase() + key.substring(1)) in style))
         {
             key = '';
         }
@@ -553,53 +553,32 @@ flyingon.ready = (function () {
 //拖动基础方法
 flyingon.dragmove = function (context, event, begin, move, end, delay) {
 
-    var target = event.dom || event.target,
+    var dom = event.dom || event.target,
+        style = dom.style,
+        x0 = dom.offsetLeft,
+        y0 = dom.offsetTop,
         x1 = event.clientX,
         y1 = event.clientY,
-        left,
-        top,
-        dom;
+        on = flyingon.dom_on,
+        off = flyingon.dom_off;
 
     function start(e) {
         
         if (begin)
         {
-            e.dom = target;
-            dom = begin.call(context, e);
+            e.dom = dom;
+            begin.call(context, e);
         }
         
-        var cache = dom || (dom = target),
-            style = dom.style;
+        flyingon.dom_suspend(dom, 'click', true);
+        flyingon.css_value(document.body, 'user-select', 'none');
         
-        if (style.position !== 'absolute')
+        if (dom.setCapture)
         {
-            style.left = cache.offsetLeft + 'px';
-            style.top = cache.offsetTop + 'px';
-            
-            if (!style.width)
-            {
-                style.width = cache.offsetWidth + 'px';
-            }
-            
-            if (!style.height)
-            {
-                style.height = cache.offsetHeight + 'px';
-            }
-            
-            style.position = 'absolute';
+            dom.setCapture();
         }
         
-        left = cache.offsetLeft;
-        top = cache.offsetTop;
-
-        flyingon.dom_suspend(target, 'click', true);
-
-        if (target.setCapture)
-        {
-            target.setCapture();
-        }
-        
-        return dom;
+        start = null;
     };
     
     function mousemove(e) {
@@ -607,58 +586,54 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
         var x = e.clientX - x1,
             y = e.clientY - y1;
 
-        if (e.dom = dom || (x < -2 || x > 2 || y < -2 || y > 2) && start(e))
+        if (!start || (x < -2 || x > 2 || y < -2 || y > 2) && start(e))
         {
-            dom.style.left = (left + x) + 'px';
-            dom.style.top = (top + y) + 'px';
+            style.left = (x0 + x) + 'px';
+            style.top = (y0 + y) + 'px';
 
             if (move)
             {
+                e.dom = dom;
                 e.distanceX = x;
                 e.distanceY = y;
                 
                 move.call(context, e);
             }
 
-            e.stopPropagation();
-            e.preventDefault();
+            e.stopImmediatePropagation();
         }
     };
 
     function mouseup(e) {
 
-        flyingon.dom_off(document, 'mousemove', mousemove);
-        flyingon.dom_off(document, 'mouseup', mouseup);
+        off(document, 'mousemove', mousemove);
+        off(document, 'mouseup', mouseup);
 
-        if (e.dom = dom)
+        if (!start)
         {
-            if (target.setCapture)
+            flyingon.css_value(document.body, 'user-select', '');
+            
+            if (dom.setCapture)
             {
-                target.releaseCapture();
+                dom.releaseCapture();
             }
 
-            setTimeout(function () {
-
-                flyingon.dom_resume(target, 'click', true);
-
-            }, 0);
+            setTimeout(resume, 0);
             
             if (end)
             {
+                e.dom = dom;
                 e.distanceX = e.clientX - x1;
                 e.distanceY = e.clientY - y1;
                 
-                if (end.call(context, e) === false)
-                {
-                    return;
-                }
-            }
-
-            if ((target !== dom) && (target = dom.parentNode))
-            {
-                target.removeChild(dom);
+                end.call(context, e);
             }
         }
+    };
+    
+    function resume() {
+      
+        flyingon.dom_resume(dom, 'click', true);
     };
     
     if (delay === false)
@@ -666,10 +641,9 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
         start(event);
     }
 
-    flyingon.dom_on(document, 'mousemove', mousemove);
-    flyingon.dom_on(document, 'mouseup', mouseup);
+    on(document, 'mousemove', mousemove);
+    on(document, 'mouseup', mouseup);
     
-    event.stopPropagation();
-    event.preventDefault();
+    event.stopImmediatePropagation();
 };
 

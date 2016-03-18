@@ -1,6 +1,6 @@
 
 //控件类
-$class('Control', [Object, flyingon.IComponent], function (self) {
+$class('Control', [Object, flyingon.Component], function (self) {
 
     
 
@@ -24,7 +24,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
         return function (html) {
 
-            var name = 'flyingon-Control',
+            var name = 'flyingon-Control ',
                 cache = this.xtype,
                 dom,
                 style;
@@ -38,10 +38,15 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
             if (cache && name !== (cache = cache.replace('.', '-')))
             {
-                name += ' ' + cache;
+                name += cache + ' ';
+            }
+            
+            if (cache = dom.className)
+            {
+                name += cache + ' ';
             }
 
-            dom.className = (cache = dom.className) ? cache + ' ' + name : name;
+            this.__default_class = dom.className = name;
 
             style.position = 'absolute';
             style.borderWidth = '0';
@@ -96,24 +101,24 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     self.defineProperty('className', '', {
 
         attributes: 'query',
-        set: 'value && (this.dom.className += " " + value);'
+        set: 'this.dom.className = this.__default_class + (value ? value + " " : "");'
     });
 
 
 
     //是否包含指定class
-    self.hasClass = function (className) {
+    self.hasClass = function (name) {
 
-        return className ? this.dom.className.indexOf(' ' + className) > 0 : false;
+        return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
     };
 
 
     //添加class
-    self.addClass = function (className) {
+    self.addClass = function (name) {
 
-        if (className)
+        if (name)
         {
-            this.dom.className += ' ' + className;
+            this.dom.className += name + ' ';
         }
 
         return this;
@@ -121,12 +126,12 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
 
     //移除class
-    self.removeClass = function (className) {
+    self.removeClass = function (name) {
 
-        if (className)
+        if (name)
         {
             var dom = this.dom;
-            dom.className = dom.className.replace(' ' + className, '');
+            dom.className = dom.className.replace(name + ' ', '');
         }
 
         return this;
@@ -134,20 +139,20 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
 
 
     //切换class 有则移除无则添加
-    self.toggleClass = function (className) {
+    self.toggleClass = function (name) {
 
-        if (className)
+        if (name)
         {
             var dom = this.dom,
-                name = dom.className;
+                className = dom.className;
 
-            if (name.indexOf(className = ' ' + className) > 0)
+            if (className.indexOf(name = name + ' ') >= 0)
             {
-                dom.className = name.replace(className, '');
+                dom.className = className.replace(name, '');
             }
             else
             {
-                dom.className += className;
+                dom.className += name;
             }
         }
 
@@ -188,20 +193,15 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
         
     self.locationProperty('overflowX', '', {
        
-        set: 'this.__change_style("overflowX", value);'
+        set: 'this.dom.style.overflowX = value;'
     });
     
     
     self.locationProperty('overflowY', '', {
        
-        set: 'this.__change_style("overflowY", value);'
+        set: 'this.dom.style.overflowY = value;'
     });
     
-
-    self.__change_style = function (name, value) {
-      
-        this.dom.style[name] = value;
-    };
     
 
     self.render = function () {
@@ -553,7 +553,7 @@ $class('Control', [Object, flyingon.IComponent], function (self) {
     };
     
         
-    //更新
+    //更新布局
     self.update = function () {
         
         var parent = this.__parent;
