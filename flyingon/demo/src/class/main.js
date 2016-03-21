@@ -1,5 +1,5 @@
-$include('demo/src/class/class1.js');
-$include('demo/src/class/class2.js');
+$include('flyingon/demo/src/class/class1.js');
+$include('flyingon/demo/src/class/class2.js');
 
 
 $namespace('flyingon.test', function (test) {

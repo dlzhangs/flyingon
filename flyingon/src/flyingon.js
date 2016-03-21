@@ -118,7 +118,7 @@ flyingon.globalEval = function (text) {
 flyingon.absoluteUrl = (function () {
 
     var dom = document.createElement('a'),
-        base = location.href,
+        base = location.href.replace(/[?#][\s\S]*/, ''),
         regex;
 
     dom.href = '';

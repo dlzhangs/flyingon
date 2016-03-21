@@ -441,14 +441,7 @@ $namespace(function (flyingon) {
         //已打开的窗口集合
         var dialog_list = [];
         
-        
-        self.createDomTemplate('<div style="position:absolute;border-width:1px;z-index:100;">'
-                + '<div class="flyingon-Dialog-head"></div>'
-                + '<div class="flyingon-Dialog-body"></div>'
-            + '</div>');
-        
-            
-        
+                    
         $constructor(function () {
            
             var Control = flyingon.Control,
@@ -467,14 +460,13 @@ $namespace(function (flyingon) {
                 self.close();
             });
             
-            head.layout('flyingon-Dialog-head');
-            head.children().push(icon, title, close);
+            head.addClass('flyingon-Dialog-head')
+                .zIndex(100)
+                .layout('flyingon-Dialog-head')
+                .children().push(icon, title, close);
+            
             head.__parent = this;
             head.__dom_dirty = true;
-            
-            this.dom.children[0].appendChild(head.dom);
-            
-            dragmove(this);
         });
         
         
@@ -506,17 +498,11 @@ $namespace(function (flyingon) {
         
         
         //是否可拖动窗口
-        self.defineProperty('draggable', true, {
-            
-            set: 'this.__set_draggable(value);'
-        });
+        self.defineProperty('draggable', true);
         
         
         //是否可调整大小
-        self.defineProperty('resizable', true, {
-           
-            set: 'this.__set_resizable(value);'
-        });
+        self.defineProperty('resizable', true);
         
         
         //是否显示关闭按钮
@@ -538,37 +524,6 @@ $namespace(function (flyingon) {
             icon.className = 'flyingon-Control flyingon-Dialog-icon ' + (value || '');
         };
         
-        
-        self.__set_draggable = function (value) {
-          
-            var fn = this.__draggable;
-            
-            if (fn)
-            {
-                flyingon.dom_off(this.dom.children[0], 'mousedown', fn);
-            }
-            
-            if (value)
-            {
-                dragmove(this);
-            }
-        };
-        
-        
-        function dragmove(self) {
-            
-            flyingon.dom_on(self.dom.children[0], 'mousedown', self.__draggable = function (e) {
-                
-                //指定被拖动的对象
-                e.dom = self.dom;
-                flyingon.dragmove(self, e);
-            });
-        };
-        
-        
-        self.__set_resizable = function (value) {
-            
-        };
         
         
         //扩展顶级控件接口
@@ -602,6 +557,13 @@ $namespace(function (flyingon) {
             var body = document.body,
                 dom = self.dom;
             
+            self.draggable() && self.head.on('mousedown', self.__draggable = function (e) {
+                
+                //指定被拖动的对象
+                e.dom = self.dom;
+                flyingon.dragmove(self, e);
+            });
+            
             if (overlay)
             {
                 overlay = self.overlay = document.createElement('div');
@@ -610,7 +572,7 @@ $namespace(function (flyingon) {
                 
                 body.appendChild(overlay);
             }
-            
+                        
             body.appendChild(dom);
             
             self.refresh(2);
@@ -625,6 +587,14 @@ $namespace(function (flyingon) {
         };
         
         
+        self.clientRect = function () {
+            
+            var clientRect = base.clientRect.call(this);
+            
+            return clientRect;
+        };
+        
+        
         self.arrange = function () {
             
             this.refresh.call(this.head);
@@ -636,7 +606,13 @@ $namespace(function (flyingon) {
             
             if (this.trigger(new flyingon.Event('closing')) !== false)
             {
-                var body = document.body;
+                var body = document.body,
+                    cache;
+                
+                if (cache = this.__draggable)
+                {
+                    this.head.off('mousedown', cache);
+                }
                 
                 body.removeChild(this.dom);
                 
