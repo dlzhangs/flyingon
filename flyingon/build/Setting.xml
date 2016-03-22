@@ -26,8 +26,6 @@
         <file>..\src\ui\control.js</file>
         <file>..\src\ui\container.js</file>
         <file>..\src\ui\panel.js</file>
-        <file>..\src\ui\topcontrol.js</file>
-        <file>..\src\ui\page.js</file>
         
     </combine>
     

@@ -193,17 +193,18 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
     self.locationProperty('overflowX', '', {
        
-        set: 'this.dom.style.overflowX = value;'
+        set: '(this.dom_body || this.dom).style.overflowX = value;'
     });
     
     
     self.locationProperty('overflowY', '', {
        
-        set: 'this.dom.style.overflowY = value;'
+        set: '(this.dom_body || this.dom).style.overflowY = value;'
     });
     
     
 
+    //渲染dom的大小及位置
     self.render = function () {
       
         var style = this.dom.style,
@@ -215,8 +216,16 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
         if (!this.box_sizing_border && (box = this.__boxModel))
         {
-            width -= (border = box.border).width + (padding = box.padding).width;
-            height -= border.height + padding.height;
+            border = box.border;
+            width -= border.width;
+            height -= border.height;
+            
+            if (!this.__no_padding)
+            {
+                padding = box.padding;
+                width -= padding.width;
+                height -= padding.height;
+            }
         }
         
         style.left = this.offsetLeft + 'px';
@@ -224,7 +233,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
         style.width = width + 'px';
         style.height = height + 'px';
     };
-    
+        
     
     //样式默认属性值
     var style_attributes = {
@@ -453,11 +462,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
         MouseEvent = flyingon.MouseEvent,
         
-        KeyEvent = flyingon.KeyEvent,
-        
-        arrange_controls = [], //待排列的控件集合
-        
-        arrange_timeout; //排列定时器
+        KeyEvent = flyingon.KeyEvent;
     
     
     function event_control(e) {
@@ -552,17 +557,115 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
     };
     
+    
+    var update_list = [],
+        delay;
+        
+    
+    //延时更新
+    function update_delay() {
+        
+        var list = update_list;
+        
+        for (var i = list.length - 1; i >= 0; i--)
+        {
+            list[i].refresh();
+        }
+        
+        list.length = 0;
+        delay = 0;
+    };
+    
+    
+    //更新
+    function update(dirty) {
+      
+        if (!dirty)
+        {
+            this.__location_dirty = true;
+        }
+        
+        this.__arrange_dirty = dirty || 2;
+
+        if (!this.__update_dirty)
+        {
+            this.__update_dirty = true;
+            
+            update_list.push(this);
+            delay || (delay = setTimeout(update_delay, 10)); //10毫秒后定时刷新
+        }
+
+        return this;
+    };
+    
+    
+    //刷新控件
+    self.refresh = function (dirty) {
+      
+        var dom = this.dom;
+        
+        if (dom && (dom = dom.parentNode))
+        {
+            if (this.__location_dirty)
+            {
+                var width = dom.clientWidth,
+                    height = dom.clientHeight,
+                    box = this.boxModel(width, height);
+
+                this.measure(box, width, height, false);
+                this.locate(box, box.left, box.top, width, height);
+                this.render();
+            }
+
+            if ((dirty || this.__arrange_dirty) && this.arrange)
+            {
+                this.arrange(dirty);
+            }
+            
+            this.__update_dirty = false;
+        }
+    };
+    
         
     //更新布局
     self.update = function () {
         
         var parent = this.__parent;
         
-        this.__update_dirty = true;
+        this.__location_dirty = true;
         
         if (parent && !parent.__arrange_dirty)
         {
             parent.update(2);
+        }
+    };
+    
+    
+    //附加控件至dom容器
+    self.attach = function (dom_host) {
+        
+        if (this.update !== update)
+        {
+            var dom = this.dom;
+            
+            dom.style.position = 'relative';
+            dom_host.appendChild(dom);
+            
+            this.update = update;
+            this.refresh(2);
+        }
+    };
+    
+    
+    //从dom容器中移除
+    self.detach = function () {
+        
+        if (this.update === update)
+        {
+            var dom = this.dom;
+            
+            dom.parentNode.removeChild(dom);
+            delete this.update;  
         }
     };
     

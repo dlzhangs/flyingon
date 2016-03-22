@@ -86,11 +86,6 @@ flyingon.IContainerControl = function (self) {
         
         if (control.__parent !== self)
         {
-            if (control['flyingon.ITopControl'])
-            {
-                throw $errortext('flyingon', 'ITopControl append');
-            }
-            
             if (control instanceof self.control_type)
             {
                 if (control.__arrange_dirty !== 2)
@@ -285,12 +280,13 @@ flyingon.IContainerControl = function (self) {
     
     function arrange(self, children) {
         
-        var layout = self.__layout;
+        var layout = self.__layout,
+            cache;
             
         //初始化dom
         if (self.__dom_dirty)
         {
-            var cache = document.createDocumentFragment();
+            cache = document.createDocumentFragment();
 
             for (var i = 0, _ = children.length; i < _; i++)
             {
@@ -315,64 +311,83 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            self.arrange_children(layout, children);
+            var clientRect = self.clientRect(),
+                hscroll,
+                vscroll,
+                control;
+
+            switch (self.overflowX())
+            {
+                case 'scroll':
+                    clientRect.height -= layout.hscroll_height;
+                    break;
+
+                case 'auto':
+                    hscroll = true;
+                    break;
+            }
+
+            switch (self.overflowY())
+            {
+                case 'scroll':
+                    clientRect.width -= layout.vscroll_width;
+                    break;
+
+                case 'auto':
+                    vscroll = true;
+                    break;
+            }
+
+            layout.init(self, clientRect, hscroll, vscroll, children);
+            
+            self.arrange_children(children);
         }
     };
     
     
     //排列子项
-    self.arrange_children = function (layout, children) {
+    self.arrange_children = function (children) {
 
-        var clientRect = this.clientRect(),
-            hscroll,
-            vscroll,
-            control;
-
-        switch (this.overflowX())
-        {
-            case 'scroll':
-                clientRect.height -= layout.hscroll_height;
-                break;
-
-            case 'auto':
-                hscroll = true;
-                break;
-        }
-
-        switch (this.overflowY())
-        {
-            case 'scroll':
-                clientRect.width -= layout.vscroll_width;
-                break;
-
-            case 'auto':
-                vscroll = true;
-                break;
-        }
-
-        layout.init(this, clientRect, hscroll, vscroll, children);
-                
         for (var i = 0, _ = children.length; i < _; i++)
         {
-            if (control = children[i])
+            var control = children[i];
+            
+            if (control.arrange)
             {
-                if (control.arrange)
-                {
-                    control.arrange();
-                }
-             
-                control.render();
+                control.arrange();
             }
+            
+            control.render();
         }
+    };
+    
+    
+    //设置渲染大小时不包含padding
+    self.__no_padding = true;
+    
+    
+    //padding变更时不同步dom
+    self.__style_padding = function (value) {
+    
     };
     
     
     self.onarrange = function () {
       
-        var style = this.dom.children[0].style;
+        var box = this.__boxModel,
+            width = this.contentWidth,
+            height = this.contentHeight,
+            style = (this.dom_body || this.dom).children[0].style;
         
-        style.width = this.contentWidth + 'px';
-        style.height = this.contentHeight + 'px';
+        if (box)
+        {
+            box = box.padding;
+            width += box.right;
+            height += box.bottom;
+        }
+        
+        style.width = width + 'px';
+        style.height = height + 'px';
     };
     
     
@@ -383,7 +398,7 @@ flyingon.IContainerControl = function (self) {
         
         if (!dirty)
         {
-            this.__update_dirty = true;
+            this.__location_dirty = true;
         }
         
         this.__arrange_dirty = +dirty || 2;

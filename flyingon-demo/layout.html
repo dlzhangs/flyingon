@@ -6,15 +6,11 @@
 </head>
 <body style="padding:10px;">
 
-    <script type="text/javascript" src="../../flyingon/js/flyingon.ui.js"></script>
+    <script type="text/javascript" src="../flyingon/js/flyingon.ui.js"></script>
     
     <script type="text/javascript">
         
-        
-        //指定引入资源初始路径
-        flyingon.include_path('../../');
-      
-            
+                    
         flyingon.layout('flyingon-Panel', {
            
             type: 'dock',
@@ -84,7 +80,7 @@
         });
         
         
-        var page = new flyingon.Page().sets({
+        var page = new flyingon.Panel().sets({
         
             id: 'page',
             width: 1000,
@@ -136,7 +132,7 @@
         }
 
         
-        page.show();
+        page.attach(document.body);
 
       
     </script>

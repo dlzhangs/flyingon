@@ -216,7 +216,7 @@ flyingon.ILocatable = function (self, control) {
             attributes.group = 'location';
             attributes.query = true;
             attributes.set = ((set = attributes.set) ? set + '\n\t' : '') 
-                + 'if (!this.__update_dirty) this.update();';
+                + 'if (!this.__location_dirty) this.update();';
         }
         
         this.defineProperty(name, defaultValue, attributes);
@@ -286,9 +286,16 @@ flyingon.ILocatable = function (self, control) {
 
     self.locationProperty('padding', '0', {
      
-        set: 'this.dom.style.padding = value > 0 ? value + "px" : value;'
+        set: 'this.__style_padding(value > 0 ? value + "px" : value);'
     });
     
+    
+    //设置dom padding方法
+    self.__style_padding = function (value) {
+    
+        this.dom.style.padding = value;
+    };
+
 
     if (extend_list)
     {
@@ -549,7 +556,8 @@ flyingon.ILocatable = function (self, control) {
         }
 
         this.onmeasure(box, this.offsetWidth = width, this.offsetHeight = height);
-        this.__update_dirty = false;
+
+        this.__location_dirty = false;
     };
     
     
@@ -557,7 +565,7 @@ flyingon.ILocatable = function (self, control) {
     self.onmeasure = function (box, width, height) {
         
     };
-        
+    
     
     //定位
     self.locate = function (box, x, y, align_width, align_height) {
@@ -617,8 +625,9 @@ flyingon.ILocatable = function (self, control) {
     self.onlocate = function (box, x, y) {
         
     };
+        
     
-    
+    //获取客户区大小
     self.clientRect = function () {
         
         var box = this.__boxModel || this.boxModel(),
@@ -629,8 +638,8 @@ flyingon.ILocatable = function (self, control) {
 
         return {
           
-            left: 0,
-            top: 0,
+            left: padding.left,
+            top: padding.top,
             width: width >= 0 ? width : 0,
             height: height >= 0 ? height : 0
         };
@@ -678,8 +687,8 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
                 border = this.__boxModel.border,
                 clientRect = this.clientRect();
 
-            clientRect.left = x + border.left;
-            clientRect.top = y + border.top;
+            clientRect.left += x + border.left;
+            clientRect.top += y + border.top;
             
             layout.init(this, clientRect, false, false, items[0], items[1], items[2]);
             

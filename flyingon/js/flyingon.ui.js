@@ -20,7 +20,10 @@
 
 
 //根名字空间
-var flyingon = window.flyingon = flyingon || {};
+var flyingon = window.flyingon = function (selector, context) {
+    
+    return new flyingon.Query(selector, context);
+};
 
 
 
@@ -175,12 +178,10 @@ flyingon.absoluteUrl = (function () {
         
         base_path = flyingon.absoluteUrl('/'), //网站主路径
 
-        flyingon_path = flyingon.absoluteUrl('', true), //起始文件路径, 当前html路径
+        flyingon_path, //flyingon路径, flyingon所在目录或flyingon.js文件所在目录
 
-        include_base = flyingon_path, //引入资源起始目录
+        include_path, //引入资源起始目录
 
-        include_path, //特殊指定的相对路径映射关系
-        
         include_version = '', //引入资源版本
 
         include_files = flyingon.create(null), //特殊指定的引入资源版本
@@ -220,6 +221,28 @@ flyingon.absoluteUrl = (function () {
 
     
     
+    //实始化起始路径
+    flyingon_path = include_path = (function () {
+        
+        var list = document.scripts,
+            regex = /flyingon(.|\/js\/flyingon.)(?:ui.)?(?:min.)?js/;
+        
+        for (var i = list.length - 1; i >= 0; i--)
+        {
+            var src = list[i].src,
+                index = src.search(regex);
+            
+            if (index >= 0)
+            {
+                return src.substring(0, index);
+            }
+        }
+        
+        return flyingon.absoluteUrl('', true);
+        
+    })();
+    
+    
     //是否使用同步script模式加载资源
     flyingon.include_sync = function (value) {
     
@@ -238,40 +261,33 @@ flyingon.absoluteUrl = (function () {
     
 
     //指定引入资源起始路径
-    flyingon.include_path = function (path, values) {
+    flyingon.include_path = function (path) {
 
         if (path === void 0)
         {
-            return include_base;
+            return include_path;
         }
 
         if (path && typeof path === 'string')
         {
             if (path.charAt(0) === '/')
             {
-                include_base = flyingon.absoluteUrl(path);
+                include_path = flyingon.absoluteUrl(path);
             }
-            else if (path.indexOf('://') >= 0)
+            else if (path.indexOf(':/') >= 0)
             {
-                include_base = path;
+                include_path = path;
             }
             else
             {
-                include_base = flyingon.absoluteUrl(flyingon_path + path);
+                include_path = flyingon.absoluteUrl(flyingon_path + path);
             }
             
             if (path.charAt(path.length - 1) !== '/')
             {
-                include_base += '/';
+                include_path += '/';
             }
         }
-        else
-        {
-            values = path;
-            include_base = flyingon_path;
-        }
-        
-        include_path = typeof values === 'object' && values;
     };
 
 
@@ -457,21 +473,9 @@ flyingon.absoluteUrl = (function () {
         {
             cache = base_path + cache.substring(1);
         }
-        else if (url.indexOf('://') < 0)
+        else if (url.indexOf(':/') < 0)
         {
-            if (index = include_path) //如果指定了特殊的相对url映射则处理映射关系
-            {
-                for (var key in index)
-                {
-                    if (cache.indexOf(key) === 0)
-                    {
-                        cache = index[key] + cache.substring(key.length);
-                        break;
-                    }
-                }
-            }
-            
-            cache = include_base + cache;
+            cache = include_path + cache;
         }
         
         //记录多语言及皮肤
@@ -1089,7 +1093,7 @@ flyingon.absoluteUrl = (function () {
     
     
     //默认名字空间名
-    flyingon.name = 'flyingon';
+    flyingon.namespace_name = 'flyingon';
 
 
     //定义或切换模块
@@ -1109,18 +1113,17 @@ flyingon.absoluteUrl = (function () {
 
                 for (var i = 0, _ = items.length; i < _; i++)
                 {
-                    name = items[i];
-
-                    if (cache = target[name])
+                    if (!(cache = target[name = items[i]]))
                     {
-                        target = cache;
+                        cache = target[name] = flyingon.create(null);
                     }
-                    else
+                    
+                    if (!cache.namespace_name)
                     {
-                        cache = flyingon.create(null);
-                        cache.name = target.name ? target.name + '.' + name : name;
-                        target = target[name] = cache;
+                        cache.namespace_name = target.namespace_name ? target.namespace_name + '.' + name : name;
                     }
+                    
+                    target = cache;
                 }
             }
             else
@@ -1293,7 +1296,7 @@ flyingon.absoluteUrl = (function () {
         //xtype
         if (name)
         {
-            prototype.xtype = namespace.name + '.' + name;
+            prototype.xtype = namespace.namespace_name + '.' + name;
         }
         
 
@@ -4083,7 +4086,7 @@ flyingon.ILocatable = function (self, control) {
             attributes.group = 'location';
             attributes.query = true;
             attributes.set = ((set = attributes.set) ? set + '\n\t' : '') 
-                + 'if (!this.__update_dirty) this.update();';
+                + 'if (!this.__location_dirty) this.update();';
         }
         
         this.defineProperty(name, defaultValue, attributes);
@@ -4153,9 +4156,16 @@ flyingon.ILocatable = function (self, control) {
 
     self.locationProperty('padding', '0', {
      
-        set: 'this.dom.style.padding = value > 0 ? value + "px" : value;'
+        set: 'this.__style_padding(value > 0 ? value + "px" : value);'
     });
     
+    
+    //设置dom padding方法
+    self.__style_padding = function (value) {
+    
+        this.dom.style.padding = value;
+    };
+
 
     if (extend_list)
     {
@@ -4416,7 +4426,8 @@ flyingon.ILocatable = function (self, control) {
         }
 
         this.onmeasure(box, this.offsetWidth = width, this.offsetHeight = height);
-        this.__update_dirty = false;
+
+        this.__location_dirty = false;
     };
     
     
@@ -4424,7 +4435,7 @@ flyingon.ILocatable = function (self, control) {
     self.onmeasure = function (box, width, height) {
         
     };
-        
+    
     
     //定位
     self.locate = function (box, x, y, align_width, align_height) {
@@ -4484,8 +4495,9 @@ flyingon.ILocatable = function (self, control) {
     self.onlocate = function (box, x, y) {
         
     };
+        
     
-    
+    //获取客户区大小
     self.clientRect = function () {
         
         var box = this.__boxModel || this.boxModel(),
@@ -4496,8 +4508,8 @@ flyingon.ILocatable = function (self, control) {
 
         return {
           
-            left: 0,
-            top: 0,
+            left: padding.left,
+            top: padding.top,
             width: width >= 0 ? width : 0,
             height: height >= 0 ? height : 0
         };
@@ -4545,8 +4557,8 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
                 border = this.__boxModel.border,
                 clientRect = this.clientRect();
 
-            clientRect.left = x + border.left;
-            clientRect.top = y + border.top;
+            clientRect.left += x + border.left;
+            clientRect.top += y + border.top;
             
             layout.init(this, clientRect, false, false, items[0], items[1], items[2]);
             
@@ -6121,17 +6133,18 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
     self.locationProperty('overflowX', '', {
        
-        set: 'this.dom.style.overflowX = value;'
+        set: '(this.dom_body || this.dom).style.overflowX = value;'
     });
     
     
     self.locationProperty('overflowY', '', {
        
-        set: 'this.dom.style.overflowY = value;'
+        set: '(this.dom_body || this.dom).style.overflowY = value;'
     });
     
     
 
+    //渲染dom的大小及位置
     self.render = function () {
       
         var style = this.dom.style,
@@ -6143,8 +6156,16 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
         if (!this.box_sizing_border && (box = this.__boxModel))
         {
-            width -= (border = box.border).width + (padding = box.padding).width;
-            height -= border.height + padding.height;
+            border = box.border;
+            width -= border.width;
+            height -= border.height;
+            
+            if (!this.__no_padding)
+            {
+                padding = box.padding;
+                width -= padding.width;
+                height -= padding.height;
+            }
         }
         
         style.left = this.offsetLeft + 'px';
@@ -6152,7 +6173,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
         style.width = width + 'px';
         style.height = height + 'px';
     };
-    
+        
     
     //样式默认属性值
     var style_attributes = {
@@ -6381,11 +6402,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
         MouseEvent = flyingon.MouseEvent,
         
-        KeyEvent = flyingon.KeyEvent,
-        
-        arrange_controls = [], //待排列的控件集合
-        
-        arrange_timeout; //排列定时器
+        KeyEvent = flyingon.KeyEvent;
     
     
     function event_control(e) {
@@ -6480,17 +6497,115 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
     };
     
+    
+    var update_list = [],
+        delay;
+        
+    
+    //延时更新
+    function update_delay() {
+        
+        var list = update_list;
+        
+        for (var i = list.length - 1; i >= 0; i--)
+        {
+            list[i].refresh();
+        }
+        
+        list.length = 0;
+        delay = 0;
+    };
+    
+    
+    //更新
+    function update(dirty) {
+      
+        if (!dirty)
+        {
+            this.__location_dirty = true;
+        }
+        
+        this.__arrange_dirty = dirty || 2;
+
+        if (!this.__update_dirty)
+        {
+            this.__update_dirty = true;
+            
+            update_list.push(this);
+            delay || (delay = setTimeout(update_delay, 10)); //10毫秒后定时刷新
+        }
+
+        return this;
+    };
+    
+    
+    //刷新控件
+    self.refresh = function (dirty) {
+      
+        var dom = this.dom;
+        
+        if (dom && (dom = dom.parentNode))
+        {
+            if (this.__location_dirty)
+            {
+                var width = dom.clientWidth,
+                    height = dom.clientHeight,
+                    box = this.boxModel(width, height);
+
+                this.measure(box, width, height, false);
+                this.locate(box, box.left, box.top, width, height);
+                this.render();
+            }
+
+            if ((dirty || this.__arrange_dirty) && this.arrange)
+            {
+                this.arrange(dirty);
+            }
+            
+            this.__update_dirty = false;
+        }
+    };
+    
         
     //更新布局
     self.update = function () {
         
         var parent = this.__parent;
         
-        this.__update_dirty = true;
+        this.__location_dirty = true;
         
         if (parent && !parent.__arrange_dirty)
         {
             parent.update(2);
+        }
+    };
+    
+    
+    //附加控件至dom容器
+    self.attach = function (dom_host) {
+        
+        if (this.update !== update)
+        {
+            var dom = this.dom;
+            
+            dom.style.position = 'relative';
+            dom_host.appendChild(dom);
+            
+            this.update = update;
+            this.refresh(2);
+        }
+    };
+    
+    
+    //从dom容器中移除
+    self.detach = function () {
+        
+        if (this.update === update)
+        {
+            var dom = this.dom;
+            
+            dom.parentNode.removeChild(dom);
+            delete this.update;  
         }
     };
     
@@ -6595,11 +6710,6 @@ flyingon.IContainerControl = function (self) {
         
         if (control.__parent !== self)
         {
-            if (control['flyingon.ITopControl'])
-            {
-                throw $errortext('flyingon', 'ITopControl append');
-            }
-            
             if (control instanceof self.control_type)
             {
                 if (control.__arrange_dirty !== 2)
@@ -6794,12 +6904,13 @@ flyingon.IContainerControl = function (self) {
     
     function arrange(self, children) {
         
-        var layout = self.__layout;
+        var layout = self.__layout,
+            cache;
             
         //初始化dom
         if (self.__dom_dirty)
         {
-            var cache = document.createDocumentFragment();
+            cache = document.createDocumentFragment();
 
             for (var i = 0, _ = children.length; i < _; i++)
             {
@@ -6824,64 +6935,83 @@ flyingon.IContainerControl = function (self) {
         
         if (layout)
         {
-            self.arrange_children(layout, children);
+            var clientRect = self.clientRect(),
+                hscroll,
+                vscroll,
+                control;
+
+            switch (self.overflowX())
+            {
+                case 'scroll':
+                    clientRect.height -= layout.hscroll_height;
+                    break;
+
+                case 'auto':
+                    hscroll = true;
+                    break;
+            }
+
+            switch (self.overflowY())
+            {
+                case 'scroll':
+                    clientRect.width -= layout.vscroll_width;
+                    break;
+
+                case 'auto':
+                    vscroll = true;
+                    break;
+            }
+
+            layout.init(self, clientRect, hscroll, vscroll, children);
+            
+            self.arrange_children(children);
         }
     };
     
     
     //排列子项
-    self.arrange_children = function (layout, children) {
+    self.arrange_children = function (children) {
 
-        var clientRect = this.clientRect(),
-            hscroll,
-            vscroll,
-            control;
-
-        switch (this.overflowX())
-        {
-            case 'scroll':
-                clientRect.height -= layout.hscroll_height;
-                break;
-
-            case 'auto':
-                hscroll = true;
-                break;
-        }
-
-        switch (this.overflowY())
-        {
-            case 'scroll':
-                clientRect.width -= layout.vscroll_width;
-                break;
-
-            case 'auto':
-                vscroll = true;
-                break;
-        }
-
-        layout.init(this, clientRect, hscroll, vscroll, children);
-                
         for (var i = 0, _ = children.length; i < _; i++)
         {
-            if (control = children[i])
+            var control = children[i];
+            
+            if (control.arrange)
             {
-                if (control.arrange)
-                {
-                    control.arrange();
-                }
-             
-                control.render();
+                control.arrange();
             }
+            
+            control.render();
         }
+    };
+    
+    
+    //设置渲染大小时不包含padding
+    self.__no_padding = true;
+    
+    
+    //padding变更时不同步dom
+    self.__style_padding = function (value) {
+    
     };
     
     
     self.onarrange = function () {
       
-        var style = this.dom.children[0].style;
+        var box = this.__boxModel,
+            width = this.contentWidth,
+            height = this.contentHeight,
+            style = (this.dom_body || this.dom).children[0].style;
         
-        style.width = this.contentWidth + 'px';
-        style.height = this.contentHeight + 'px';
+        if (box)
+        {
+            box = box.padding;
+            width += box.right;
+            height += box.bottom;
+        }
+        
+        style.width = width + 'px';
+        style.height = height + 'px';
     };
     
     
@@ -6892,7 +7022,7 @@ flyingon.IContainerControl = function (self) {
         
         if (!dirty)
         {
-            this.__update_dirty = true;
+            this.__location_dirty = true;
         }
         
         this.__arrange_dirty = +dirty || 2;
@@ -6960,103 +7090,4 @@ $class('Panel', flyingon.Control, function (self, base) {
 
 });
     
-
-
-//顶级控件接口
-flyingon.ITopControl = function (self) {
-    
-    
-    var update_list = [],
-        delay;
-        
-    
-    //接口标记
-    self['flyingon.ITopControl'] = true;
-    
-    
-    //延时更新
-    function update_delay() {
-        
-        var list = update_list;
-        
-        for (var i = list.length - 1; i >= 0; i--)
-        {
-            list[i].refresh();
-        }
-        
-        list.length = 0;
-        delay = 0;
-    };
-    
-    
-    //刷新控件
-    self.refresh = function (dirty) {
-      
-        var dom = this.dom;
-        
-        if (dom && (dom = dom.parentNode))
-        {
-            if (this.__update_dirty)
-            {
-                var style = this.dom.style,
-                    width = dom.clientWidth,
-                    height = dom.clientHeight,
-                    box = this.boxModel(width, height);
-
-                this.measure(box, width, height, false);
-                this.locate(box, 0, 0, width, height);
-                this.render();
-                
-                style.position = 'relative';
-                style.left = this.left();
-                style.top = this.top();
-            }
-
-            if (dirty || this.__arrange_dirty)
-            {
-                this.arrange(dirty);
-            }
-        }
-    };
-    
-    
-    self.update = function (dirty) {
-      
-        var arrange = this.__arrange_dirty;
-        
-        if (!dirty)
-        {
-            this.__update_dirty = true;
-        }
-        
-        this.__arrange_dirty = dirty || 2;
-
-        if (!arrange)
-        {
-            update_list.push(this);
-            delay || (delay = setTimeout(update_delay, 10)); //10毫秒后定时刷新
-        }
-
-        return this;
-    };
-    
-    
-};
-
-
-$class('Page', flyingon.Panel, function (self, base) {
-    
-  
-    //扩展顶级控件接口
-    flyingon.ITopControl(self);
-    
-    
-    self.show = function (dom) {
-        
-        (dom || document.body).appendChild(this.dom);
-        this.refresh(2);
-    };
-    
-    
-});
 

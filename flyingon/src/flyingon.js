@@ -14,7 +14,10 @@
 
 
 //根名字空间
-var flyingon = window.flyingon = flyingon || {};
+var flyingon = window.flyingon = function (selector, context) {
+    
+    return new flyingon.Query(selector, context);
+};
 
 
 
@@ -169,12 +172,10 @@ flyingon.absoluteUrl = (function () {
         
         base_path = flyingon.absoluteUrl('/'), //网站主路径
 
-        flyingon_path = flyingon.absoluteUrl('', true), //起始文件路径, 当前html路径
+        flyingon_path, //flyingon路径, flyingon所在目录或flyingon.js文件所在目录
 
-        include_base = flyingon_path, //引入资源起始目录
+        include_path, //引入资源起始目录
 
-        include_path, //特殊指定的相对路径映射关系
-        
         include_version = '', //引入资源版本
 
         include_files = flyingon.create(null), //特殊指定的引入资源版本
@@ -214,6 +215,28 @@ flyingon.absoluteUrl = (function () {
 
     
     
+    //实始化起始路径
+    flyingon_path = include_path = (function () {
+        
+        var list = document.scripts,
+            regex = /flyingon(.|\/js\/flyingon.)(?:ui.)?(?:min.)?js/;
+        
+        for (var i = list.length - 1; i >= 0; i--)
+        {
+            var src = list[i].src,
+                index = src.search(regex);
+            
+            if (index >= 0)
+            {
+                return src.substring(0, index);
+            }
+        }
+        
+        return flyingon.absoluteUrl('', true);
+        
+    })();
+    
+    
     //是否使用同步script模式加载资源
     flyingon.include_sync = function (value) {
     
@@ -232,40 +255,33 @@ flyingon.absoluteUrl = (function () {
     
 
     //指定引入资源起始路径
-    flyingon.include_path = function (path, values) {
+    flyingon.include_path = function (path) {
 
         if (path === void 0)
         {
-            return include_base;
+            return include_path;
         }
 
         if (path && typeof path === 'string')
         {
             if (path.charAt(0) === '/')
             {
-                include_base = flyingon.absoluteUrl(path);
+                include_path = flyingon.absoluteUrl(path);
             }
-            else if (path.indexOf('://') >= 0)
+            else if (path.indexOf(':/') >= 0)
             {
-                include_base = path;
+                include_path = path;
             }
             else
             {
-                include_base = flyingon.absoluteUrl(flyingon_path + path);
+                include_path = flyingon.absoluteUrl(flyingon_path + path);
             }
             
             if (path.charAt(path.length - 1) !== '/')
             {
-                include_base += '/';
+                include_path += '/';
             }
         }
-        else
-        {
-            values = path;
-            include_base = flyingon_path;
-        }
-        
-        include_path = typeof values === 'object' && values;
     };
 
 
@@ -451,21 +467,9 @@ flyingon.absoluteUrl = (function () {
         {
             cache = base_path + cache.substring(1);
         }
-        else if (url.indexOf('://') < 0)
+        else if (url.indexOf(':/') < 0)
         {
-            if (index = include_path) //如果指定了特殊的相对url映射则处理映射关系
-            {
-                for (var key in index)
-                {
-                    if (cache.indexOf(key) === 0)
-                    {
-                        cache = index[key] + cache.substring(key.length);
-                        break;
-                    }
-                }
-            }
-            
-            cache = include_base + cache;
+            cache = include_path + cache;
         }
         
         //记录多语言及皮肤
@@ -1083,7 +1087,7 @@ flyingon.absoluteUrl = (function () {
     
     
     //默认名字空间名
-    flyingon.name = 'flyingon';
+    flyingon.namespace_name = 'flyingon';
 
 
     //定义或切换模块
@@ -1103,18 +1107,17 @@ flyingon.absoluteUrl = (function () {
 
                 for (var i = 0, _ = items.length; i < _; i++)
                 {
-                    name = items[i];
-
-                    if (cache = target[name])
+                    if (!(cache = target[name = items[i]]))
                     {
-                        target = cache;
+                        cache = target[name] = flyingon.create(null);
                     }
-                    else
+                    
+                    if (!cache.namespace_name)
                     {
-                        cache = flyingon.create(null);
-                        cache.name = target.name ? target.name + '.' + name : name;
-                        target = target[name] = cache;
+                        cache.namespace_name = target.namespace_name ? target.namespace_name + '.' + name : name;
                     }
+                    
+                    target = cache;
                 }
             }
             else
@@ -1287,7 +1290,7 @@ flyingon.absoluteUrl = (function () {
         //xtype
         if (name)
         {
-            prototype.xtype = namespace.name + '.' + name;
+            prototype.xtype = namespace.namespace_name + '.' + name;
         }
         
 
