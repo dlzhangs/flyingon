@@ -1,17 +1,13 @@
 
 //容器控件接口
-flyingon.IContainerControl = function (self) {
+flyingon.IContainerControl = function (self, base) {
 
 
 
     //接口标记
     self['flyingon.IContainerControl'] = true;
     
-    
-    //dom元素模板
-    self.createDomTemplate('<div><div style="position:relative;margin:0;border:0;padding:0;left:0;top:0;overflow:hidden;"></div></div>');
-
-    
+        
 
     //当前布局
     self.defineProperty('layout', null, {
@@ -27,6 +23,9 @@ flyingon.IContainerControl = function (self) {
         return this.__children || (this.__children = []);
     });
     
+    
+    //默认设置需处理dom
+    self.__dom_dirty = true;
           
     
     //子控件类型
@@ -38,9 +37,17 @@ flyingon.IContainerControl = function (self) {
 
         if (control && check_control(this, control))
         {
-            this.__dom_dirty = true;
+            if (!this.__dom_dirty)
+            {
+                if (this.__arrange_dirty !== 2)
+                {
+                    this.update();
+                }
+                
+                (this.dom_body || this.dom).appendChild(control.dom);
+            }
             
-            (this.__children || (this.__children = [])).push(control);
+            (this.__children || this.children()).push(control);
             control.__parent = this;
         }
         
@@ -53,27 +60,19 @@ flyingon.IContainerControl = function (self) {
 
         if (control && check_control(this, control))
         {
-            var dom = this.dom,
-                children = this.__children || (this.__children = []);
+            var children = this.__children || this.children(),
+                index = flyingon.range(index | 0, 0, children.length); 
             
-            if (index < 0)
+            if (!this.__dom_dirty)
             {
-                index = 0;
+                if (this.__arrange_dirty !== 2)
+                {
+                    this.update();
+                }
+                
+                (this.dom_body || this.dom).insertBefore(control.dom, children[index].dom || null);
             }
-            else if (index > children.length)
-            {
-                index = children.length;
-            }
-                     
-            if (dom.children.length >= index)
-            {
-                this.dom.insertBefore(control.dom, dom.children[index] || null);
-            }
-            else
-            {
-                this.__dom_dirty = true;
-            }
-            
+               
             children.splice(index, 0, control);
             control.__parent = this;
         }
@@ -107,29 +106,37 @@ flyingon.IContainerControl = function (self) {
         var parent = this.__parent,
             children;
         
-        if (index >= 0)
+        if (parent && (children = parent.__children))
         {
-            if (parent && (children = parent.__children) && children[index] !== this)
-            {
-                var dom = this.dom,
-                    dom_parent = dom.parentNode,
-                    i = children.indexOf(this);
-                
-                if (this.__arrange_dirty !== 2)
-                {
-                    this.update();
-                }
-                
-                children.splice(i, 1);
-                children.splice(index, 0, this);
-                
-                dom_parent.insertBefore(dom, dom_parent.children[index] || null);
-            }
-            
-            return this;
-        }
+            var old_index = children.indexOf(this);
 
-        return parent ? parent.__children.indexOf(this) : -1;
+            if (index != null)
+            {
+                index = flyingon.range(index | 0, 0, children.length);
+
+                if (old_index !== index)
+                {
+                    if (!this.__dom_dirty)
+                    {
+                        if (this.__arrange_dirty !== 2)
+                        {
+                            this.update();
+                        }
+                     
+                        (parent.dom_body || parent.dom).insertBefore(this.dom, children[index].dom || null);
+                    }
+
+                    children.splice(old_index, 1);
+                    children.splice(index, 0, this);
+                }
+
+                return this;
+            }
+
+            return old_index;
+        }
+        
+        return this;
     };
 
 
@@ -140,7 +147,7 @@ flyingon.IContainerControl = function (self) {
         
         if (control && (children = this.__children) && (index = children.indexOf(control)) >= 0)
         {
-            remove(control, dispose);
+            remove(control, index, dispose);
             children.splice(index, 1);
 
             if (this.__arrange_dirty !== 2)
@@ -162,7 +169,7 @@ flyingon.IContainerControl = function (self) {
         {       
             remove(control, dispose);
             children.splice(index, 1);
-            
+
             if (this.__arrange_dirty !== 2)
             {
                 this.update();
@@ -214,6 +221,11 @@ flyingon.IContainerControl = function (self) {
         }
         else
         {
+            if (!this.__dom_dirty)
+            {
+                this.dom.removeChild(control.dom);
+            }
+            
             control.__parent = null;
         }
     };
@@ -243,6 +255,12 @@ flyingon.IContainerControl = function (self) {
     
 
 
+    //控件内容大小的dom
+    var content_dom = document.createElement('div');
+    
+    content_dom.style.cssText = 'overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;visibility:hidden;';
+    
+    
     //排列子控件
     self.arrange = function (dirty) {
 
@@ -287,13 +305,15 @@ flyingon.IContainerControl = function (self) {
         if (self.__dom_dirty)
         {
             cache = document.createDocumentFragment();
+            
+            cache.appendChild(self.__dom_content = content_dom.cloneNode(false));
 
             for (var i = 0, _ = children.length; i < _; i++)
             {
                 cache.appendChild(children[i].dom);
             }
 
-            self.dom.children[0].appendChild(cache);
+            (self.dom_body || self.dom).appendChild(cache);
             self.__dom_dirty = false;
         }
         
@@ -375,19 +395,20 @@ flyingon.IContainerControl = function (self) {
     self.onarrange = function () {
       
         var box = this.__boxModel,
-            width = this.contentWidth,
-            height = this.contentHeight,
-            style = (this.dom_body || this.dom).children[0].style;
-        
+            width = this.contentWidth - 1,
+            height = this.contentHeight - 1,
+            style = this.__dom_content.style;
+
         if (box)
         {
             box = box.padding;
             width += box.right;
             height += box.bottom;
         }
-        
-        style.width = width + 'px';
-        style.height = height + 'px';
+
+        //使用left及top属性定位时在IE6,7不正常
+        style.marginRight = width + 'px';
+        style.marginBottom = height + 'px';
     };
     
     
@@ -441,7 +462,8 @@ flyingon.IContainerControl = function (self) {
             }
         }
 
-        return base.dispose.call(this);
+        this.__dom_content = null;
+        base.dispose.call(this);
     };
 
 

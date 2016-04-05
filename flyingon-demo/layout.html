@@ -13,13 +13,14 @@
                     
         flyingon.layout('flyingon-Panel', {
            
-            type: 'dock',
-            spacingX: 10,
-            spacingY: 10,
+            type: 'line',
+            //spacingX: 10,
+            //spacingY: 10,
             //lineWidth: 150,
             //lineHeight: 40,
-            vertical: true,
-
+            vertical: false//,
+            
+/*
             sublayouts: [
                 
                 {
@@ -77,6 +78,7 @@
                     }
                 }
             ]
+            */
         });
         
         
@@ -104,7 +106,7 @@
         });
         
 
-        for (var i = 0; i < 10; i++)
+        for (var i = 0; i < 1; i++)
         {
             var panel = new flyingon.Panel().sets({
                
@@ -112,24 +114,48 @@
                 width: 'fill',
                 border: 1,
                 borderStyle: 'solid',
+                padding: 2,
                 overflowX: 'auto',
                 overflowY: 'auto',
                 layout: 'flyingon-Panel'
             });
 
-            for (var j = 0; j < 200; j++)
+            for (var j = 0; j < 20; j++)
             {
                 panel.append(new flyingon.Control().sets({
 
                     id: 'control' + i + j,
                     margin: 2,
                     border: '1px',
-                    borderStyle: 'solid'
+                    borderStyle: 'solid',
+                    dock: get_dock(j)
                 })); 
             }
 
             page.append(panel);
         }
+                             
+                        
+        function get_dock(index) {
+          
+            switch (index % 5)
+            {
+                case 0:
+                    return 'left';
+                    
+                case 1:
+                    return 'top';
+                    
+                case 2:
+                    return 'right';
+                    
+                case 3:
+                    return 'bottom';
+                    
+                default:
+                    return 'fill';
+            }
+        };
 
         
         page.attach(document.body);

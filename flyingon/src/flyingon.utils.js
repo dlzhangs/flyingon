@@ -1,4 +1,5 @@
 
+
 Array.prototype.remove || (Array.prototype.remove = function (item) {
 
     var index = this.indexOf(item);
@@ -65,6 +66,24 @@ Function.prototype.bind || (Function.prototype.bind = function (context) {
         return fn.apply(context || this, arguments);
     };
 });
+
+
+
+//扩展获取指定范围值的函数, 如果小于最小值返回最小值, 大于最大值返回最大值, 否则返回当前值
+flyingon.range = function (value, min, max) {
+    
+    if (value < min)
+    {
+        return min;
+    }
+    
+    if (value > max)
+    {
+        return max;
+    }
+    
+    return value;
+};
 
 
 //循环处理

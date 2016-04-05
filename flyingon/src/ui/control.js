@@ -24,7 +24,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
         return function (html) {
 
-            var name = 'flyingon-Control ',
+            var name = 'flyingon-Control',
                 cache = this.xtype,
                 dom,
                 style;
@@ -34,22 +34,22 @@ $class('Control', [Object, flyingon.Component], function (self) {
             dom = this.dom_template = host.children[0];
             dom.parentNode.removeChild(dom);
             
-            style = dom.style;
-
-            if (cache && name !== (cache = cache.replace('.', '-')))
+            if (cache && name !== (cache = cache.replace(/\./g, '-')))
             {
-                name += cache + ' ';
+                name += ' ' + cache;
             }
             
             if (cache = dom.className)
             {
-                name += cache + ' ';
+                name += ' ' + cache;
             }
 
-            this.__default_class = dom.className = name;
+            this.__default_class = dom.className = name + ' ';
 
+            style = dom.style;
             style.position = 'absolute';
             style.borderWidth = '0';
+            style.margin = '0';
 
             //计算盒模型在不同浏览器中的偏差
             //需等document初始化完毕后才可执行
@@ -75,8 +75,35 @@ $class('Control', [Object, flyingon.Component], function (self) {
     })();
 
 
-    //创建默认dom模板
-    self.createDomTemplate('<div></div>');
+    //控件类初始化处理
+    self.__class_init = function (Class, self, base) {
+     
+        var dom = this.dom_template;
+        
+        if (dom)
+        {
+            if (base && dom === base.dom_template)
+            {
+                var name1 = base.xtype.replace(/\./g, '-'),
+                    name2 = self.xtype.replace(/\./g, '-');
+                
+                dom = this.dom_template = base.dom_template.cloneNode(true);
+                
+                if (name1 === 'flyingon-Control')
+                {
+                    dom.className += name2 + ' ';
+                }
+                else
+                {
+                    dom.className = dom.className.replace(name1, name2);
+                }
+            }
+        }
+        else
+        {
+            this.createDomTemplate('<div></div>');
+        }
+    };
 
 
 

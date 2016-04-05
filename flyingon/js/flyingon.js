@@ -1373,7 +1373,7 @@ flyingon.absoluteUrl = (function () {
 
         if (cache = prototype.__class_init)
         {
-            cache.call(prototype, Class);
+            cache.call(prototype, Class, prototype, base);
         }
 
 

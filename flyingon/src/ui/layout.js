@@ -1642,26 +1642,26 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
                 {
                     case 'left':
                         item.measure(box, width, height, rearrange, true, false, false, true);
-                        cache = item.locate(box, x, y, 0, height);
+                        cache = item.locate(box, x + margin.left, y + margin.top, 0, height);
                         width = right - (x = cache.right + spacingX);
                         break;
 
                     case 'top':
                         item.measure(box, width, height, rearrange, false, true, true);
-                        cache = item.locate(box, x, y, width, 0);
+                        cache = item.locate(box, x + margin.left, y + margin.top, width, 0);
                         height = bottom - (y = cache.bottom + spacingY);
                         break;
 
                     case 'right':
                         item.measure(box, width, height, rearrange, true, false, false, true);
-                        cache = item.locate(box, right -= item.offsetWidth + margin.width, y, 0, height);
-                        width = (right = item.offsetLeft - spacingX) - x;
+                        cache = item.locate(box, right -= item.offsetWidth + margin.right, y + margin.top, 0, height);
+                        width = (right = item.offsetLeft - margin.left - spacingX) - x;
                         break;
 
                     case 'bottom':
                         item.measure(box, width, height, rearrange, true, false, true);
-                        cache = item.locate(box, x, bottom -= item.offsetHeight + margin.height, width, 0);
-                        height = (bottom = item.offsetTop - spacingY) - y;
+                        cache = item.locate(box, x + margin.left, bottom -= item.offsetHeight + margin.bottom, width, 0);
+                        height = (bottom = item.offsetTop - margin.top - spacingY) - y;
                         break;
 
                     default:
@@ -1691,7 +1691,7 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
                 margin = list[i];
 
                 item.measure(box, width, height, rearrange, false, false, true, true);
-                cache = item.locate(box, x, y, width, height);
+                cache = item.locate(box, x + margin.left, y + margin.top, width, height);
                 
                 if (maxWidth < cache.right)
                 {
