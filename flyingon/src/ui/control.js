@@ -1,4 +1,5 @@
 
+
 //控件类
 $class('Control', [Object, flyingon.Component], function (self) {
 
@@ -101,7 +102,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
         }
         else
         {
-            this.createDomTemplate('<div></div>');
+            this.createDomTemplate('<div style="border-style:solid;"></div>');
         }
     };
 
@@ -113,6 +114,60 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
         return this.__parent || null;
     });
+    
+    
+    //获取或设置当前控件在父控件中的索引号
+    self.index = function (index) {
+        
+        var parent = this.__parent,
+            children;
+        
+        if (parent && (children = parent.__children))
+        {
+            var old_index = children.indexOf(this);
+
+            if (index !== void 0)
+            {
+                index = check_index(index | 0, 0, children.length);
+
+                if (old_index !== index)
+                {
+                    children.splice(old_index, 1);
+                    children.splice(index, 0, this);
+                    
+                    if (parent.__dom_content)
+                    {
+                        (parent.dom_body || parent.dom).insertBefore(this.dom, children[index].dom || null);
+                        
+                        if (parent.__arrange_dirty !== 2)
+                        {
+                            parent.update();
+                        }
+                    }
+                }
+
+                return this;
+            }
+
+            return old_index;
+        }
+        
+        return this;
+    };
+    
+    
+    function check_index(index) {
+      
+        if (index < 0)
+        {
+            if ((index += length) < 0)
+            {
+                return 0;
+            }
+        }
+
+        return index >= length ? length - 1 : index;
+    };
 
 
 
@@ -293,7 +348,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //控件上右下左边框样式
-    style('border-style', '');
+    style('border-style');
 
 
     //控件上右下左边框颜色

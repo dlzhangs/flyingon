@@ -69,23 +69,6 @@ Function.prototype.bind || (Function.prototype.bind = function (context) {
 
 
 
-//扩展获取指定范围值的函数, 如果小于最小值返回最小值, 大于最大值返回最大值, 否则返回当前值
-flyingon.range = function (value, min, max) {
-    
-    if (value < min)
-    {
-        return min;
-    }
-    
-    if (value > max)
-    {
-        return max;
-    }
-    
-    return value;
-};
-
-
 //循环处理
 flyingon.each = function (values, fn, context) {
     

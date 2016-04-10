@@ -10,95 +10,67 @@
     
     <script type="text/javascript">
         
-                    
-        flyingon.layout('flyingon-Panel', {
-           
+        
+        flyingon.layout('line', {
+        
             type: 'line',
-            //spacingX: 10,
-            //spacingY: 10,
-            //lineWidth: 150,
-            //lineHeight: 40,
-            vertical: false//,
+            spacingX: 2,
+            spacingY: 2,
+            vertical: true
+        });
+        
+                    
+        flyingon.layout('panel', {
+           
+            type: 'dock',
+            spacingX: 20,
+            spacingY: 20,
+            vertical: false,
+            //mirror: 'center',
             
-/*
             sublayouts: [
                 
                 {
                     length: 10,
-                    width: 200,
-                    height: 'auto',
                     dock: 'left',
-                    
-                    layout: {
-                     
-                        type: 'line',
-                        spacingX: 2,
-                        spacingY: 2,
-                        vertical: true,
-                        
-                        subitems: {
-                         
-                            width: 'fill'
-                        }
-                    }
-                },
-                
-                {
-                    length: 0.5,
-                    width: 'fill',
+                    width: 'auto',
                     height: 'auto',
+                    layout: 'line'
+                },
+                              
+                {
                     dock: 'fill',
-                    
+                    height: 'auto',
+
                     layout: {
                      
                         type: 'flow',
-                        spacingX: 2,
+                        spacingX: 4,
                         spacingY: 2
                     }
                 },
-                
+                              
                 {
-                    //length: 10,
-                    width: 200,
-                    height: 'auto',
+                    length: 50,
                     dock: 'right',
-                    
-                    layout: {
-                     
-                        type: 'line',
-                        spacingX: 2,
-                        spacingY: 2,
-                        vertical: true,
-                        
-                        subitems: {
-                         
-                            width: 'fill',
-                            height: 40
-                        }
-                    }
+                    width: 'auto',
+                    height: 'auto',
+                    layout: 'line'
                 }
             ]
-            */
         });
         
         
-        var page = new flyingon.Panel().sets({
+        var panel = new flyingon.Panel().sets({
         
-            id: 'page',
+            id: 'panel',
             width: 1000,
             height: 400,
+            border: 1,
+            padding: 8,
             overflowX: 'auto',
             overflowY: 'auto',
-            border: 1,
-            borderStyle: 'solid',
-            padding: 2,
-            
-            layout: {
-             
-                type: 'flow',
-                spacingX: 2,
-                spacingY: 2
-            }
+            layout: 'panel'
             
         }).on('click', function (e) {
             
@@ -106,59 +78,16 @@
         });
         
 
-        for (var i = 0; i < 1; i++)
+        for (var i = 0; i < 300; i++)
         {
-            var panel = new flyingon.Panel().sets({
-               
-                id: 'panel' + i,
-                width: 'fill',
-                border: 1,
-                borderStyle: 'solid',
-                padding: 2,
-                overflowX: 'auto',
-                overflowY: 'auto',
-                layout: 'flyingon-Panel'
-            });
+            panel.append(new flyingon.Control().sets({
 
-            for (var j = 0; j < 20; j++)
-            {
-                panel.append(new flyingon.Control().sets({
-
-                    id: 'control' + i + j,
-                    margin: 2,
-                    border: '1px',
-                    borderStyle: 'solid',
-                    dock: get_dock(j)
-                })); 
-            }
-
-            page.append(panel);
+                id: 'control' + i,
+                border: 1
+            })); 
         }
-                             
-                        
-        function get_dock(index) {
-          
-            switch (index % 5)
-            {
-                case 0:
-                    return 'left';
-                    
-                case 1:
-                    return 'top';
-                    
-                case 2:
-                    return 'right';
-                    
-                case 3:
-                    return 'bottom';
-                    
-                default:
-                    return 'fill';
-            }
-        };
-
-        
-        page.attach(document.body);
+              
+        panel.attach(document.body);
 
       
     </script>
