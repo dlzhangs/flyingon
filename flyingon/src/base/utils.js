@@ -244,7 +244,7 @@ flyingon.isArray = Array.isArray || (function () {
 
 
 //dom事件扩展
-(function (window, document, flyingon) {
+(function (window, flyingon) {
 
 
     var events = flyingon.dom_events = flyingon.create(null), //dom事件集合
@@ -449,40 +449,8 @@ flyingon.isArray = Array.isArray || (function () {
 
 
 
-})(window, document, flyingon);
+})(window, flyingon);
 
-
-
-//dom测试
-flyingon.dom_test = (function () {
-
-    var body = document.body,
-        dom = document.createElement('div');
-
-    dom.style.cssText = 'position:absolute;overflow:hidden;top:-10000px;top:-10000px;';
-    
-    return function (fn, context) {
-
-        if (body)
-        {
-            if (dom.parentNode !== body)
-            {
-                body.appendChild(dom);
-            }
-            
-            fn.call(context, dom);
-        }
-        else
-        {
-            flyingon.ready(function () {
-
-                (body = document.body).appendChild(dom);
-                fn.call(context, dom);
-            });
-        }
-    };
-
-})();
 
 
 //html文档树加载完毕
@@ -552,8 +520,41 @@ flyingon.ready = (function () {
 
 
 
+//dom测试
+flyingon.dom_test = (function () {
+
+    var body = document.body,
+        dom = document.createElement('div');
+
+    dom.style.cssText = 'position:absolute;overflow:hidden;top:-10000px;top:-10000px;';
+    
+    return function (fn, context) {
+
+        if (body)
+        {
+            if (dom.parentNode !== body)
+            {
+                body.appendChild(dom);
+            }
+            
+            fn.call(context, dom);
+        }
+        else
+        {
+            flyingon.ready(function () {
+
+                (body = document.body).appendChild(dom);
+                fn.call(context, dom);
+            });
+        }
+    };
+
+})();
+
+
+
 //拖动基础方法
-flyingon.dragmove = function (context, event, begin, move, end, delay) {
+flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
     var dom = event.dom || event.target,
         style = dom.style,
@@ -590,9 +591,16 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
 
         if (!start || (x < -2 || x > 2 || y < -2 || y > 2) && start(e))
         {
-            style.left = (x0 + x) + 'px';
-            style.top = (y0 + y) + 'px';
-
+            if (locked !== true && locked !== 'x')
+            {
+                style.left = (x0 + x) + 'px';
+            }
+            
+            if (locked !== true && locked !== 'y')
+            {
+                style.top = (y0 + y) + 'px';
+            }
+            
             if (move)
             {
                 e.dom = dom;
@@ -649,3 +657,122 @@ flyingon.dragmove = function (context, event, begin, move, end, delay) {
     event.stopImmediatePropagation();
 };
 
+
+
+//对齐到指定的dom
+//source: 参考停靠的dom对象
+//target: 要对齐的dom对象
+//position: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
+//align: 对齐 left|center|right|top|middle|bottom
+//reverse: 空间不足时是否反转方向
+//offset1: 当前方向偏移
+//offset2: 相反方向偏移
+flyingon.dom_align = function (source, target, position, align, reverse, offset1, offset2) {
+
+    var width = source.offsetWidth,
+        height = source.offsetHeight,
+        style = target.style,
+        rect = target.getBoundingClientRect(),
+        x1 = rect.left,
+        y1 = rect.top,
+        x2 = rect.right,
+        y2 = rect.bottom,
+        x,
+        y;
+
+    offset1 = +offset1 || 0;
+
+    //检测是否需倒转方向
+    if (reverse !== false)
+    {
+        var client = document.documentElement,
+            clientWidth = window.innerWidth || client.offsetHeight || 0,
+            clientHeight = window.innerHeight || client.offsetHeight || 0;
+
+        reverse = false;
+        offset2 = +offset2 || 0;
+
+        switch (position)
+        {
+            case 'left':
+                if (x1 - offset1 < height && clientWidth - x2 - offset2 >= width)
+                {
+                    offset1 = offset2;
+                    position = 'right';
+                    reverse = true;
+                }
+                break;
+
+            case 'top':
+                if (y1 - offset1 < height && clientHeight - y2 - offset2 >= height)
+                {
+                    offset1 = offset2;
+                    position = 'bottom';
+                    reverse = true;
+                }
+                break;
+
+            case 'right':
+                if (x1 - offset2 >= width && clientWidth < x2 + offset1 + width)
+                {
+                    offset1 = offset2;
+                    position = 'left';
+                    reverse = true;
+                }
+                break;
+
+            default: 
+                if (y1 - offset2 >= height && clientHeight < y2 + offset1 + height)
+                {
+                    offset1 = offset2;
+                    position = 'top';
+                    reverse = true;
+                }
+                break;
+        }
+    }
+
+    if (position === 'left' || position === 'right')
+    {
+        x = position === 'left' ? x1 - width - offset1 : x2 + offset1;
+
+        switch (align)
+        {
+            case 'middle':
+                y = y1 - (height - target.offsetHeight >> 1);
+                break;
+
+            case 'bottom':
+                y = y2 - height;
+                break;
+
+            default:
+                y = y1;
+                break;
+        }
+    }
+    else
+    {
+        switch (align)
+        {
+            case 'center':
+                x = x1 - (width - target.offsetWidth >> 1);
+                break;
+
+            case 'right':
+                x = x2 - width;
+                break;
+
+            default:
+                x = x1;
+                break;
+        }
+
+        y = position === 'top' ? y1 - height - offset1 : y2 + offset1;
+    }
+    
+    style.left = x + 'px';
+    style.top = y + 'px';
+    
+    return reverse;
+};

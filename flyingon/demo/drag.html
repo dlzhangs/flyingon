@@ -44,7 +44,7 @@
     </div>
     
     
-    <script type="text/javascript" src="../flyingon/js/flyingon.ui.js"></script>
+    <script type="text/javascript" src="../js/flyingon.js"></script>
 
     <script type="text/javascript">
             
@@ -56,7 +56,7 @@
             if (e.target !== controls)
             {
                 e.dom = drag_dom(e);
-                flyingon.dragmove(this, e, null, null, drag_end, false);
+                flyingon.dom_drag(this, e, null, null, drag_end, null, false);
             }
         });
 
@@ -104,7 +104,7 @@
             
             if (e.target !== host)
             {
-                flyingon.dragmove(this, e);
+                flyingon.dom_drag(this, e);
             }
         });
     

@@ -2,9 +2,10 @@
 $class('UIEvent', [Object, flyingon.Event], function (self) {
    
         
-    $constructor(function (type) {
+    $constructor(function (type, event) {
 
         this.type = type;
+        this.dom_event = event;
     });
     
         

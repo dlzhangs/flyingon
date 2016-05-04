@@ -8,7 +8,7 @@
 
     请使用网络跟踪工具查看网络请求, 可通过修改main.js中的引入资源设置控制js合并及版本
 
-    <script type="text/javascript" src="../flyingon/js/flyingon.js"></script>
+    <script type="text/javascript" src="../js/flyingon-mini.js"></script>
 
     <script type="text/javascript">
             
@@ -16,26 +16,26 @@
     //指定引入资源版本
     flyingon.include_version('1.0', {
 
-        //'flyingon-demo/js/class/class1.js': '1.0.1',
-        //'flyingon-demo/js/class/class.min.js': '1.0.1'
+        //'flyingon/demo/js/class/class1.js': '1.0.1',
+        //'flyingon/demo/js/class/class.min.js': '1.0.1'
     });
 
 
     //指定引入资源合并关系
     flyingon.include_merge({
 
-        //'flyingon-demo/js/class/class.min.js': [
-        //    'flyingon-demo/src/class/class1.js', 
-        //    'flyingon-demo/src/class/class2.js'
+        //'flyingon/demo/js/class/class.min.js': [
+        //    'flyingon/demo/src/class/class1.js', 
+        //    'flyingon/demo/src/class/class2.js'
         //],
-        //'flyingon-demo/js/class/main.min.js': 'flyingon-demo/src/class/main.js'
+        //'flyingon/demo/js/class/main.min.js': 'flyingon/demo/src/class/main.js'
     });
 
         
     //自定义初始化(等待main.js加载完毕才执行)
-    $require(['flyingon-demo/src/class/main.js',  
-              'flyingon-demo/css/{skin}.css', 
-              'flyingon-demo/i18n/{i18n}/test.js'], function () {
+    $require(['flyingon/demo/src/class/main.js',  
+              'flyingon/demo/css/{skin}.css', 
+              'flyingon/demo/i18n/{i18n}/test.js'], function () {
 
         new flyingon.test.MainPage();
     });

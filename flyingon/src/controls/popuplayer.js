@@ -1,4 +1,8 @@
 
+//自动引入样式
+$require('flyingon/css/{skin}/flyingon-controls.css');
+
+
 /**
 * 弹出层组件
 * 
@@ -22,7 +26,7 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
 
         var dom = this.dom = document.createElement('div');
 
-        dom.className = 'flyingon-Popuplayer';
+        dom.className = 'flyingon-PopupLayer';
         dom.style.cssText = 'position:absolute;visibility:hidden;';
         
         this.__dispose = dispose;
@@ -66,102 +70,11 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
     //offset2: 相反方向偏移
     self.open = function (dom, position, align, reverse, offset1, offset2) {
 
-        if (layers.indexOf(this) < 0 && check_open(this) !== false)
+        if (check_open(this) !== false)
         {
-            var rect = dom.getBoundingClientRect(),
-                div = this.dom,
-                width = div.offsetWidth,
-                height = div.offsetHeight,
-                x,
-                y;
-
-            offset1 = (+offset1 || 0) + 2;
-
-            //检测是否需倒转方向
-            if (reverse !== false)
-            {
-                var client = document.documentElement,
-                    client_width = window.innerWidth || client.offsetHeight || 0,
-                    client_height = window.innerHeight || client.offsetHeight || 0;
-
-                offset2 = (+offset2 || 0) + 2;
-
-                switch (position)
-                {
-                    case 'left':
-                        if (rect.left - offset1 < height && client_width - rect.right - offset2 >= width)
-                        {
-                            offset1 = offset2;
-                            position = 'right';
-                        }
-                        break;
-
-                    case 'top':
-                        if (rect.top - offset1 < height && client_height - rect.bottom - offset2 >= height)
-                        {
-                            offset1 = offset2;
-                            position = 'bottom';
-                        }
-                        break;
-
-                    case 'right':
-                        if (rect.left - offset2 >= width && client_width < rect.right + offset1 + width)
-                        {
-                            offset1 = offset2;
-                            position = 'left';
-                        }
-                        break;
-
-                    default: 
-                        if (rect.top - offset2 >= height && client_height < rect.bottom + offset1 + height)
-                        {
-                            offset1 = offset2;
-                            position = 'top';
-                        }
-                        break;
-                }
-            }
-
-            if (position === 'left' || position === 'right')
-            {
-                x = position === 'left' ? rect.left - width - offset1 : rect.right + offset1;
-
-                switch (align)
-                {
-                    case 'middle':
-                        y = rect.top - (height - dom.offsetHeight >> 1);
-                        break;
-
-                    case 'bottom':
-                        y = rect.bottom - height;
-                        break;
-
-                    default:
-                        y = rect.top;
-                        break;
-                }
-            }
-            else
-            {
-                switch (align)
-                {
-                    case 'center':
-                        x = rect.left - (width - dom.offsetWidth >> 1);
-                        break;
-
-                    case 'right':
-                        x = rect.right - width;
-                        break;
-
-                    default:
-                        x = rect.left;
-                        break;
-                }
-
-                y = position === 'top' ? rect.top - height - offset1 : rect.bottom + offset1;
-            }
-
-            open(this, x + 'px', y + 'px');
+            flyingon.dom_align(dom, this.dom, position, align, reverse, offset1 || 2, offset2 || 2);
+            open(this);
+            return true;
         }
 
         return false;
@@ -171,8 +84,10 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
     //在指定的位置打开弹出层
     self.openAt = function (left, top) {
 
-        if (layers.indexOf(this) < 0 && check_open(this) !== false)
+        if (check_open(this) !== false)
         {
+            var style = self.dom.style;
+
             if (left > 0 || left < 0)
             {
                 left += 'px';
@@ -183,7 +98,10 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
                 top += 'px';
             }
             
-            open(this, left, top);
+            style.left = left;
+            style.top = top;
+            
+            open(this);
             return true;
         }
 
@@ -193,12 +111,21 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
 
     function check_open(self) {
 
-        var length = layers.length,
+        var items = layers,
+            length = items.length,
             dom;
 
         if (length > 0)
         {
-            if (!self.multi() || !layers[0].multi())
+            for (var i = 0; i < length; i++)
+            {
+                if (items[i] === self)
+                {
+                    return false;
+                }
+            }
+            
+            if (!self.multi() || !items[0].multi())
             {
                 for (var i = length - 1; i >= 0; i--)
                 {
@@ -223,12 +150,7 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
     };
 
 
-    function open(self, left, top) {
-
-        var style = self.dom.style;
-
-        style.left = left;
-        style.top = top;
+    function open(self) {
 
         if (self.closeAway())
         {
@@ -242,6 +164,9 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
 
         //添加弹出层
         layers.push(self);
+        
+        //触发打开事件
+        self.trigger('open');
     };
 
 
@@ -420,3 +345,50 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
 
 
 });
+
+
+
+//可弹出控件接口
+flyingon.IpopupControl = function (self) {
+    
+    
+    //扩展顶级控件接口
+    flyingon.ITopControl(self);
+    
+    
+    //接口标记
+    self['flyingon.IpopupControl'] = true;
+    
+    
+    //弹出层
+    self.popup = function (dom) {
+      
+        var self = this,
+            layer = new flyingon.PopupLayer();
+        
+        layer.on('open', function (e) {
+
+            self.attach(layer.dom);
+            self.tirgger('open');
+            
+        }).on('closed', function (e) {
+
+            self.trigger('closed');
+            self.detach();
+        });
+        
+        layer.open(dom);
+        return layer;
+    };
+    
+    
+    self.show = function () {
+        
+    };
+    
+    
+    self.showDialog = function () {
+        
+    };
+    
+};

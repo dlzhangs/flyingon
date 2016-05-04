@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+</head>
+<body style="padding:10px;">
+
+    <script type="text/javascript" src="../js/flyingon.js"></script>
+    
+    <script type="text/javascript">
+        
+        
+        flyingon.layout('line', {
+        
+            type: 'line',
+            spacingX: 2,
+            spacingY: 2,
+            vertical: true
+        });
+        
+                    
+        flyingon.layout('page', {
+           
+            type: 'grid',
+            spacingX: 2,
+            spacingY: 2,
+            rows: '30px',
+            columns: '300px * 200* * 200* * 300px',
+            increase: 1,
+            //vertical: true,
+
+             
+            adaptation: {
+             
+                'width < 400': {
+                 
+                    type: 'line',
+                    spacingX: 2,
+                    spacingY: 2,
+                    vertical: true,
+                    subitems: {
+                     
+                        width: 'fill'
+                    }
+                },
+                
+                'width < 800': {
+                 
+                    type: 'flow',
+                    spacingX: 2,
+                    spacingY: 2,
+                },
+                
+                
+                'width < 1000': {
+                 
+                    type: 'dock',
+                    spacingX: 20,
+                    spacingY: 20,
+                    vertical: false,
+                    //mirror: 'center',
+
+                    sublayouts: [
+
+                        {
+                            length: 10,
+                            dock: 'left',
+                            width: 'auto',
+                            height: 'auto',
+                            layout: 'line'
+                        },
+
+                        {
+                            length: 10,
+                            dock: 'right',
+                            width: 'auto',
+                            height: 'auto',
+                            layout: 'line'
+                        },
+                        
+                        {
+                            dock: 'fill',
+                            height: 'auto',
+
+                            layout: {
+
+                                type: 'flow',
+                                spacingX: 4,
+                                spacingY: 2
+                            }
+                        }
+
+                    ]
+
+                }
+            }
+            
+        });
+        
+        
+        var page = new flyingon.Page().sets({
+        
+            id: 'page',
+            width: 1000,
+            height: 400,
+            border: 1,
+            padding: 8,
+            overflowX: 'auto',
+            overflowY: 'auto',
+            layout: 'page'
+            
+        }).on('click', function (e) {
+            
+            alert(e.target.id());
+        });
+        
+
+        for (var i = 0; i < 60; i++)
+        {
+            page.append(new flyingon.Control().sets({
+
+                id: 'control' + i,
+                border: 1
+            })); 
+        }
+              
+        page.attach(document.body);
+
+        
+        flyingon.dom_on(document.body, 'mousedown', function (e) {
+            
+            var width = page.offsetWidth,
+                height = page.offsetHeight;
+                
+            flyingon.dom_drag(this, e, null, function dragmove(e) {
+          
+                page.width(width + e.distanceX);
+                page.height(height + e.distanceY);
+                
+            }, null, true, true);
+        });
+        
+      
+    </script>
+
+</body>
+</html>

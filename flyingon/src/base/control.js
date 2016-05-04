@@ -141,7 +141,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
                         
                         if (parent.__arrange_dirty !== 2)
                         {
-                            parent.update();
+                            parent.invalidate();
                         }
                     }
                 }
@@ -640,55 +640,14 @@ $class('Control', [Object, flyingon.Component], function (self) {
     };
     
     
-    var update_list = [],
-        delay;
-        
-    
-    //延时更新
-    function update_delay() {
-        
-        var list = update_list;
-        
-        for (var i = list.length - 1; i >= 0; i--)
-        {
-            list[i].refresh();
-        }
-        
-        list.length = 0;
-        delay = 0;
-    };
-    
-    
-    //更新
-    function update(dirty) {
-      
-        if (!dirty)
-        {
-            this.__location_dirty = true;
-        }
-        
-        this.__arrange_dirty = dirty || 2;
-
-        if (!this.__update_dirty)
-        {
-            this.__update_dirty = true;
-            
-            update_list.push(this);
-            delay || (delay = setTimeout(update_delay, 10)); //10毫秒后定时刷新
-        }
-
-        return this;
-    };
-    
-    
-    //刷新控件
-    self.refresh = function (dirty) {
+    //更新布局
+    self.update = function (dirty) {
       
         var dom = this.dom;
         
         if (dom && (dom = dom.parentNode))
         {
-            if (this.__location_dirty)
+            if (!this.__has_measure)
             {
                 var width = dom.clientWidth,
                     height = dom.clientHeight,
@@ -709,56 +668,100 @@ $class('Control', [Object, flyingon.Component], function (self) {
     };
     
         
-    //更新布局
-    self.update = function () {
+    //使布局无效
+    self.invalidate = function (dirty) {
         
         var parent = this.__parent;
         
-        this.__location_dirty = true;
-        
         if (parent && !parent.__arrange_dirty)
         {
-            parent.update(2);
+            parent.invalidate(1);
         }
     };
     
     
+    var dispose = self.dispose;
+        
+    self.dispose = function () {
+    
+        this.dom = this.dom.control = this.__parent = null;
+        dispose.call(this);
+    };
+    
+
+});
+
+
+
+//顶级控件接口
+flyingon.ITopControl = function (self) {
+    
+    
+    var update_list = [],
+        delay;
+        
+    
+    //接口标记
+    self['flyingon.ITopControl'] = true;
+    
+    
+    //更新
+    function update() {
+        
+        var list = update_list;
+        
+        for (var i = list.length - 1; i >= 0; i--)
+        {
+            list[i].update();
+        }
+        
+        list.length = 0;
+        delay = 0;
+    };
+    
+    
+    //使布局无效
+    self.invalidate = function (dirty) {
+      
+        this.__arrange_dirty = dirty || 2;
+
+        if (!this.__update_dirty)
+        {
+            this.__update_dirty = true;
+            
+            update_list.push(this);
+            delay || (delay = setTimeout(update, 10)); //10毫秒后定时刷新
+        }
+
+        return this;
+    };
+    
+        
     //附加控件至dom容器
     self.attach = function (dom_host) {
         
-        if (this.update !== update)
-        {
-            var dom = this.dom;
-            
-            dom.style.position = 'relative';
-            dom_host.appendChild(dom);
-            
-            this.update = update;
-            this.refresh(2);
-        }
+        var dom = this.dom;
+
+        dom.style.position = 'relative';
+        (dom_host || document.body).appendChild(dom);
+
+        this.update(2);
     };
     
     
     //从dom容器中移除
     self.detach = function () {
-        
-        if (this.update === update)
+     
+        var dom = this.dom,
+            parent = dom.parentNode;
+
+        if (parent)
         {
-            var dom = this.dom;
-            
-            dom.parentNode.removeChild(dom);
-            delete this.update;  
+            parent.removeChild(dom);
         }
     };
     
- 
-        
-    self.dispose = function () {
     
-        this.dom = this.dom.control = this.__parent = null;
-        return base.dispose.call(this);
-    };
-    
+};
 
-});
 

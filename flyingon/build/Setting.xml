@@ -3,49 +3,50 @@
 
 
     <!--compress 0:不压缩 1:仅去空格 2:去空格及压缩-->
-    <combine output="..\js\flyingon.js" compress="0">
+    <combine output="..\js\flyingon-mini.js" compress="0">
 
-        <file>..\src\flyingon.js</file>
+        <file>..\src\base\flyingon.js</file>
 
     </combine>
 
-    <combine output="..\js\flyingon.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+    <combine output="..\js\flyingon-mini.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
 
-        <file>..\src\flyingon.js</file>
+        <file>..\js\flyingon.js</file>
 
     </combine>
     
 
-    <combine output="..\js\flyingon.ui.js" compress="0" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+    <combine output="..\js\flyingon.js" compress="0" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
 
-        <file>..\src\flyingon.js</file>
-        <file>..\src\flyingon.utils.js</file>
-        <file>..\src\ui\layout.js</file>
-        <file>..\src\ui\event.js</file>
-        <file>..\src\ui\decrator.js</file>
-        <file>..\src\ui\control.js</file>
-        <file>..\src\ui\container.js</file>
-        <file>..\src\ui\panel.js</file>
+        <file>..\src\base\flyingon.js</file>
+        <file>..\src\base\utils.js</file>
+        <file>..\src\base\layout.js</file>
+        <file>..\src\base\event.js</file>
+        <file>..\src\base\control.js</file>
+        <file>..\src\base\container.js</file>
+        <file>..\src\base\panel.js</file>
+        <file>..\src\base\page.js</file>
         
     </combine>
     
-    <combine output="..\js\flyingon.ui.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+    <combine output="..\js\flyingon.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
 
-        <file>..\js\flyingon.ui.js</file>
+        <file>..\js\flyingon.js</file>
 
     </combine>
     
     
-    <combine output="..\js\flyingon.controls.js" compress="0" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+    <combine output="..\js\flyingon-controls.js" compress="0" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
 
+        <file>..\js\flyingon.js</file>
         <file>..\src\controls\popuplayer.js</file>
         <file>..\src\controls\dialog.js</file>
         
     </combine>
     
-    <combine output="..\js\flyingon.controls.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
+    <combine output="..\js\flyingon-controls.min.js" compress="2" remark="/*&#xD;&#xA;* flyingon javascript library v0.0.1&#xD;&#xA;* https://github.com/freeoasoft/flyingon &#xD;&#xA;* Copyright 2014, yaozhengyang&#xD;&#xA;* licensed under the LGPL Version 3 licenses&#xD;&#xA;*/">
 
-        <file>..\js\flyingon.controls.js</file>
+        <file>..\js\flyingon-controls.js</file>
 
     </combine>
 

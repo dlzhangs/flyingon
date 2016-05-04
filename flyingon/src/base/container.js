@@ -12,7 +12,7 @@ flyingon.IContainerControl = function (self, base) {
     //当前布局
     self.defineProperty('layout', null, {
      
-        set: 'this.__layout = value && typeof value === "object";this.update();'
+        set: 'this.__layout = value && typeof value === "object";this.invalidate();'
     });
     
     
@@ -48,7 +48,7 @@ flyingon.IContainerControl = function (self, base) {
             {
                 if (this.__arrange_dirty !== 2)
                 {
-                    this.update();
+                    this.invalidate();
                 }
                 
                 (this.dom_body || this.dom).appendChild(control.dom);
@@ -75,7 +75,7 @@ flyingon.IContainerControl = function (self, base) {
             {
                 if (this.__arrange_dirty !== 2)
                 {
-                    this.update();
+                    this.invalidate();
                 }
                 
                 (this.dom_body || this.dom).insertBefore(control.dom, children[index].dom || null);
@@ -103,6 +103,11 @@ flyingon.IContainerControl = function (self, base) {
     
     function check_control(self, control) {
         
+        if (control['flyingon.ITopControl'])
+        {
+            throw $errortext('flyingon', 'top control');
+        }
+        
         if (control instanceof self.control_type)
         {
             var parent = control.__parent;
@@ -114,7 +119,7 @@ flyingon.IContainerControl = function (self, base) {
         
             if (control.__arrange_dirty !== 2)
             {
-                control.update();
+                control.invalidate();
             }
 
             return true;
@@ -136,7 +141,7 @@ flyingon.IContainerControl = function (self, base) {
 
             if (this.__arrange_dirty !== 2)
             {
-                this.update();
+                this.invalidate();
             }
         }
 
@@ -156,7 +161,7 @@ flyingon.IContainerControl = function (self, base) {
 
             if (this.__arrange_dirty !== 2)
             {
-                this.update();
+                this.invalidate();
             }
         }
 
@@ -181,7 +186,7 @@ flyingon.IContainerControl = function (self, base) {
             
             if (this.__arrange_dirty !== 2)
             {
-                this.update();
+                this.invalidate();
             }
         }
         
@@ -227,12 +232,12 @@ flyingon.IContainerControl = function (self, base) {
             
             if (auto_width)
             {
-                this.offsetWidth = this.contentWidth;
+                this.offsetWidth = this.contentWidth + box.border.width;
             }
             
             if (auto_height)
             {
-                this.offsetHeight = this.contentHeight;
+                this.offsetHeight = this.contentHeight + box.border.height;
             }
         }
     };
@@ -314,15 +319,19 @@ flyingon.IContainerControl = function (self, base) {
         
         if (layout)
         {
-            var clientRect = self.clientRect(),
-                hscroll,
-                vscroll,
-                control;
-
+            var hscroll, vscroll;
+            
+            cache = self.__boxModel || self.boxModel();
+                
+            self.compute_arrange(cache.border, cache.padding);
+            
             switch (self.overflowX())
             {
                 case 'scroll':
-                    clientRect.height -= layout.hscroll_height;
+                    if ((this.arrangeHeight -= layout.hscroll_height) < 0)
+                    {
+                        this.arrangeHeight = 0;
+                    }
                     break;
 
                 case 'auto':
@@ -333,7 +342,10 @@ flyingon.IContainerControl = function (self, base) {
             switch (self.overflowY())
             {
                 case 'scroll':
-                    clientRect.width -= layout.vscroll_width;
+                    if ((this.arrangeWidth -= layout.vscroll_width) < 0)
+                    {
+                        this.arrangeWidth = 0;
+                    }
                     break;
 
                 case 'auto':
@@ -342,7 +354,7 @@ flyingon.IContainerControl = function (self, base) {
             }
 
             //初始化布局
-            layout.init(self, clientRect, hscroll, vscroll, children);
+            layout.init(self, hscroll, vscroll, children);
             
             //排列后处理
             self.onarrange(layout);
@@ -357,6 +369,20 @@ flyingon.IContainerControl = function (self, base) {
             self.arrange_children(children);
         }
     };
+    
+    
+    //计算排列空间
+    self.compute_arrange = function (border, padding) {
+
+        var width = this.offsetWidth - border.width - padding.width,
+            height = this.offsetHeight - border.height - padding.height;
+
+        this.arrangeLeft = padding.left;
+        this.arrangeTop = padding.top;
+        this.arrangeWidth = width >= 0 ? width : 0;
+        this.arrangeHeight = height >= 0 ? height : 0;
+    };
+    
     
     
     //排列子项
@@ -394,25 +420,20 @@ flyingon.IContainerControl = function (self, base) {
         style.top = (this.contentHeight - 1) + 'px';
     };
     
-    
-    //更新布局
-    self.update = function (dirty) {
+       
+    //使布局无效
+    self.invalidate = function (dirty) {
         
         var parent = this.__parent;
-        
-        if (!dirty)
-        {
-            this.__location_dirty = true;
-        }
         
         this.__arrange_dirty = +dirty || 2;
         
         if (parent && !parent.__arrange_dirty)
         {
-            parent.update(1);
+            parent.invalidate(1);
         }
     };
-
+    
     
     self.serialize = function (writer) {
         
