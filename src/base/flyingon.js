@@ -219,11 +219,11 @@ flyingon.absoluteUrl = (function () {
     flyingon_path = include_path = (function () {
         
         var list = document.scripts,
-            regex = /flyingon(.|\/js\/flyingon.)(?:ui.)?(?:min.)?js/;
+            regex = /flyingon(?:\/js\/flyingon)?-(?:core|layout|full)(?:\.min)?\.js/;
         
         for (var i = list.length - 1; i >= 0; i--)
         {
-            var src = list[i].src,
+            var src = flyingon.absoluteUrl(list[i].src), //注：ie7以下的src不会转成绝对路径
                 index = src.search(regex);
             
             if (index >= 0)
@@ -1600,11 +1600,9 @@ $class('Component', function (self) {
         {
             this.__defaults[name] = defaultValue;
 
-            if (!attributes.dataType &&
-                (attributes.dataType = typeof defaultValue) === 'number' && 
-                ('' + defaultValue).indexOf('.') < 0)
+            if (!cache || !cache.dataType)
             {
-                attributes.dataType = 'int';
+                attributes.dataType = typeof defaultValue;
             }
         }
 
@@ -1695,7 +1693,7 @@ $class('Component', function (self) {
                     writer.push('value = !!value;\n\n');
                     break;
 
-                case 'int':
+                case 'integer':
                     writer.push('value = value >>> 0;\n\n');
                     break;
 

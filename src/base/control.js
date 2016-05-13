@@ -15,7 +15,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
     
     //盒模型大小是否包含边框
-    self.box_sizing_border = false;
+    self.box_border = false;
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
@@ -49,9 +49,8 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
             style = dom.style;
             style.position = 'absolute';
-            style.borderWidth = '0';
             style.margin = '0';
-
+            
             //计算盒模型在不同浏览器中的偏差
             //需等document初始化完毕后才可执行
             flyingon.dom_test(function (div) {
@@ -65,7 +64,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
                 div.appendChild(dom);
 
                 //盒模型的宽度是否包含边框
-                this.box_sizing_border = dom.offsetWidth === 100;
+                this.box_border = dom.offsetWidth === 100;
                 div.innerHTML = '';
 
             }, this);
@@ -102,7 +101,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
         }
         else
         {
-            this.createDomTemplate('<div style="border-style:solid;"></div>');
+            this.createDomTemplate('<div style="border-style:solid;border-width:0;"></div>');
         }
     };
 
@@ -285,45 +284,6 @@ $class('Control', [Object, flyingon.Component], function (self) {
     });
     
     
-
-    //渲染dom的大小及位置
-    self.render = function () {
-      
-        var style = this.dom.style,
-            width = this.offsetWidth,
-            height = this.offsetHeight,
-            box,
-            border,
-            padding;
-        
-        if (!this.box_sizing_border && (box = this.__boxModel))
-        {
-            border = box.border;
-            width -= border.width;
-            height -= border.height;
-            
-            if (!this.__no_padding)
-            {
-                padding = box.padding;
-                width -= padding.width;
-                height -= padding.height;
-            }
-        }
-        
-        style.left = this.offsetLeft + 'px';
-        style.top = this.offsetTop + 'px';
-        style.width = width + 'px';
-        style.height = height + 'px';
-    };
-        
-    
-    //样式默认属性值
-    var style_attributes = {
-
-        group: 'appearance',
-        query: true
-    };
-    
     
     //创建样式
     function style(name, style) {
@@ -334,10 +294,12 @@ $class('Control', [Object, flyingon.Component], function (self) {
         });
         
         //定义属性
-        var attributes = style_attributes;
-        
-        attributes.set = style || 'this.dom.style.' + name + ' = value;\n';
-        self.defineProperty(name, '', attributes);
+        self.defineProperty(name, '', {
+
+            group: 'appearance',
+            query: true,
+            set: style || 'this.dom.style.' + name + ' = value;\n'
+        });
     };
 
 
@@ -629,55 +591,59 @@ $class('Control', [Object, flyingon.Component], function (self) {
     };
     */
     
-    
-    self.__event_on_scroll = function () {
-        
-    };
-    
-    
-    self.__event_off_scroll = function () {
-        
-    };
-    
-    
-    //更新布局
-    self.update = function (dirty) {
       
-        var dom = this.dom;
-        
-        if (dom && (dom = dom.parentNode))
-        {
-            if (!this.__has_measure)
-            {
-                var width = dom.clientWidth,
-                    height = dom.clientHeight,
-                    box = this.boxModel(width, height);
-
-                this.measure(box, width, height, false);
-                this.locate(box, box.left, box.top, width, height);
-                this.render();
-            }
-
-            if ((dirty || this.__arrange_dirty) && this.arrange)
-            {
-                this.arrange(dirty);
-            }
-            
-            this.__update_dirty = false;
-        }
-    };
-    
-        
+     
     //使布局无效
     self.invalidate = function (dirty) {
         
         var parent = this.__parent;
         
-        if (parent && !parent.__arrange_dirty)
+        if (parent && (dirty = dirty || 2) > parent.__arrange_dirty || 0)
         {
             parent.invalidate(1);
+            
+            if (data === 2)
+            {
+                parent.__arrange_dirty = dirty;
+            }
         }
     };
+    
+    
+    //渲染dom
+    self.render = function () {
+      
+        var style = this.dom.style,
+            width = this.offsetWidth,
+            height = this.offsetHeight,
+            box,
+            border,
+            padding;
+        
+        if (!this.box_border && (box = this.__boxModel))
+        {
+            border = box.border;
+            width -= border.width;
+            height -= border.height;
+            
+            if (!this.__no_padding)
+            {
+                padding = box.padding;
+                width -= padding.width;
+                height -= padding.height;
+            }
+        }
+        
+        style.left = this.offsetLeft + 'px';
+        style.top = this.offsetTop + 'px';
+        style.width = width + 'px';
+        style.height = style.lineHeight = height + 'px';
+    };
+        
+        
+    //重绘(默认与渲染dom相同)
+    self.update = self.render;
+    
     
     
     var dispose = self.dispose;
@@ -708,44 +674,90 @@ flyingon.ITopControl = function (self) {
     //更新
     function update() {
         
-        var list = update_list;
+        var list = update_list,
+            i = list.length - 1;
         
-        for (var i = list.length - 1; i >= 0; i--)
+        while (i >= 0)
         {
-            list[i].update();
+            list[i--].update();
         }
         
         list.length = 0;
-        delay = 0;
+        
+        if (i = delay)
+        {
+            clearTimeout(i);
+            delay = 0;
+        }
     };
     
     
     //使布局无效
-    self.invalidate = function (dirty) {
+    self.invalidate = function (dirty, time) {
       
-        this.__arrange_dirty = dirty || 2;
-
-        if (!this.__update_dirty)
+        if (this.arrange)
         {
-            this.__update_dirty = true;
-            
-            update_list.push(this);
-            delay || (delay = setTimeout(update, 10)); //10毫秒后定时刷新
+            if (!this.__arrange_dirty)
+            {
+                update_list.push(this);
+            }
+
+            this.__arrange_dirty = dirty || 2;
         }
 
+        if (time === 0)
+        {
+            update();
+        }
+        else
+        {
+            delay || (delay = setTimeout(update, time || 30)); //30毫秒后定时刷新
+        }
+        
         return this;
     };
     
         
-    //附加控件至dom容器
-    self.attach = function (dom_host) {
+    //更新布局
+    self.update = function () {
+      
+        var dom = this.dom;
+        
+        if (dom && (dom = dom.parentNode))
+        {
+            if (this.__update_dirty)
+            {
+                var width = dom.clientWidth,
+                    height = dom.clientHeight,
+                    box = this.boxModel(width, height);
+
+                this.measure(box, width, height, false);
+                this.locate(box, box.left, box.top, width, height);
+                this.render();
+                
+                this.__update_dirty = false;
+            }
+
+            if (this.arrange)
+            {
+                this.arrange();
+            }
+        }
+        
+        return this;
+    };
+    
+        
+    //显示控件至dom容器
+    self.show = function (dom_host) {
         
         var dom = this.dom;
 
         dom.style.position = 'relative';
         (dom_host || document.body).appendChild(dom);
 
-        this.update(2);
+        this.invalidate(2, 0);
+        return this;
     };
     
     
@@ -759,6 +771,8 @@ flyingon.ITopControl = function (self) {
         {
             parent.removeChild(dom);
         }
+        
+        return this;
     };
     
     

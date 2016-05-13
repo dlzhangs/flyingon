@@ -6,13 +6,13 @@
 </head>
 <body style="padding:10px;">
 
-    <script type="text/javascript" src="../js/flyingon.js"></script>
+    <script type="text/javascript" src="../js/flyingon-layout.js"></script>
     
     <script type="text/javascript">
         
         
         flyingon.layout('line', {
-        
+            
             type: 'line',
             spacingX: 2,
             spacingY: 2,
@@ -59,12 +59,12 @@
                     spacingX: 20,
                     spacingY: 20,
                     vertical: false,
-                    //mirror: 'center',
+                    //mirror: 'y',
 
                     sublayouts: [
 
                         {
-                            length: 10,
+                            scale: 5,
                             dock: 'left',
                             width: 'auto',
                             height: 'auto',
@@ -72,7 +72,7 @@
                         },
 
                         {
-                            length: 10,
+                            scale: 0.2,
                             dock: 'right',
                             width: 'auto',
                             height: 'auto',
@@ -80,6 +80,7 @@
                         },
                         
                         {
+                            scale: 0.8,                            
                             dock: 'fill',
                             height: 'auto',
 
@@ -112,20 +113,23 @@
             
         }).on('click', function (e) {
             
-            alert(e.target.id());
+            //alert(e.target.id());
         });
         
 
         for (var i = 0; i < 60; i++)
         {
-            page.append(new flyingon.Control().sets({
+            page.append(new flyingon.HtmlControl().sets({
 
                 id: 'control' + i,
-                border: 1
-            })); 
+                text: 'text' + i,
+                border: 1,
+                textAlign: 'center',
+                verticalAlign: 'middle'
+            }));
         }
               
-        page.attach(document.body);
+        page.show(document.body);
 
         
         flyingon.dom_on(document.body, 'mousedown', function (e) {

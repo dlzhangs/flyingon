@@ -660,14 +660,14 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
 
 //对齐到指定的dom
-//source: 参考停靠的dom对象
 //target: 要对齐的dom对象
+//source: 参考停靠的dom对象
 //position: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
 //align: 对齐 left|center|right|top|middle|bottom
 //reverse: 空间不足时是否反转方向
 //offset1: 当前方向偏移
 //offset2: 相反方向偏移
-flyingon.dom_align = function (source, target, position, align, reverse, offset1, offset2) {
+flyingon.dom_align = function (target, source, position, align, reverse, offset1, offset2) {
 
     var width = source.offsetWidth,
         height = source.offsetHeight,

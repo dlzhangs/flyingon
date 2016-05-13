@@ -220,34 +220,46 @@ flyingon.IContainerControl = function (self, base) {
     };
     
     
-    //测量后处理
-    self.onmeasure = function (box, width, height) {
-        
-        var auto_width = box.width === 'auto',
-            auto_height = box.height === 'auto';
-        
-        if (auto_width || auto_height)
-        {
-            this.arrange();
-            
-            if (auto_width)
-            {
-                this.offsetWidth = this.contentWidth + box.border.width;
-            }
-            
-            if (auto_height)
-            {
-                this.offsetHeight = this.contentHeight + box.border.height;
-            }
-        }
-    };
-    
-
 
     //控件内容大小的dom
     var content_dom = document.createElement('div');
     
     content_dom.style.cssText = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;visibility:hidden;';
+    
+    
+    //扩展容器组件接口
+    flyingon.IContainer(self);
+    
+    
+    //设置渲染大小时不包含padding
+    self.__no_padding = true;
+    
+    
+    //padding变更时不同步dom
+    self.__style_padding = function (value) {
+    
+    };
+    
+    
+    //测量自动大小
+    self.measure_auto = function (box, auto_width, auto_height) {
+        
+        this.arrange();
+
+        if (auto_width)
+        {
+            this.offsetWidth = this.contentWidth + box.border.width;
+        }
+
+        if (auto_height)
+        {
+            this.offsetHeight = this.contentHeight + box.border.height;
+        }
+    };
+    
+        
+    //设置默认排列标记
+    self.__arrange_dirty = 0;
     
     
     //排列子控件
@@ -317,74 +329,80 @@ flyingon.IContainerControl = function (self, base) {
             layout = flyingon.findLayout(self.layout());
         }
         
-        if (layout)
+        var style, hscroll, vscroll;
+
+        cache = self.__boxModel || self.boxModel();
+
+        self.arrange_range(cache.border, cache = cache.padding);
+
+        switch (self.overflowX())
         {
-            var hscroll, vscroll;
-            
-            cache = self.__boxModel || self.boxModel();
-                
-            self.compute_arrange(cache.border, cache.padding);
-            
-            switch (self.overflowX())
-            {
-                case 'scroll':
-                    if ((this.arrangeHeight -= layout.hscroll_height) < 0)
-                    {
-                        this.arrangeHeight = 0;
-                    }
-                    break;
+            case 'scroll':
+                if ((self.arrangeHeight -= layout.hscroll_height) < 0)
+                {
+                    self.arrangeHeight = 0;
+                }
+                break;
 
-                case 'auto':
-                    hscroll = true;
-                    break;
-            }
-
-            switch (self.overflowY())
-            {
-                case 'scroll':
-                    if ((this.arrangeWidth -= layout.vscroll_width) < 0)
-                    {
-                        this.arrangeWidth = 0;
-                    }
-                    break;
-
-                case 'auto':
-                    vscroll = true;
-                    break;
-            }
-
-            //初始化布局
-            layout.init(self, hscroll, vscroll, children);
-            
-            //排列后处理
-            self.onarrange(layout);
-
-            //最后渲染
-            for (var i = children.length - 1; i >= 0; i--)
-            {
-                children[i].render();
-            }
-            
-            //排列子项
-            self.arrange_children(children);
+            case 'auto':
+                hscroll = true;
+                break;
         }
+
+        switch (self.overflowY())
+        {
+            case 'scroll':
+                if ((self.arrangeWidth -= layout.vscroll_width) < 0)
+                {
+                    self.arrangeWidth = 0;
+                }
+                break;
+
+            case 'auto':
+                vscroll = true;
+                break;
+        }
+
+        //初始化布局
+        layout.init(self, hscroll, vscroll, children);
+
+        //处理滚动条: 注overflow==='auto'在chrome下在未超出原滚动条时不会消失
+        if (hscroll || vscroll)
+        {
+            style = (self.dom_body || self.dom).style;
+
+            if (hscroll)
+            {
+                hscroll = cache.left + self.arrangeWidth + cache.right >= self.contentWidth;
+                style.overflowX = hscroll ? 'hidden' : 'scroll';
+            }
+
+            if (vscroll)
+            {
+                vscroll = cache.top + self.arrangeHeight + cache.bottom >= self.contentHeight;
+                style.overflowY = vscroll ? 'hidden' : 'scroll';
+            }
+        }
+
+        //使用positon:relatvie left,top或margin:bottom,right定位时在IE6,7不正常
+        //style.margin = height + 'px 0 0 ' + width + 'px';
+        style = self.__dom_content.style;
+        style.left = (self.contentWidth - 1) + 'px';
+        style.top = (self.contentHeight - 1) + 'px';
+
+        //最后渲染
+        for (var i = children.length - 1; i >= 0; i--)
+        {
+            cache = children[i];
+            cache.update();
+            cache.__update_dirty = false;
+        }
+
+        //排列子项
+        self.arrange_children(children);
     };
     
-    
-    //计算排列空间
-    self.compute_arrange = function (border, padding) {
-
-        var width = this.offsetWidth - border.width - padding.width,
-            height = this.offsetHeight - border.height - padding.height;
-
-        this.arrangeLeft = padding.left;
-        this.arrangeTop = padding.top;
-        this.arrangeWidth = width >= 0 ? width : 0;
-        this.arrangeHeight = height >= 0 ? height : 0;
-    };
-    
-    
-    
+        
     //排列子项
     self.arrange_children = function (children) {
 
@@ -399,41 +417,7 @@ flyingon.IContainerControl = function (self, base) {
         }
     };
     
-    
-    //设置渲染大小时不包含padding
-    self.__no_padding = true;
-    
-    
-    //padding变更时不同步dom
-    self.__style_padding = function (value) {
-    
-    };
-    
-    
-    self.onarrange = function () {
-      
-        var style = this.__dom_content.style;
-
-        //使用positon:relatvie left,top或margin:bottom,right定位时在IE6,7不正常
-        //style.margin = height + 'px 0 0 ' + width + 'px';
-        style.left = (this.contentWidth - 1) + 'px';
-        style.top = (this.contentHeight - 1) + 'px';
-    };
-    
-       
-    //使布局无效
-    self.invalidate = function (dirty) {
-        
-        var parent = this.__parent;
-        
-        this.__arrange_dirty = +dirty || 2;
-        
-        if (parent && !parent.__arrange_dirty)
-        {
-            parent.invalidate(1);
-        }
-    };
-    
+           
     
     self.serialize = function (writer) {
         

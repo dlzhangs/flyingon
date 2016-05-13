@@ -12,7 +12,7 @@ $require('flyingon/css/{skin}/flyingon-controls.css');
 * closing: 关闭前事件(可取消)
 * closed: 关闭后事件
 */
-$class('PopupLayer', flyingon.IObject, function (self, base) {
+$class('PopupLayer', flyingon.Component, function (self, base) {
 
 
 
@@ -58,22 +58,29 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
 
     //鼠标离弹出层越来越远时是否自动关闭
     self.defineProperty('closeAway', false);
-
-
-
-    //打开弹出层
-    //dom: 参考停靠的dom对象
+    
+    
+    //弹出定位方式 值:对象
     //position: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
     //align: 对齐 left|center|right|top|middle|bottom
     //reverse: 空间不足时是否反转方向
     //offset1: 当前方向偏移
     //offset2: 相反方向偏移
-    self.open = function (dom, position, align, reverse, offset1, offset2) {
+    self.defineProperty('location', null);
+
+
+
+    //打开弹出层
+    //dom: 参考停靠的dom对象
+    self.open = function (dom) {
 
         if (check_open(this) !== false)
         {
-            flyingon.dom_align(dom, this.dom, position, align, reverse, offset1 || 2, offset2 || 2);
+            var location = this.location() || {};
+            
+            flyingon.dom_align(this.dom, dom, location.position, location.align, location.reverse, location.offset1 || 2, location.offset2 || 2);
             open(this);
+            
             return true;
         }
 
@@ -86,7 +93,7 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
 
         if (check_open(this) !== false)
         {
-            var style = self.dom.style;
+            var style = this.dom.style;
 
             if (left > 0 || left < 0)
             {
@@ -346,49 +353,3 @@ $class('PopupLayer', flyingon.IObject, function (self, base) {
 
 });
 
-
-
-//可弹出控件接口
-flyingon.IpopupControl = function (self) {
-    
-    
-    //扩展顶级控件接口
-    flyingon.ITopControl(self);
-    
-    
-    //接口标记
-    self['flyingon.IpopupControl'] = true;
-    
-    
-    //弹出层
-    self.popup = function (dom) {
-      
-        var self = this,
-            layer = new flyingon.PopupLayer();
-        
-        layer.on('open', function (e) {
-
-            self.attach(layer.dom);
-            self.tirgger('open');
-            
-        }).on('closed', function (e) {
-
-            self.trigger('closed');
-            self.detach();
-        });
-        
-        layer.open(dom);
-        return layer;
-    };
-    
-    
-    self.show = function () {
-        
-    };
-    
-    
-    self.showDialog = function () {
-        
-    };
-    
-};
