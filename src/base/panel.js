@@ -1,15 +1,15 @@
     
-$class('Panel', flyingon.Control, function (self, base) {
+$class('Panel', flyingon.Control, function (base) {
 
 
-    self.defaultWidth = 400;
+    this.defaultWidth = 400;
     
     
-    self.defaultHeight = 400;
+    this.defaultHeight = 400;
     
     
     //扩展接口标记
-    flyingon.IContainerControl(self, base);
+    flyingon.IContainerControl.call(this);
     
     
     

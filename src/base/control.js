@@ -1,7 +1,7 @@
 
 
 //控件类
-$class('Control', [Object, flyingon.Component], function (self) {
+$class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
     
 
@@ -15,11 +15,11 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
     
     //盒模型大小是否包含边框
-    self.box_border = false;
+    this.box_border = false;
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
-    self.createDomTemplate = (function () {
+    this.createDomTemplate = (function () {
 
         var host = document.createElement('div');
 
@@ -76,7 +76,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //控件类初始化处理
-    self.__class_init = function (Class, self, base) {
+    this.__class_init = function (Class, base) {
      
         var dom = this.dom_template;
         
@@ -85,7 +85,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
             if (base && dom === base.dom_template)
             {
                 var name1 = base.xtype.replace(/\./g, '-'),
-                    name2 = self.xtype.replace(/\./g, '-');
+                    name2 = this.xtype.replace(/\./g, '-');
                 
                 dom = this.dom_template = base.dom_template.cloneNode(true);
                 
@@ -109,14 +109,14 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //父控件
-    self.defineProperty('parent', function () {
+    this.defineProperty('parent', function () {
 
         return this.__parent || null;
     });
     
     
     //获取或设置当前控件在父控件中的索引号
-    self.index = function (index) {
+    this.index = function (index) {
         
         var parent = this.__parent,
             children;
@@ -171,7 +171,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //id
-    self.defineProperty('id', '', {
+    this.defineProperty('id', '', {
 
         set: 'this.dom.id = value;'
     });
@@ -179,7 +179,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //指定class名 与html一样
-    self.defineProperty('className', '', {
+    this.defineProperty('className', '', {
 
         attributes: 'query',
         set: 'this.dom.className = this.__default_class + (value ? value + " " : "");'
@@ -188,14 +188,14 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //是否包含指定class
-    self.hasClass = function (name) {
+    this.hasClass = function (name) {
 
         return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
     };
 
 
     //添加class
-    self.addClass = function (name) {
+    this.addClass = function (name) {
 
         if (name)
         {
@@ -207,7 +207,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //移除class
-    self.removeClass = function (name) {
+    this.removeClass = function (name) {
 
         if (name)
         {
@@ -220,7 +220,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //切换class 有则移除无则添加
-    self.toggleClass = function (name) {
+    this.toggleClass = function (name) {
 
         if (name)
         {
@@ -241,6 +241,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
     };
 
 
+    /*
     //IE7点击滚动条时修改className会造成滚动条无法拖动,需在改变className后设置focus获取焦点解决此问题
     //IE8以下无Object.defineProperty方法
     flyingon.each('disabled,active,hover,focus,checked', function (name) {
@@ -264,21 +265,17 @@ $class('Control', [Object, flyingon.Component], function (self) {
             + '}');
 
     }, self);
+    */
 
-
-    
-    //扩展可布局对象接口
-    flyingon.ILocatable(self, true);
-    
-    
         
-    self.locationProperty('overflowX', '', {
+        
+    this.locationProperty('overflowX', '', {
        
         set: '(this.dom_body || this.dom).style.overflowX = value;'
     });
     
     
-    self.locationProperty('overflowY', '', {
+    this.locationProperty('overflowY', '', {
        
         set: '(this.dom_body || this.dom).style.overflowY = value;'
     });
@@ -594,24 +591,32 @@ $class('Control', [Object, flyingon.Component], function (self) {
       
      
     //使布局无效
-    self.invalidate = function (dirty) {
+    this.invalidate = function (target) {
         
-        var parent = this.__parent;
+        var parent;
         
-        if (parent && (dirty = dirty || 2) > parent.__arrange_dirty || 0)
+        if ((target || (target = this.__parent)) && target.__arrange_dirty !== 2)
         {
-            parent.invalidate(1);
+            target.__arrange_dirty = 2;
             
-            if (data === 2)
+            while ((parent = target.__parent) && !parent.__arrange_dirty)
             {
-                parent.__arrange_dirty = dirty;
+                parent.__arrange_dirty = 1;
+                target = parent;
+            }
+            
+            if (target['flyingon.ITopControl'])
+            {
+                flyingon.update_delay(this);
             }
         }
+        
+        return this;
     };
     
     
     //渲染dom
-    self.render = function () {
+    this.render = function () {
       
         var style = this.dom.style,
             width = this.offsetWidth,
@@ -638,20 +643,97 @@ $class('Control', [Object, flyingon.Component], function (self) {
         style.top = this.offsetTop + 'px';
         style.width = width + 'px';
         style.height = style.lineHeight = height + 'px';
+        
+        return this;
     };
         
         
     //重绘(默认与渲染dom相同)
-    self.update = self.render;
+    this.update = this.render;
     
     
     
-    var dispose = self.dispose;
+    
+    
+    var dispose = this.dispose;
         
-    self.dispose = function () {
+    
+    //从dom容器中移除
+    this.detach = function (dispose) {
+     
+        var dom = this.dom,
+            parent = dom.parentNode;
+
+        if (parent)
+        {
+            parent.removeChild(dom);
+        }
+        
+        if (parent = this.__parent)
+        {
+            parent.remove(this, dispose);
+        }
+        else if (dispose)
+        {
+            this.dispose();
+        }
+        
+        return this;
+    };
+    
+        
+    this.dispose = function () {
     
         this.dom = this.dom.control = this.__parent = null;
         dispose.call(this);
+    };
+    
+    
+    
+    var update_list = [],
+        update_delay;
+        
+    
+    //更新
+    function update() {
+        
+        var list = update_list,
+            index = 0,
+            item;
+        
+        while (item = list[index++])
+        {
+            item.update();
+            item.__update_delay = false;
+        }
+        
+        list.length = 0;
+        
+        if (index = update_delay)
+        {
+            clearTimeout(index);
+            update_delay = 0;
+        }
+    };
+    
+    
+    //延时更新
+    flyingon.update_delay = function (control, delay) {
+      
+        if (control && !control.__update_delay)
+        {
+            control.__update_delay = true;
+            update_list.push(control);
+            
+            if (delay === false)
+            {
+                update();
+            }
+            else if (!update_delay)
+            {
+                update_delay = setTimeout(update, delay || 30); //30毫秒后定时刷新
+            }
+        }
     };
     
 
@@ -660,66 +742,30 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
 //顶级控件接口
-flyingon.ITopControl = function (self) {
+flyingon.ITopControl = function () {
     
     
-    var update_list = [],
-        delay;
-        
     
     //接口标记
-    self['flyingon.ITopControl'] = true;
+    this['flyingon.ITopControl'] = true;
     
-    
-    //更新
-    function update() {
-        
-        var list = update_list,
-            i = list.length - 1;
-        
-        while (i >= 0)
-        {
-            list[i--].update();
-        }
-        
-        list.length = 0;
-        
-        if (i = delay)
-        {
-            clearTimeout(i);
-            delay = 0;
-        }
-    };
     
     
     //使布局无效
-    self.invalidate = function (dirty, time) {
+    this.invalidate = function () {
       
-        if (this.arrange)
+        if (this.__arrange_dirty < 2)
         {
-            if (!this.__arrange_dirty)
-            {
-                update_list.push(this);
-            }
-
-            this.__arrange_dirty = dirty || 2;
+            this.__arrange_dirty = 2;
         }
 
-        if (time === 0)
-        {
-            update();
-        }
-        else
-        {
-            delay || (delay = setTimeout(update, time || 30)); //30毫秒后定时刷新
-        }
-        
+        flyingon.update_delay(this);
         return this;
     };
     
         
     //更新布局
-    self.update = function () {
+    this.update = function () {
       
         var dom = this.dom;
         
@@ -738,7 +784,7 @@ flyingon.ITopControl = function (self) {
                 this.__update_dirty = false;
             }
 
-            if (this.arrange)
+            if (this.__arrange_dirty)
             {
                 this.arrange();
             }
@@ -749,33 +795,24 @@ flyingon.ITopControl = function (self) {
     
         
     //显示控件至dom容器
-    self.show = function (dom_host) {
+    this.show = function (dom_host) {
         
         var dom = this.dom;
 
         dom.style.position = 'relative';
         (dom_host || document.body).appendChild(dom);
 
-        this.invalidate(2, 0);
-        return this;
-    };
-    
-    
-    //从dom容器中移除
-    self.detach = function () {
-     
-        var dom = this.dom,
-            parent = dom.parentNode;
-
-        if (parent)
+        if (this.__arrange_dirty < 2)
         {
-            parent.removeChild(dom);
+            this.__arrange_dirty = 2;
         }
+        
+        flyingon.update_delay(this, false);
         
         return this;
     };
     
-    
+        
 };
 
 

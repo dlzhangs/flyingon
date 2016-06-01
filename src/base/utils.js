@@ -1,16 +1,5 @@
 
 
-Array.prototype.remove || (Array.prototype.remove = function (item) {
-
-    var index = this.indexOf(item);
-    
-    if (index >= 0)
-    {
-        this.splice(index, 1);
-    }
-});
-
-
 Array.prototype.indexOf || (Array.prototype.indexOf = function (item) {
 
     for (var i = 0, _ = this.length; i < _; i++)
@@ -25,6 +14,7 @@ Array.prototype.indexOf || (Array.prototype.indexOf = function (item) {
 });
 
 
+
 Array.prototype.lastIndexOf || (Array.prototype.lastIndexOf = function (item) {
 
     for (var i = this.length - 1; i >= 0; i--)
@@ -37,6 +27,7 @@ Array.prototype.lastIndexOf || (Array.prototype.lastIndexOf = function (item) {
     
     return -1;
 });
+
 
 
 Function.prototype.bind || (Function.prototype.bind = function (context) {
@@ -100,6 +91,102 @@ flyingon.isArray = Array.isArray || (function () {
     };
 
 })();
+
+
+
+//扩展ES6 Set类
+window.Set || (window.Set = $class(function () {
+    
+    
+    $constructor(function () {
+    
+        this.__items = [];
+    });
+    
+    
+    function indexOf(items, item) {
+    
+        var index = 0,
+            length = items.length;
+        
+        if (item === item) //非NaN
+        {
+            while (index < length)
+            {
+                if (items[index++] === item)
+                {
+                    return --index;
+                }
+            }
+        }
+        else //NaN
+        {
+            while (index < length)
+            {
+                if ((item = items[index++]) === item)
+                {
+                    return --index;
+                }
+            }
+        }
+        
+        return -1;
+    };
+    
+    
+    this.size = 0;
+    
+    
+    this.has = function (item) {
+        
+        return indexOf(this.__items, item) >= 0;
+    };
+    
+    
+    this.add = function (item) {
+        
+        var items = this.__items;
+        
+        if (indexOf(items, item) < 0)
+        {
+            items.push(item);
+            this.size++;
+        }
+        
+        return this;
+    };
+    
+    
+    this['delete'] = function (item) {
+        
+        var items = this.__items,
+            index = indexOf(items, item);
+        
+        if (index >= 0)
+        {
+            items.splice(index, 1);
+            this.size--;
+            
+            return true;
+        }
+        
+        return false;
+    };
+    
+    
+    this.clear = function () {
+        
+        this.size = this.__items.length = 0;
+    };
+    
+    
+    this.keys = this.values = function () {
+      
+        return this.__items;
+    };
+    
+    
+}));
 
 
 
@@ -669,10 +756,10 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 //offset2: 相反方向偏移
 flyingon.dom_align = function (target, source, position, align, reverse, offset1, offset2) {
 
-    var width = source.offsetWidth,
-        height = source.offsetHeight,
+    var width = target.offsetWidth,
+        height = target.offsetHeight,
         style = target.style,
-        rect = target.getBoundingClientRect(),
+        rect = source.getBoundingClientRect(),
         x1 = rect.left,
         y1 = rect.top,
         x2 = rect.right,
@@ -776,3 +863,34 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
     
     return reverse;
 };
+
+
+
+//dom节点集合
+$class('NodeList', Array, function () {
+    
+        
+    this.addClass = function (name) {
+      
+        name = ' ' + name;
+        
+        for (var i = 0, _ = this.length; i < _; i++)
+        {
+            this[i].className += name;
+        }
+    };
+    
+    
+    this.removeClass = function (name) {
+        
+        name = ' ' + name;
+        
+        for (var i = 0, _ = this.length; i < _; i++)
+        {
+            var dom = this[i];
+            dom.className = dom.className.replace(name, '');
+        }
+    };
+    
+    
+});

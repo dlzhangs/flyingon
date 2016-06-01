@@ -1,6 +1,6 @@
 
 
-$class('Dialog', flyingon.Panel, function (self, base) {
+$class('Dialog', flyingon.Panel, function (base) {
 
 
     //已打开的窗口集合
@@ -16,64 +16,64 @@ $class('Dialog', flyingon.Panel, function (self, base) {
 
 
     
-    self.createDomTemplate('<div></div>');
+    this.createDomTemplate('<div></div>');
     
     
     //扩展顶级控件接口
-    flyingon.ITopControl(self);
+    flyingon.ITopControl.call(this);
 
-    show = self.show;
+    show = this.show;
     
 
-    self.defaultWidth = 400;
+    this.defaultWidth = 400;
 
-    self.defaultHeight = 300;
+    this.defaultHeight = 300;
 
-    self.defaultValue('border', 1);
+    this.defaultValue('border', 1);
     
-    self.defaultValue('padding', 2);
+    this.defaultValue('padding', 2);
 
 
     //窗口图标        
-    self.defineProperty('icon', '', {
+    this.defineProperty('icon', '', {
 
         set: 'this.__set_icon(value);'
     });
 
 
     //窗口标题
-    self.defineProperty('title', '', {
+    this.defineProperty('title', '', {
 
         set: 'this.head.title.dom.innerHTML = value;'
     });
 
 
-    self.defineProperty('html', '', {
+    this.defineProperty('html', '', {
 
         set: 'this.clear();\n\t' + 'this.dom.children[1].innerHTML = value;'
     });
 
 
     //是否可拖动窗口
-    self.defineProperty('draggable', true);
+    this.defineProperty('draggable', true);
 
 
     //是否可调整大小
-    self.defineProperty('resizable', true);
+    this.defineProperty('resizable', true);
 
 
     //是否显示关闭按钮
-    self.defineProperty('closable', true, {
+    this.defineProperty('closable', true, {
 
         set: 'this.head.close.visible(value);'
     });
 
 
     //是否居中显示
-    self.defineProperty('center', true);
+    this.defineProperty('center', true);
 
 
-    self.__set_icon = function (value) {
+    this.__set_icon = function (value) {
 
         var icon = this.head.icon;
 
@@ -84,7 +84,7 @@ $class('Dialog', flyingon.Panel, function (self, base) {
 
 
 
-    self.show = function () {
+    this.show = function () {
 
         if (dialog_list.indexOf(this) < 0)
         {
@@ -97,7 +97,7 @@ $class('Dialog', flyingon.Panel, function (self, base) {
     };
 
 
-    self.showDialog = function () {
+    this.showDialog = function () {
 
         if (dialog_list.indexOf(this) < 0)
         {
@@ -141,7 +141,7 @@ $class('Dialog', flyingon.Panel, function (self, base) {
     };
 
 
-    self.clientRect = function () {
+    this.clientRect = function () {
 
         var clientRect = base.clientRect.call(this);
 
@@ -149,14 +149,14 @@ $class('Dialog', flyingon.Panel, function (self, base) {
     };
 
 
-    self.arrange = function () {
+    this.arrange = function () {
 
         this.refresh.call(this.head);
         base.arrange.call(this);
     };
 
 
-    self.close = function (dispose) {
+    this.close = function (dispose) {
 
         if (this.trigger(new flyingon.Event('closing')) !== false)
         {
@@ -186,7 +186,7 @@ $class('Dialog', flyingon.Panel, function (self, base) {
     };
 
 
-    self.dispose = function () {
+    this.dispose = function () {
 
         this.head.dispose();
         this.head = null;

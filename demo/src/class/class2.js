@@ -7,7 +7,7 @@ $namespace('flyingon.test', function (test) {
     
 
     //定义子类 freeoasoft.test.ChildClass 从BaseClass继承 (注:仅在名字空间内才可定义类)
-    $class('ChildClass', test.BaseClass, function (self, base) {
+    $class('ChildClass', test.BaseClass, function (base) {
 
 
         //子类会自动调用父类的构造函数
@@ -18,7 +18,7 @@ $namespace('flyingon.test', function (test) {
 
 
         //重载实例方法
-        self.instance_fn = function () {
+        this.instance_fn = function () {
 
             //先调用父类的方法
             base.instance_fn.call(this);

@@ -1,693 +1,33 @@
 
-//布局相关基础方法
-(function (flyingon) {
-
-
-    var pixel_unit = flyingon.create(null), //单位换算列表
-
-        pixel_list = flyingon.create(null), //缓存的单位转换值
-
-        regex_unit = /[a-zA-z]+|%/, //计算尺寸正则表达式
-
-        regex_sides = /[+-]?[\w%.]+/g, //4边解析正则表达式
-        
-        sides_list = flyingon.create(null), //4边缓存列表
-        
-        parse = parseFloat,
-        
-        pixel;
-    
-    
-    //计算单位换算列表
-    flyingon.dom_test(function (div) {
-
-        var list = pixel_unit;
-
-        //计算单位换算列表
-        div.style.cssText = 'position:absolute;overflow:scroll;border:0;padding:0;left:-10000em;top:-10000in;width:10000ex;height:100px;';
-
-        list.px = 1;
-        list.ex = div.offsetWidth / 10000;
-        list.em = list.rem = -div.offsetLeft / 10000;
-        
-        list.pt = (list.pc = (list['in'] = -div.offsetTop / 10000) / 6) / 12;
-        list.mm = (list.cm = list['in'] / 2.54) / 10;
-
-        div.style.width = '100px';
-        div.innerHTML = "<div style='position:relative;width:200px;height:200px;'></div>";
-
-        //竖直滚动条宽度
-        flyingon.vscroll_width = div.offsetWidth - div.clientWidth;
-
-        //水平滚动条高度
-        flyingon.hscroll_height = div.offsetHeight - div.clientHeight;
-
-        div.innerHTML = '';
-        
-    });
-
-
-    //或者或设置象素转换单位
-    flyingon.pixel_unit = function (name, value) {
-
-        if (value === void 0)
-        {
-            return pixel_unit[name];
-        }
-
-        if (pixel_unit[name] !== value)
-        {
-            pixel_unit[name] = value;
-
-            var list = pixel_list;
-
-            for (var key in list)
-            {
-                if (key.indexOf(name) > 0)
-                {
-                    list[key] = void 0;
-                }
-            }
-        }
-    };
-
-
-    //转换css尺寸为像素值
-    //注: em与rem相同, 且在初始化时有效
-    flyingon.pixel = pixel = function (value, size) {
-
-        if (value >= 0)
-        {
-            return value >> 0;
-        }
-
-        var cache = pixel_list[value];
-
-        if (cache !== void 0)
-        {
-            return cache !== true ? cache : parse(value) * size / 100 + 0.5 | 0;
-        }
-
-        if (cache = value.match(regex_unit)) 
-        {
-            if ((cache = cache[0]) === '%')
-            {
-                pixel_list[value] = true;
-                return parse(value) * size / 100 + 0.5 | 0;
-            }
-            
-            cache = cache.toLowerCase();
-        }
-
-        return pixel_list[value] = parse(value) * (pixel_unit[cache] || 1) + 0.5 | 0;
-    };
-    
-    
-    //转换4边尺寸为像素值(margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比)
-    flyingon.pixel_sides = function (value, width) {
-        
-        var values = sides_list[value];
-        
-        if (values)
-        {
-            //直接取缓存
-            if (values.cache)
-            {
-                return values;
-            }
-        }
-        else if (value >= 0)
-        {
-            return sides_list[value] = sides_values(value | 0);
-        }
-        else if (value && (values = ('' + value).match(regex_sides)))
-        {
-            if ((values = pixel_sides(values)).cache)
-            {
-                return sides_list[value] = values;
-            }
-        }
-        else
-        {
-            return sides_list[value] = sides_values(0);
-        }
-
-        return pixel_sides(values, width);
-    };
-    
-    
-    function sides_values(value) {
-    
-        return { 
-                
-            left: value, 
-            top: value, 
-            right: value, 
-            bottom: value, 
-            width: value = value << 1, 
-            height: value,
-            cache: true
-        };
-    };
-    
-    
-    function pixel_sides(sides, width) {
-        
-        var target = {},
-            fn = pixel;
-        
-        switch (sides.length)
-        {
-            case 1:
-                target.left = target.top = target.right = target.bottom = fn(sides[0], width);
-                break;
-
-            case 2:
-                target.left = target.right = fn(sides[1], width);
-                target.top = target.bottom = fn(sides[0], width);
-                break;
-
-            case 3:
-                target.left = target.right = fn(sides[1], width);
-                target.top = fn(sides[0], width);
-                target.bottom = fn(sides[2], width);
-                break;
-
-            default:
-                target.left = fn(sides[3], width);
-                target.top = fn(sides[0], width);
-                target.right = fn(sides[1], width);
-                target.bottom = fn(sides[2], width);
-                break;
-        }
-
-        target.width = target.left + target.right
-        target.height = target.top + target.bottom;
-        target.cache = !isNaN(target.width, target.height);
-            
-        return target;
-    };
-    
-
-})(flyingon);
-
-
-
-//可定位对象接口
-flyingon.ILocatable = function (self, control) {
-   
-    
-    var ILocatable = flyingon.ILocatable,
-        extend_list = ILocatable.__extend_list,
-        extend = flyingon.extend,
-        pixel = flyingon.pixel,
-        pixel_sides = flyingon.pixel_sides;
-
-    
-    //记录被扩展的目标
-    (ILocatable.__target_list || (ILocatable.__target_list = [])).push(self);
-    
-    
-    //接口标记
-    self['flyingon.ILocatable'] = true;
-
-    
-    self.locationProperty = function (name, defaultValue, attributes) {
-        
-        var set;
-            
-        if (control)
-        {
-            attributes = attributes || {};
-            attributes.group = 'location';
-            attributes.query = true;
-            attributes.set = ((set = attributes.set) ? set + '\n\t' : '') 
-                + 'if (!this.__update_dirty)\n\t'
-                + '{\n\t\t'
-                    + 'this.__update_dirty = true;\n\t\t'
-                    + 'this.invalidate();\n\t'
-                + '}';
-        }
-        
-        this.defineProperty(name, defaultValue, attributes);
-    };
-    
-        
-    //默认设置重绘状态
-    self.__update_dirty = true;
-    
-    //控件默认宽度(width === 'default'时的宽度)
-    self.defaultWidth = 100;
-
-    //控件默认高度(height === 'default'时的高度)
-    self.defaultHeight = 21;
-
-    //是否可见
-    self.locationProperty('visible', true, {
-     
-        set: 'this.dom.style.display = value ? "" : "none";'
-    });
-        
-    
-    //控件横向对齐方式
-    //left      左边对齐
-    //center    横向居中对齐
-    //right     右边对齐
-    self.locationProperty('alignX', 'left');
-
-    //控件纵向对齐方式
-    //top       顶部对齐
-    //middle    纵向居中对齐
-    //bottom    底部对齐
-    self.locationProperty('alignY', 'top');
-
-
-    self.locationProperty('left', '0');
-
-    self.locationProperty('top', '0');
-
-    self.locationProperty('width', 'default');
-
-    self.locationProperty('height', 'default');
-
-
-    self.locationProperty('minWidth', '0');
-
-    self.locationProperty('maxWidth', '0');
-
-    self.locationProperty('minHeight', '0');
-
-    self.locationProperty('maxHeight', '0');
-
-
-    self.locationProperty('margin', '0');
-
-    self.locationProperty('border', '0', {
-    
-        set: 'this.dom.style.borderWidth = value > 0 ? value + "px" : value;\n\t'
-    });
-
-    self.locationProperty('padding', '0', {
-     
-        set: 'this.__style_padding(value > 0 ? value + "px" : value);'
-    });
-    
-    
-    //设置dom padding方法
-    self.__style_padding = function (value) {
-    
-        this.dom.style.padding = value;
-    };
-
-
-    if (extend_list)
-    {
-        for (var name in extend_list)
-        {
-            self.locationProperty.apply(self, extend_list[name]);
-        }
-    }
-
-
-    //获取定位属性值
-    self.locationValue = function (name) {
-      
-        var values = this.__location_values,
-            value;
-        
-        if (values && (value = values[name]) != null)
-        {
-            return value;
-        }
-        
-        return (this.__storage || this.__defaults)[name];
-    };
-    
-    
-    //默认盒模型
-    var box_default = {
-        
-        visible: false,
-        alignX: 'center',
-        alignY: 'middle',
-        left: 0,
-        top: 0,
-        width: 'default',
-        height: 'default',
-        minWidth: 0,
-        maxWidth: 0,
-        minHeight: 0,
-        maxHeight: 0
-    };
-    
-    box_default.margin = box_default.border = box_default.padding = {
-            
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 0,
-        height: 0
-    };
-    
-    
-    //获取盒模型
-    self.boxModel = function (width, height) {
-      
-        var box = this.__boxModel,
-            storage = this.__storage || this.__defaults,
-            values = this.__location_values,
-            fn = pixel,
-            value;
-        
-        if (values)
-        {
-            if ((value = values.visible) != null ? value : storage.visible)
-            {
-                if (!box || !box.visible)
-                {
-                    box = this.__boxModel = { visible: true };
-                }
-                
-                box.alignX = values.alignX || storage.alignX;
-                box.alignY = values.alignY || storage.alignY;
-
-                box.left = fn((value = values.left) != null ? value : storage.left, width);
-                box.top = fn((value = values.top) != null ? value : storage.top, height);
-
-                box.width = (value = values.width) != null ? value : storage.width;
-                box.height = (value = values.height) != null ? value : storage.height;
-
-                box.minWidth = fn((value = values.minWidth) != null ? value : storage.minWidth, width);
-                box.maxWidth = fn((value = values.maxWidth) != null ? value : storage.maxWidth, width);
-                box.minHeight = fn((value = values.minHeight) != null ? value : storage.minHeight, height);
-                box.maxHeight = fn((value = values.maxHeight) != null ? value : storage.maxHeight, height);
-
-                fn = pixel_sides;
-
-                //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
-                box.margin = fn((value = values.margin) != null ? value : storage.margin, width);
-                box.border = fn((value = values.border) != null ? value : storage.border, width);
-                box.padding = fn((value = values.padding) != null ? value : storage.padding, width);
-                
-                return box;
-            }
-        }
-        else if (storage.visible)
-        {
-            if (!box || !box.visible)
-            {
-                box = this.__boxModel = { visible: true };
-            }
-            
-            box.alignX = storage.alignX;
-            box.alignY = storage.alignY;
-            
-            box.left = fn(storage.left, width);
-            box.top = fn(storage.top, height);
-            
-            box.width = storage.width;
-            box.height = storage.height;
-            
-            box.minWidth = fn(storage.minWidth, width);
-            box.maxWidth = fn(storage.maxWidth, width);
-            box.minHeight = fn(storage.minHeight, height);
-            box.maxHeight = fn(storage.maxHeight, height);
-            
-            fn = pixel_sides;
-            
-            //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
-            box.margin = fn(storage.margin, width);
-            box.border = fn(storage.border, width);
-            box.padding = fn(storage.padding, width);
-            
-            return box;
-        }
-        
-        return this.__boxModel = box_default;
-    };
-    
-    
-    //测量大小(不可以手动调用或重载此函数，由布局系统自动调用)
-    self.measure = function (
-        box, //盒模型
-        available_width, //可用宽度 
-        available_height, //可用高度
-        less_width_to_default, //宽度不足时是否使用默认宽度
-        less_height_to_default, //高度不足时是否使用默认高度
-        default_width_to_fill, //默认宽度是否转为充满
-        default_height_to_fill //默认高度是否转为充满
-    ) {
-        
-        var width = box.width, 
-            height = box.height,
-            auto_width,
-            auto_height;
-
-        //处理宽度
-        switch (width)
-        {
-            case 'default': //默认
-                width = default_width_to_fill ? true : this.defaultWidth;
-                break;
-
-            case 'fill': //充满可用区域
-                width = true;
-                break;
-
-            case 'auto': //根据内容自动调整大小
-                width = less_width_to_default = auto_width = true;
-                break;
-                
-            default:
-                width = pixel(width, available_width);
-                break;
-        }
-
-        //充满可用宽度
-        if (width === true)
-        {
-            if ((available_width -= box.margin.width) > 0) //有可用空间
-            {
-                width = available_width;
-            }
-            else if (less_width_to_default) //可用空间不足时使用默认宽度
-            {
-                width = this.defaultWidth;
-            }
-            else //无空间
-            {
-                width = 0;
-            }
-        }
-
-        //处理高度
-        switch (height)
-        {
-            case 'default': //自动
-                height = default_height_to_fill ? true : this.defaultHeight;
-                break;
-
-            case 'fill': //充满可用区域
-                height = true;
-                break;
-
-            case 'auto': //根据内容自动调整大小
-                height = less_height_to_default = auto_height = true;
-                break;
-
-            default:  //其它值
-                height = pixel(height, available_height);
-                break;
-        }
-
-        //充满可用高度
-        if (height === true)
-        {
-            if ((available_height -= box.margin.height) > 0) //有可用空间
-            {
-                height = available_height;
-            }
-            else if (less_height_to_default) //可用空间不足时使用默认高度
-            {
-                height = this.defaultHeight;
-            }
-            else //无空间
-            {
-                height = 0;
-            }
-        }
-
-        //检测宽高范围
-        this.__check_size(box, width, height);
-
-        //测量自动大小
-        if ((auto_width || auto_height) && this.measure_auto(box, auto_width, auto_height) !== false)
-        {
-            this.__check_size(box, width, height);
-        }
-    };
-    
-    
-    //检测宽高范围
-    self.__check_size = function (box, width, height) {
-      
-        //处理最小及最大宽度
-        if (width < box.minWidth)
-        {
-            width = box.minWidth;
-        }
-        else if (box.maxWidth > 0 && width > box.maxWidth)
-        {
-            width = box.maxWidth;
-        }
-        
-        //处理最小及最大宽度
-        if (height < box.minHeight)
-        {
-            height = box.minHeight;
-        }
-        else if (box.maxHeight > 0 && height > box.maxHeight)
-        {
-            height = box.maxHeight;
-        }
-        
-        this.offsetWidth = width;
-        this.offsetHeight = height
-    };
-    
-    
-    //测量自动大小
-    self.measure_auto = function (box, auto_width, auto_height) {
-        
-        return false;
-    };
-    
-    
-    //定位(不可以手动调用或重载此函数，由布局系统自动调用)
-    self.locate = function (box, x, y, align_width, align_height) {
-        
-        var margin = box.margin,
-            value;
-
-        if (align_width > 0 && (value = align_width - margin.width - this.offsetWidth))
-        {
-            switch (box.alignX)
-            {
-                case 'center':
-                    x += value >> 1;
-                    break;
-
-                case 'right':
-                    x += value;
-                    break;
-                    
-                default:
-                    x += margin.left;
-                    break;
-            }
-        }
-        else
-        {
-            x += margin.left;
-        }
-
-        if (align_height > 0 && (value = align_height - margin.height - this.offsetHeight))
-        {
-            switch (box.alignY)
-            {
-                case 'middle':
-                    y += value >> 1;
-                    break;
-
-                case 'bottom':
-                    y += value;
-                    break;
-                    
-                default:
-                    y += margin.top;
-                    break;
-            }
-        }
-        else
-        {
-            y += margin.top;
-        }
-
-        return {
-            
-            right: (this.offsetLeft = x) + this.offsetWidth + margin.right,
-            bottom: (this.offsetTop = y) + this.offsetHeight + margin.bottom
-        };
-    };
-            
-    
-};
-
-
-
-//容器组件接口
-flyingon.IContainer = function (self) {
-    
-    
-    self.arrange = function () {
-        
-    };
-    
-    
-    self.arrange_range = function (border, padding) {
-      
-        var width = this.offsetWidth - border.width - padding.width,
-            height = this.offsetHeight - border.height - padding.height;
-
-        this.arrangeLeft = padding.left;
-        this.arrangeTop = padding.top;
-        this.arrangeWidth = width >= 0 ? width : 0;
-        this.arrangeHeight = height >= 0 ? height : 0;
-    };
-    
-    
-};
-
-
-
 //子布局
-$class('Sublayout', [Object, flyingon.Component], function (self) {
+$class('Sublayout', flyingon.ILocatable, function (base) {
        
     
+    //扩展容器组件接口
+    flyingon.IContainer.call(this);
+    
+    
     //子项占比
-    self.defineProperty('scale', 0, {
+    this.defineProperty('scale', 0, {
      
         minValue: 0
     });
     
     
     //布局
-    self.defineProperty('layout', null, {
+    this.defineProperty('layout', null, {
      
         storage: 'this.__layout'
     });
     
     
-    //扩展可定位对象接口
-    flyingon.ILocatable(self);
-    
-    
-    //扩展容器组件接口
-    flyingon.IContainer(self);
-    
-    
-    var measure = self.measure,
-        locate = self.locate;
-    
-    
     //指定默认大小
-    self.defaultWidth = self.defaultHeight = 200;
+    this.defaultWidth = this.defaultHeight = 200;
     
     
-    self.measure = function (box) {
+    this.measure = function (box) {
     
-        measure.apply(this, arguments);
+        base.measure.apply(this, arguments);
         
         this.arrange_range(box.border, box.padding);
         this.arrange();
@@ -704,16 +44,16 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
     };
     
     
-    self.arrange = function () {
+    this.arrange = function () {
       
         var items = this.__items;
         this.__layout_.init(this, false, false, items[0], items[1], items[2], true);
     };
     
         
-    self.locate = function () {
+    this.locate = function () {
         
-        var cache = locate.apply(this, arguments),
+        var cache = base.locate.apply(this, arguments),
             x = this.offsetLeft,
             y = this.offsetTop,
             items, 
@@ -742,7 +82,7 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
     };
     
         
-    self.serialize = function (writer) {
+    this.serialize = function (writer) {
         
         var cache;
         
@@ -758,7 +98,7 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
     };
     
     
-    self.deserialize_list.layout = function (reader, values) {
+    this.deserialize_layout = function (reader, values) {
     
         this.__layout_ = (this.__layout = values) && flyingon.findLayout(values, reader);
     };
@@ -769,7 +109,7 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
 
 
 //布局基类
-$class('Layout', [Object, flyingon.Component], function (self) {
+$class('Layout', flyingon.Component, function (base, self) {
 
     
 
@@ -819,28 +159,17 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
 
     //布局类型
-    self.type = null;
+    this.type = null;
 
     
     //定义排列属性方法
-    self.arrangeProperty = self.defineProperty;
+    this.arrangeProperty = this.defineProperty;
     
 
     //定义定位属性方法
-    self.locationProperty = function (name, defaultValue, attributes) {
+    this.locationProperty = function (name, defaultValue, attributes) {
 
-        var ILocatable = flyingon.ILocatable,
-            list = ILocatable.__target_list;
-        
-        (ILocatable.__extend_list || (ILocatable.__extend_list = {}))[name] = arguments;
-
-        if (list)
-        {
-            for (var i = list.length - 1; i >= 0; i--)
-            {
-                list[i].locationProperty(name, defaultValue, attributes);
-            }
-        }
+        flyingon.ILocatable.prototype.locationProperty(name, defaultValue, attributes);
     };
     
 
@@ -848,28 +177,28 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     //是否竖排
     //true      竖排
     //false     横排
-    self.arrangeProperty('vertical', false);
+    this.arrangeProperty('vertical', false);
 
     //镜像布局变换
     //none:     不进行镜像变换
     //x:        沿x轴镜像变换
     //y:        沿y轴镜像变换
     //center:   沿中心镜像变换
-    self.arrangeProperty('mirror', 'none');
+    this.arrangeProperty('mirror', 'none');
 
     //布局间隔宽度
     //length	规定以具体单位计的值 比如像素 厘米等
     //number%   控件客户区宽度的百分比
-    self.arrangeProperty('spacingX', '0');
+    this.arrangeProperty('spacingX', '0');
 
     //布局间隔高度
     //length	规定以具体单位计的值 比如像素 厘米等
     //number%   控件客户区高度的百分比
-    self.arrangeProperty('spacingY', '0');
+    this.arrangeProperty('spacingY', '0');
 
 
     //子项
-    self.arrangeProperty('subitems', null, {
+    this.arrangeProperty('subitems', null, {
 
         storage: 'this.__subitems',
         set: 'this.__subitems_ = !!value;'
@@ -877,7 +206,7 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
     
     //子布局
-    self.arrangeProperty('sublayouts', null, {
+    this.arrangeProperty('sublayouts', null, {
        
         storage: 'this.__sublayouts',
         set: 'this.__sublayouts_ = !!value;'
@@ -885,7 +214,7 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
 
     //自适应布局
-    self.arrangeProperty('adaptation', null, {
+    this.arrangeProperty('adaptation', null, {
 
         storage: 'this.__adaptation',
         set: 'this.__adaptation_ = !!value;'
@@ -893,17 +222,17 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
         
     //滚动条大小
-    self.hscroll_height = flyingon.hscroll_height;
+    this.hscroll_height = flyingon.hscroll_height;
     
-    self.vscroll_width = flyingon.vscroll_width;
+    this.vscroll_width = flyingon.vscroll_width;
     
     
     //计算css单位为象素值方法
-    self.pixel = flyingon.pixel;
+    this.pixel = flyingon.pixel;
     
     
     //初始化排列
-    self.init = function (container, hscroll, vscroll, items, start, end, sublayout) {
+    this.init = function (container, hscroll, vscroll, items, start, end, sublayout) {
         
         var index = items.length;
         
@@ -1204,13 +533,13 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
     };
     
         
     //排列检测
-    self.arrange_check = function (maxWidth, maxHeight, data) {
+    this.arrange_check = function (maxWidth, maxHeight, data) {
         
         var container = data[0],
             arrange;
@@ -1245,7 +574,7 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
     
     //序列化方法
-    self.serialize = function (writer) {
+    this.serialize = function (writer) {
 
         var cache;
 
@@ -1274,11 +603,11 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
     
     //设置不反序列化type属性
-    self.deserialize_list.type = true;
+    this.deserialize_type = true;
     
             
 
-    self.__class_init = function (Class) {
+    this.__class_init = function (Class) {
 
         if (self !== this)
         {
@@ -1302,14 +631,14 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
 
 //单列布局类
-$class('LineLayout', flyingon.Layout, function (self, base) {
+$class('LineLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'line';
+    this.type = 'line';
     
         
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var x = container.arrangeLeft,
             y = container.arrangeTop,
@@ -1403,18 +732,18 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
 
 
 //流式布局类
-$class('FlowLayout', flyingon.Layout, function (self, base) {
+$class('FlowLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'flow';
+    this.type = 'flow';
 
 
     //是否需要处理滚动条
-    self.scroll = true;
+    this.scroll = true;
     
     
     //竖直布局行宽
-    self.arrangeProperty('lineWidth', 0, {
+    this.arrangeProperty('lineWidth', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -1422,18 +751,18 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
 
     
     //水平布局行高
-    self.arrangeProperty('lineHeight', 0, {
+    this.arrangeProperty('lineHeight', 0, {
      
         dataType: 'integer',
         minValue: 0
     });
 
     
-    self.locationProperty('newline', false);
+    this.locationProperty('newline', false);
         
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var pixel = this.pixel,
             x = container.arrangeLeft,
@@ -1568,10 +897,10 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
 
 
 //停靠布局类
-$class('DockLayout', flyingon.Layout, function (self, base) {
+$class('DockLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'dock';
+    this.type = 'dock';
     
     
     //控件停靠方式(此值仅在当前布局类型为停靠布局(dock)时有效)
@@ -1580,11 +909,11 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
     //right:    右停靠
     //bottom:   底部停靠
     //fill:     充满
-    self.locationProperty('dock', 'left');
+    this.locationProperty('dock', 'left');
 
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var pixel = this.pixel,
             x = container.arrangeLeft,
@@ -1685,14 +1014,14 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
 
 
 //层叠布局类
-$class('CascadeLayout', flyingon.Layout, function (self, base) {
+$class('CascadeLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'cascade';
+    this.type = 'cascade';
     
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var x = container.arrangeLeft,
             y = container.arrangeTop,
@@ -1730,14 +1059,14 @@ $class('CascadeLayout', flyingon.Layout, function (self, base) {
 
 
 //绝对定位布局类
-$class('AbsoluteLayout', flyingon.Layout, function (self, base) {
+$class('AbsoluteLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'absolute';
+    this.type = 'absolute';
     
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var x = container.arrangeLeft,
             y = container.arrangeTop,
@@ -1778,114 +1107,124 @@ $class('AbsoluteLayout', flyingon.Layout, function (self, base) {
 flyingon.Layout.parse = (function () {
     
     
-    var parse_list = {},
-        regex = /[*%\[\]{}()/!]|[\w.]+|\.{3}/g,
-        pixel = flyingon.pixel;
+    function Item() {};
     
     
-    function parse(items, token, tokens, index) {
+    var fn = Item.prototype,
         
-        if (token > 0)
+        parse_cache = {},
+        
+        regex_parse = /[*%.!\w]+|[\[\]{}<>=]/g,
+        
+        regex_loop = /\(([^()]+)\)\s*x(\d+)/g,
+                
+        parse = parseFloat;
+    
+            
+    fn.enabled = true;
+
+    fn.clone = function () {
+
+        var item = new Item(),
+            cache;
+
+        item.value = this.value;
+        item.unit = this.unit;
+
+        if (!item.enabled)
         {
-            switch (tokens[index])
+            item.enabled = false;
+        }
+
+        if (cache = this.table)
+        {
+            item.table = clone_items(cache);
+        }
+
+        if (cache = this.items)
+        {
+            item.items = clone_items(cache);
+        }
+
+        return item;
+    };
+        
+    
+    function clone_items(items) {
+        
+        var list = [],
+            cache;
+        
+        for (var i = 0, _ = items.length; i < _; i++)
+        {
+            list.push(items[i].clone());
+        }
+        
+        if (cache = items.parameters)
+        {
+            list.parameters = flyingon.extend({}, cache);
+        }
+        
+        return list;
+    };    
+    
+    
+    function parse_loop(text) {
+    
+        var regex = regex_loop,
+            loop;
+        
+        function fn(_, text, length) {
+            
+            var items = [];
+            
+            do
             {
-                case '*':
-                    parse_star(items, token);
-                    return ++index;
-                    
-                case '%':
-                    parse_percent(items, token);
-                    return ++index;
+                items.push(text);
             }
-        }
-        else if ((token = pixel(token)) > 0)
+            while (--length > 0);
+            
+            loop = true;
+            
+            return items.join(' ');
+        };
+        
+        do
         {
-            items.push({ value: token });
+            loop = false;
+            text = text.replace(regex, fn);
         }
+        while (loop);
         
-        return index;
+        return text;
     };
     
     
-    function parse_star(items, token) {
+    function parse_items(items, tokens, index, end) {
       
-        var value = +token || 100,
-            item = { value: value, weight: true };
+        var item, token;
         
-        item.weight += value;
-        items.push(item);
-    };
-    
-    
-    function parse_percent(items, token) {
-      
-        var value = +token || 100,
-            item = { value: value, percent: true };
-        
-        item.percent += value;
-        items.push(item);
-    };
-    
-    
-    function parse_loop(items, token, tokens, index) {
-        
-    };
-    
-    
-    function parse_rows(target, tokens, index) {
-      
-        var list = parse_rows,
-            rows = target.rows = [],
-            row;
-        
-        rows.weight = rows.percent = 0;
-        
-        while (token = tokens[index++])
-        {
-            index = (list[token] || parse)(rows, token, tokens, index);
-        }
-        
-        return index;
-    };
-    
-    
-    function parse_columns(items, token, tokens, index) {
-      
-        var list = parse_columns,
-            row = items[items.length - 1] || {},
-            columns = row.columns = [];
-        
-        columns.weight = columns.percent = 0;
-        
-        while (token = tokens[index++])
-        {
-            if (token !== ']')
-            {
-                index = (list[token] || parse)(columns, token, tokens, index);
-            }
-            else
-            {
-                return index;
-            }
-        }
-        
-        return index;
-    };
-    
-    
-    function parse_table(items, token, tokens, index) {
-      
-        while (token = tokens[index++])
+        while ((token = tokens[index++]) !== void 0)
         {
             switch (token)
             {
-                case '}':
-                    return index;
-                    
-                case '(':
+                case '[':
+                    index = parse_items(item ? (item.items = []) : [], tokens, index, ']');
+                    break;
+
+                case '{':
+                    index = parse_items(item ? (item.table = []) : [], tokens, index, '}');
                     break;
                     
+                case '<':
+                    index = parse_parameters(items, tokens, index);
+                    break;
+
+                case end:
+                    return index;
+
                 default:
+                    item = parse_item(items, token) || item;
                     break;
             }
         }
@@ -1894,27 +1233,71 @@ flyingon.Layout.parse = (function () {
     };
     
     
-    parse_rows['*'] = parse_columns['*'] = parse_star;
+    function parse_parameters(items, tokens, index) {
+        
+        var token;
+        
+        while ((token = tokens[index++]) !== void 0)
+        {
+            switch (token)
+            {
+                case '=':
+                    if (token = tokens[index - 2])
+                    {
+                        (items.parameters || (items.parameters = {}))[token] = tokens[index++];
+                    }
+                    break;
+                    
+                case '>':
+                    return index;
+            }
+        }
+    };
     
-    parse_rows['...'] = parse_columns['...'] = parse_loop;
     
-    parse_rows['['] = parse_columns;
-    
-    parse_columns['{'] = parse_table;
-    
+    function parse_item(items, token) {
+      
+        var item = new Item(), 
+            value;
+        
+        if (token.indexOf('!') >= 0)
+        {
+            item.enabled = false;
+            token = token.replace('!', '');   
+        }
+        
+        if (token === '*')
+        {
+            item.value = 100;
+            item.unit = '*';
+        }
+        else if ((value = parse(token)) === value)
+        {
+            item.value = value;
+            item.unit = token.replace(value, '');
+        }
+        else
+        {
+            return;
+        }
+        
+        items.push(item);
+        return item;
+    };
+      
     
     return function (text) {
         
-        var cache = parse_list[text];
+        var items = parse_cache[text];
         
-        if (!cache)
+        if (items)
         {
-            parse_rows(cache = {}, text.match(regex), 0);
-            cache = cache.rows;
+            return clone_items(items);
         }
         
-        return cache;
-    };    
+        parse_items(items = [], parse_loop(text).match(regex_parse), 0, ']');
+        return parse_cache[text] = items;
+    };
     
     
 })();
@@ -1922,27 +1305,27 @@ flyingon.Layout.parse = (function () {
 
 
 //网格布局类
-$class('GridLayout', flyingon.Layout, function (self, base) {
+$class('GridLayout', flyingon.Layout, function (base) {
 
 
     var regex = /[*%]|[\w.]+/g;
         
     
-    self.type = 'grid';
+    this.type = 'grid';
 
 
     //均匀网格布局行数
     //number	整数值 
     //string    自定义行 如:'20px 30% 20* *'表示4行 第一行固定宽度为20px 第2行使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
-    self.arrangeProperty('rows', '3');
+    this.arrangeProperty('rows', '3');
 
     //均匀网格布局列数
     //number	整数值 
     //string    自定义列 如:'20px 30% 20* *'表示4列 第一列固定宽度为20px 第2列使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
-    self.arrangeProperty('columns', '3');
+    this.arrangeProperty('columns', '3');
     
     //自动增加循环数 0表示不自动增长
-    self.arrangeProperty('increase', 0, {
+    this.arrangeProperty('increase', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -1951,7 +1334,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     //横跨行数
     //number	整数值(负整数表示横跨至倒数第几列)
-    self.locationProperty('rowspan', 0, {
+    this.locationProperty('rowSpan', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -1959,7 +1342,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     //纵跨列数
     //number	整数值(负整数表示横跨至倒数第几列)
-    self.locationProperty('colspan', 0, {
+    this.locationProperty('colSpan', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -1967,7 +1350,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     //间隔网格数
     //number	整数值
-    self.locationProperty('spacing', 0, {
+    this.locationProperty('spaces', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -1975,7 +1358,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
 
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var rows = this.__rows || (this.__rows = parse(this.rows() || '3')),
             columns = this.__columns || (this.__columns = parse(this.columns() || '3')),
@@ -2008,16 +1391,16 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
         {
             list1 = columns;
             list2 = rows;
-            span1 = 'colspan';
-            span2 = 'rowspan';
+            span1 = 'colSpan';
+            span2 = 'rowSpan';
             
         }
         else
         {
             list1 = rows;
             list2 = columns;
-            span1 = 'rowspan';
-            span2 = 'colspan';
+            span1 = 'rowSpan';
+            span2 = 'colSpan';
         }
         
         length1 = list1.length;
@@ -2027,7 +1410,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
         {
             if ((item = items[i]).locationValue('visible'))
             {
-                if (cache = item.locationValue('spacing'))
+                if (cache = item.locationValue('spaces'))
                 {
                     list2.index += cache;
                 }
@@ -2375,44 +1758,111 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
 
 //表格布局类
-$class('TableLayout', flyingon.Layout, function (self, base) {
+$class('TableLayout', flyingon.Layout, function (base) {
 
     
-    //布局示例: *[* * *] *[* {(spacingX=50% spacingY=50%)*[* ..2] ..2} *] *[* * *]
-    //loop 3 back 2
-    var regex = /\w+|[*%\[\]{}()=]|../g;
-    
-    
-    
-    self.type = 'table';
+    this.type = 'table';
 
 
-    //表格布局定义(此值仅对表格布局(table)有效)
     //行列格式: row[column ...] ... row,column可选值: 
     //整数            固定行高或列宽 
     //数字+%          总宽度或高度的百分比 
     //数字+*          剩余空间的百分比, 数字表示权重, 省略时权重默认为100
     //数字+css单位    指定单位的行高或列宽
     //列可嵌套表或表组 表或表组可指定参数
-    //参数集: (name1=value1, ...)   多个参数之间用逗号分隔
-    //嵌套表: {(参数集) row[column ...] ...} 参数集可省略
-    //嵌套表组: <(参数集) { ... } ...> 参数集可省略 多个嵌套表之间用空格分隔
-    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* * {(spacingWidth=50% spacingHeight=50%) *[* * *] *[* * *] *[* * *]} *] *[* * *]'
-    self.arrangeProperty('table', '*[* * *] *[* * *] *[* * *]', 'last-value');
+    //参数集: <name1=value1 ...>   多个参数之间用逗号分隔
+    //嵌套表: {<参数集> row[column ...] ...} 参数集可省略
+    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* * {<spacingX=50% spacingY=50%> *[* * *] *[* * *] *[* * *]} *] *[* * *]'
+    
+    
+    
+    this.arrangeProperty('header', '', {
+    
+        set: 'this.__header = null;'
+    });
+    
+    
+    //内容区表格行定义
+    this.arrangeProperty('body', '*[* * *] *[* * *] *[* * *]', {
+     
+        set: 'this.__body = null;'
+    });
+    
+    
+    //自动增长行数
+    this.arrangeProperty('increase', '', {
+       
+        set: 'this.__increase = null;'
+    });
+    
+    
+    //尾部优先排列行数
+    this.arrangeProperty('footer', '', {
+       
+        set: 'this.__footer = null;'
+    });
 
 
+    
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
-
+        var table = this.__table || (this.__table = flyingon.Layout.parse(this.table())),
+            increase = this.increase(),
+            tails = this.tails(),
+            total;
+        
+        if (increase > 0 && (total = check_increase(table, end - start + 1)) > 0)
+        {
+            auto_increase(table = table.slice(0), total);
+        }
     };
 
         
-    function parse(items, tokeys, index) {
+    function check_increase(table, total) {
+        
+        for (var i = table.length - 1; i >= 0; i--)
+        {
+            var row = table[i],
+                items = row.items,
+                length = 0;
+            
+            for (var j = items.length - 1; j >= 0; j--)
+            {
+                var item = items[j];
+                
+                if (item.enabled)
+                {
+                    if (item.table)
+                    {
+                        length -= check_increase(item.table, increase, tails, 0);
+                    }
+                    else
+                    {
+                        length++;
+                    }
+                }
+            }
+            
+            total -= length;
+        }
+        
+        return total;
+    };
+    
+    
+    function auto_increase(table, increase, tails, total) {
+        
+        var start = table.length - increase - tails,
+            end = start + increase;
+        
+        if (start < 0)
+        {
+            start = 0;
+        }
         
         
     };
-
 
 
 });

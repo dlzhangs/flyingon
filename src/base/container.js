@@ -1,16 +1,16 @@
 
 //容器控件接口
-flyingon.IContainerControl = function (self, base) {
+flyingon.IContainerControl = function (base) {
 
 
 
     //接口标记
-    self['flyingon.IContainerControl'] = true;
+    this['flyingon.IContainerControl'] = true;
     
         
 
     //当前布局
-    self.defineProperty('layout', null, {
+    this.defineProperty('layout', null, {
      
         set: 'this.__layout = value && typeof value === "object";this.invalidate();'
     });
@@ -18,7 +18,7 @@ flyingon.IContainerControl = function (self, base) {
     
 
     //子控件集合
-    self.defineProperty('children', function (index) {
+    this.defineProperty('children', function (index) {
 
         var children = this.__children;
         
@@ -33,18 +33,18 @@ flyingon.IContainerControl = function (self, base) {
     
     
     //子控件类型
-    self.control_type = flyingon.Control;
+    this.control_type = flyingon.Control;
     
 
     //添加子控件
-    self.append = function (control) {
+    this.append = function (control) {
 
         if (control && check_control(this, control))
         {
             (this.__children || this.children()).push(control);
             control.__parent = this;
             
-            if (this.__dom_content)
+            if (this.__dom_scroll)
             {
                 if (this.__arrange_dirty !== 2)
                 {
@@ -60,7 +60,7 @@ flyingon.IContainerControl = function (self, base) {
 
 
     //在指定位置插入子控件
-    self.insert = function (index, control) {
+    this.insert = function (index, control) {
 
         if (control && check_control(this, control))
         {
@@ -71,7 +71,7 @@ flyingon.IContainerControl = function (self, base) {
             children.splice(index, 0, control);
             control.__parent = this;
 
-            if (this.__dom_content)
+            if (this.__dom_scroll)
             {
                 if (this.__arrange_dirty !== 2)
                 {
@@ -130,7 +130,7 @@ flyingon.IContainerControl = function (self, base) {
     
 
     //移除子控件或从父控件中移除
-    self.remove = function (control, dispose) {
+    this.remove = function (control, dispose) {
             
         var children, index;
         
@@ -150,7 +150,7 @@ flyingon.IContainerControl = function (self, base) {
 
 
     //移除指定位置的子控件
-    self.removeAt = function (index, dispose) {
+    this.removeAt = function (index, dispose) {
 
         var children, control;
 
@@ -170,7 +170,7 @@ flyingon.IContainerControl = function (self, base) {
 
 
     //清除子控件
-    self.clear = function (dispose) {
+    this.clear = function (dispose) {
       
         var children = this.__children,
             length;
@@ -210,7 +210,7 @@ flyingon.IContainerControl = function (self, base) {
         }
         else
         {
-            if (this.__dom_content)
+            if (this.__dom_scroll)
             {
                 this.dom.removeChild(control.dom);
             }
@@ -222,27 +222,27 @@ flyingon.IContainerControl = function (self, base) {
     
 
     //控件内容大小的dom
-    var content_dom = document.createElement('div');
+    var scroll_dom = document.createElement('div');
     
-    content_dom.style.cssText = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;visibility:hidden;';
+    scroll_dom.style.cssText = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;visibility:hidden;';
     
     
     //扩展容器组件接口
-    flyingon.IContainer(self);
+    flyingon.IContainer.call(this);
     
     
     //设置渲染大小时不包含padding
-    self.__no_padding = true;
+    this.__no_padding = true;
     
     
     //padding变更时不同步dom
-    self.__style_padding = function (value) {
+    this.__style_padding = function (value) {
     
     };
     
     
     //测量自动大小
-    self.measure_auto = function (box, auto_width, auto_height) {
+    this.measure_auto = function (box, auto_width, auto_height) {
         
         this.arrange();
 
@@ -259,11 +259,11 @@ flyingon.IContainerControl = function (self, base) {
     
         
     //设置默认排列标记
-    self.__arrange_dirty = 0;
+    this.__arrange_dirty = 0;
     
     
     //排列子控件
-    self.arrange = function (dirty) {
+    this.arrange = function (dirty) {
 
         var children = this.__children,
             length;
@@ -303,11 +303,11 @@ flyingon.IContainerControl = function (self, base) {
             cache;
             
         //初始化dom
-        if (!self.__dom_content)
+        if (!self.__dom_scroll)
         {
             cache = document.createDocumentFragment();
             
-            cache.appendChild(self.__dom_content = content_dom.cloneNode(false));
+            cache.appendChild(self.__dom_scroll = scroll_dom.cloneNode(false));
 
             for (var i = 0, _ = children.length; i < _; i++)
             {
@@ -386,7 +386,7 @@ flyingon.IContainerControl = function (self, base) {
 
         //使用positon:relatvie left,top或margin:bottom,right定位时在IE6,7不正常
         //style.margin = height + 'px 0 0 ' + width + 'px';
-        style = self.__dom_content.style;
+        style = self.__dom_scroll.style;
         style.left = (self.contentWidth - 1) + 'px';
         style.top = (self.contentHeight - 1) + 'px';
 
@@ -404,7 +404,7 @@ flyingon.IContainerControl = function (self, base) {
     
         
     //排列子项
-    self.arrange_children = function (children) {
+    this.arrange_children = function (children) {
 
         for (var i = 0, _ = children.length; i < _; i++)
         {
@@ -419,7 +419,7 @@ flyingon.IContainerControl = function (self, base) {
     
            
     
-    self.serialize = function (writer) {
+    this.serialize = function (writer) {
         
         var children;
         
@@ -432,13 +432,13 @@ flyingon.IContainerControl = function (self, base) {
     };
     
     
-    self.deserialize_list.children = function (reader, values) {
+    this.deserialize_children = function (reader, values) {
       
         this.__children = reader.read_array(values);
     };
 
 
-    self.dispose = function () {
+    this.dispose = function () {
 
         var children = this.__children;
 
@@ -450,7 +450,7 @@ flyingon.IContainerControl = function (self, base) {
             }
         }
 
-        this.__dom_content = null;
+        this.__dom_scroll = null;
         base.dispose.call(this);
     };
 

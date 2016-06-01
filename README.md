@@ -50,7 +50,7 @@ Opera9+
 
 
         //定义基类: freeoasoft.test.BaseClass (注:仅在名字空间内才可定义类)
-        $class('BaseClass', function (self) {
+        $class('BaseClass', function () {
 
 
             //定义构造函数(注:仅在定义类时有效)
@@ -69,30 +69,30 @@ Opera9+
 
 
             //定义实例方法
-            self.instance_fn = function () {
+            this.instance_fn = function () {
 
                 return 'BaseClass';
             };
 
 
             //定义布尔型属性,默认值为false
-            self.defineProperty('p_boolean', false);
+            this.defineProperty('p_boolean', false);
 
 
             //定义整数型属性,默认值为0
-            self.defineProperty('p_int', 0, true);
+            this.defineProperty('p_int', 0, true);
 
 
             //定义数字型属性,默认值为0
-            self.defineProperty('p_float', 0.0, true);
+            this.defineProperty('p_float', 0.0, true);
 
 
             //定义字符型属性,默认值为''
-            self.defineProperty('p_string', '', true);
+            this.defineProperty('p_string', '', true);
 
 
             //定义只读属性
-            self.defineProperty('p_readonly', function () {
+            this.defineProperty('p_readonly', function () {
 
                 return new Date();
             });
@@ -102,7 +102,7 @@ Opera9+
 
 
         //定义子类 freeoasoft.test.ChildClass 从BaseClass继承 (注:仅在名字空间内才可定义类)
-        $class('ChildClass', test.BaseClass, function (self, base) {
+        $class('ChildClass', test.BaseClass, function (base) {
 
 
             //子类会自动调用父类的构造函数
@@ -113,7 +113,7 @@ Opera9+
 
 
             //重载实例方法
-            self.instance_fn = function () {
+            this.instance_fn = function () {
 
                 //先调用父类的方法
                 base.instance_fn.call(this);
@@ -176,12 +176,13 @@ Opera9+
 
 
         //注册全局事件(可优先捕获任意对象触发的事件)
-        obj1.on('my_event', function (e) {
-
+        flyingon.on('my_event', function (e, data) {
+            
+            alert('global event:' + event.type + data);
+            
             //停止冒泡
-            e.stopPropagation();
-
-        }, true);
+            //e.stopPropagation();
+        });
 
         //注册事件(支持事件冒泡)
         obj2.on('my_event', function (event, data) {
@@ -192,8 +193,8 @@ Opera9+
         //触发事件
         obj2.trigger('my_event', '+dddddd'); //弹出"my_event+dddddd"
 
-        //注销obj1上的所有my_event全局事件
-        //obj1.off('my_event', null, true);
+        //注销所有my_event全局事件
+        flyingon.off('my_event');
 
         //注销obj3上的所有my_event事件
         obj2.off('my_event');

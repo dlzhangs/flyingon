@@ -1,5 +1,5 @@
 //UI事件
-$class('UIEvent', [Object, flyingon.Event], function (self) {
+$class('UIEvent', [Object, flyingon.Event], function () {
    
         
     $constructor(function (type, event) {
@@ -10,7 +10,7 @@ $class('UIEvent', [Object, flyingon.Event], function (self) {
     
         
     //阻止dom事件冒泡
-    self.dom_stopPropagation = function () {
+    this.dom_stopPropagation = function () {
 
         var e = this.dom_event;
 
@@ -22,7 +22,7 @@ $class('UIEvent', [Object, flyingon.Event], function (self) {
 
 
     //禁止默认dom事件
-    self.dom_preventDefault = function () {
+    this.dom_preventDefault = function () {
 
         var e = this.dom_event;
 
@@ -34,7 +34,7 @@ $class('UIEvent', [Object, flyingon.Event], function (self) {
 
 
     //阻止dom事件冒泡及禁止默认dom事件
-    self.dom_stopImmediatePropagation = function () {
+    this.dom_stopImmediatePropagation = function () {
 
         var e = this.dom_event;
 

@@ -1,7 +1,7 @@
-$class('HtmlControl', flyingon.Control, function (self, base) {
+$class('HtmlControl', flyingon.Control, function (base) {
    
         
-    self.defineProperty('text', '', {
+    this.defineProperty('text', '', {
         
         set: 'this.dom.innerHTML = value;'
     });

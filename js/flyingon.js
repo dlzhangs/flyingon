@@ -33,7 +33,7 @@ flyingon.version = '0.0.1.0';
 
 
 //复制源对象成员至目标对象
-flyingon.extend = function (target, source, deep) {
+flyingon.extend = function (target, source) {
     
     target = target || {};
     
@@ -41,8 +41,7 @@ flyingon.extend = function (target, source, deep) {
     {
         for (var name in source)
         {
-            var value = source[name];
-            target[name] = deep && typeof value === 'object' ? flyingon.extend(target[name], value) : value;
+            target[name] = source[name];
         }
     }
     
@@ -102,7 +101,7 @@ flyingon.parseJSON = window.JSON && JSON.parse || (function () {
         {
             if (regex1.test(text.replace(regex2, '')))
             {
-                throw $errortext('flyingon', 'json parse');
+                throw $errortext('flyingon', 'json parse error');
             }
 
             return new Function('return ' + text)();
@@ -217,15 +216,30 @@ flyingon.absoluteUrl = (function () {
         
         error_path = '{type}/i18n/{i18n}/error.js', //错误信息路径模板
         
-        error_list = flyingon.create(null); //错误信息列表        
+        error_list = flyingon.create(null), //错误信息列表        
 
+        regex_namespace = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/, //名字空间名称检测
+
+        namespace_stack = [], //名字空间栈
+        
+        namespace_current = flyingon,
+        
+        regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
+
+        class_list = flyingon.__class_list = {}, //已注册类型集合
+
+        class_stack = [],  //类栈(支持类的内部定义类)
+        
+        class_data; //当前类定义信息(支持类的内部定义类)
+        
+        
     
     
     //实始化起始路径
     flyingon_path = include_path = (function () {
         
         var list = document.scripts,
-            regex = /flyingon(?:\/js\/flyingon)?-(?:core|layout|full)(?:\.min)?\.js/;
+            regex = /flyingon(?:-mini)?(?:\.min)?\.js/;
         
         for (var i = list.length - 1; i >= 0; i--)
         {
@@ -234,7 +248,7 @@ flyingon.absoluteUrl = (function () {
             
             if (index >= 0)
             {
-                return src.substring(0, index);
+                return src.substring(0, index).replace(/flyingon\/js\/$/, '');
             }
         }
         
@@ -344,7 +358,7 @@ flyingon.absoluteUrl = (function () {
     //url: ./xxx: 相对flyingon.js目录
     //url: ../xxx: 相对flyingon.js的上级目录
     //url: xxx://xxx 绝对路径
-    flyingon.$include = window.$include = function (url, css) {
+    function $include(url, css) {
 
         if (url && typeof url === 'string' && !check_css(url, css))
         {
@@ -361,7 +375,7 @@ flyingon.absoluteUrl = (function () {
 
 
     //require函数
-    flyingon.$require = window.$require = function (url, callback, css) {
+    function $require(url, callback, css) {
 
         if (typeof url === 'function')
         {
@@ -956,7 +970,7 @@ flyingon.absoluteUrl = (function () {
             list.push(cache);
         }
         
-        flyingon.$require(list, callback, css);
+        $require(list, callback, css);
     };
 
 
@@ -968,7 +982,7 @@ flyingon.absoluteUrl = (function () {
     
     
     //获取指定key的本地化信息
-    flyingon.$i18ntext = window.$i18ntext = function (key) {
+    function $i18ntext(key) {
 
         return i18n_list[key] || key;
     };
@@ -1054,7 +1068,7 @@ flyingon.absoluteUrl = (function () {
     
     
     //获取错误信息
-    flyingon.$errortext = window.$errortext = function (type, key) {
+    function $errortext(type, key) {
       
         if (type && key)
         {
@@ -1072,32 +1086,15 @@ flyingon.absoluteUrl = (function () {
             return (cache = error_list[type]) && cache[key] || key;
         }
     };
-
-
     
-    
-    var regex_namespace = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/, //名称检测
-
-        namespace_stack = [],
-        
-        namespace_current = flyingon,
-        
-        regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
-
-        class_list = flyingon.__class_list = {}, //已注册类型集合
-
-        constructor_list,  //当前构造集合
-        
-        static_list;  //静态成员集合
-        
     
     
     //默认名字空间名
     flyingon.namespace_name = 'flyingon';
 
 
-    //定义或切换模块
-    flyingon.$namespace = window.$namespace = function (name, callback) {
+    //定义或切换名字空间
+    function $namespace(name, callback) {
 
         var target, items, cache;
 
@@ -1128,7 +1125,7 @@ flyingon.absoluteUrl = (function () {
             }
             else
             {
-                throw $errortext('flyingon', 'namespace name');
+                throw $errortext('flyingon', 'namespace name error');
             }
         }
         else
@@ -1187,26 +1184,44 @@ flyingon.absoluteUrl = (function () {
 
 
     //开放定义构造函数的方法
-    function constructor_fn(fn, replace) {
-
-        if (typeof fn === 'function')
+    function $constructor(fn, replace) {
+            
+        var data = class_data;
+            
+        if (data)
         {
-            if ((fn.replace = replace) || !constructor_list)
+            if (typeof fn === 'function')
             {
-                constructor_list = [fn];
+                if ((fn.replace = replace) || !data[0])
+                {
+                    data[0] = [fn];
+                }
+                else
+                {
+                    data[0].push(fn);
+                }
             }
-            else
-            {
-                constructor_list.push(fn);
-            }
+        }
+        else
+        {
+            throw $errortext('flyingon', '$constructor not in class');
         }
     };
     
 
     //开放定义静态成员的方法
-    function static_fn(name, value) {
+    function $static(name, value) {
 
-        (static_list || (static_list = [])).push(name, value);
+        var data = class_data;
+        
+        if (data)
+        {
+            (data[1] || (data[1] = [])).push(name, value);
+        }
+        else
+        {
+            throw $errortext('flyingon', '$static not in class');
+        }
     };
     
 
@@ -1214,18 +1229,17 @@ flyingon.absoluteUrl = (function () {
     //name:             类型名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
     //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口
     //fn:               类代码, 函数, 参数(self:类原型, base:父类原型)
-    function Class(name, superclass, fn) {
+    function $class(name, superclass, fn) {
 
 
-        var Class, base, prototype, namespace, data, cache;
+        var data = class_data = [null, null], 
+            Class, 
+            base, 
+            prototype, 
+            namespace, 
+            cache;
 
         
-        if (constructor_list || static_list)
-        {
-            throw $errortext('flyingon', 'class in');
-        }
-        
-
         //处理参数
         if (typeof name !== 'string') //不传name则创建匿名类
         {
@@ -1235,7 +1249,7 @@ flyingon.absoluteUrl = (function () {
         }
         else if (!regex_class.test(name))
         {
-            throw $errortext('flyingon', 'class name');
+            throw $errortext('flyingon', 'class name error');
         }
 
         if (!fn && (fn = superclass))
@@ -1245,22 +1259,24 @@ flyingon.absoluteUrl = (function () {
 
         if (typeof fn !== 'function')
         {
-            throw $errortext('flyingon', 'class fn');
+            throw $errortext('flyingon', 'class fn error');
         }
 
-        
+                
         //获取父类原型及创建类原型
         if (superclass && typeof superclass !== 'function')
         {
-            data = superclass;
+            cache = superclass;
             superclass = superclass[0];
         }
         
+        
+        //处理父类
         if (superclass)
         {
-            if (cache = superclass.__constructor_list)
+            if (base = superclass.__constructor_list)
             {
-                constructor_list = cache.slice(0);
+                data[0] = base.slice(0);
             }
         }
         else
@@ -1268,19 +1284,25 @@ flyingon.absoluteUrl = (function () {
             superclass = Object;
         }
         
+        
+        //创建原型
         prototype = flyingon.create(base = superclass.prototype);
 
+        
+        //扩展父类接口
+        if (cache && cache.length > 1)
+        {
+            class_superclass(prototype, cache);
+        }
+        
+        
         //初始化原型
-        if (base && (cache = base.__prototype_init))
+        if (cache = base && base.__prototype_init)
         {
             cache.call(prototype, base, true);
         }
         
-        if (data)
-        {
-            class_superclass(prototype, data);
-        }
-
+                
         //设置base属性
         prototype.base = base;
         
@@ -1299,37 +1321,30 @@ flyingon.absoluteUrl = (function () {
             prototype.xtype = namespace.namespace_name + '.' + name;
         }
         
-
+        
         try
-        {
-            //缓存原全局方法
-            data = window;
-            cache = [data.$constructor, data.$static];
+        {        
+            //进栈
+            (cache = class_stack).push(data);
             
-            //开放定义构造函数的方法
-            data.$constructor = constructor_fn;
-
-            //开放定义静态成员的方法
-            data.$static = static_fn;
-
             //执行扩展
-            fn.call(prototype, prototype, base);
+            fn.call(prototype, base, prototype);
         }
         finally
         {
-            //回滚全局变量
-            data.$constructor = cache[0];
-            data.$static = cache[1];
+            //出栈
+            cache.pop();
+            
+            //回退类定义数据
+            class_data = cache[cache.length - 1];
         }
-        
 
+        
         //处理类及构造函数
-        if (cache = constructor_list)
+        if (cache = data[0])
         {
             Class = cache.length > 1 || cache[0].superclass ? class_create(cache) : cache[0];
             Class.__constructor_list = cache; 
-            
-            constructor_list = null;
         }
         else
         {
@@ -1338,10 +1353,9 @@ flyingon.absoluteUrl = (function () {
         
         
         //初始化静态成员
-        if (cache = static_list)
+        if (cache = data[1])
         {
             class_static(Class, cache);            
-            static_list = null;
         }
 
 
@@ -1377,11 +1391,12 @@ flyingon.absoluteUrl = (function () {
         }
 
 
+        //初始化类
         if (cache = prototype.__class_init)
         {
-            cache.call(prototype, Class, prototype, base);
+            cache.call(prototype, Class, base, prototype);
         }
-
+        
 
         //返回当前类型
         return Class;
@@ -1391,7 +1406,9 @@ flyingon.absoluteUrl = (function () {
     //处理类接口
     function class_superclass(prototype, list) {
         
-        var target, cache;
+        var data = class_data,
+            target, 
+            cache;
         
         for (var i = 1, _ = list.length; i < _; i++)
         {
@@ -1400,13 +1417,13 @@ flyingon.absoluteUrl = (function () {
                 //复制构造函数
                 if (cache = target.__constructor_list)
                 {
-                    if (cache[0].replace || !constructor_list)
+                    if (cache[0].replace || !data[0])
                     {
-                        constructor_list = cache.slice(0);
+                        data[0] = cache.slice(0);
                     }
                     else
                     {
-                        cache.push.apply(constructor_list, cache);
+                        cache.push.apply(data[0], cache);
                     }
                 }
                 
@@ -1525,9 +1542,26 @@ flyingon.absoluteUrl = (function () {
     };
 
     
+    
+    //输出外部接口
     //分开赋值解决chrome调试时类名过长的问题
-    flyingon.$class = window.$class = Class;
-
+    (function (data) {
+        
+        for (var name in data)
+        {
+            flyingon[name] = window[name] = data[name];
+        }
+        
+    })({
+        $include: $include,
+        $i18ntext: $i18ntext,
+        $errortext: $errortext,
+        $require: $require,
+        $namespace: $namespace,
+        $class: $class,
+        $constructor: $constructor,
+        $static: $static
+    });
     
 
 })(window, document, flyingon);
@@ -1535,53 +1569,51 @@ flyingon.absoluteUrl = (function () {
 
 
 //组件基类
-$class('Component', function (self) {
+$class('Component', function () {
 
 
 
-    var global_events = flyingon.global_events = flyingon.create(null), //全局事件集合
-        
-        regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; //绑定表达式解析器 
+    var regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; //绑定表达式解析器 
                     
 
     
     //初始化原型
-    (self.__prototype_init = function (base, superclass) {
+    (this.__prototype_init = function (base, superclass) {
         
-        var extend = flyingon.extend,
-            cache;
+        var cache;
         
         if (superclass)
         {
             this.__defaults = flyingon.create(base && base.__defaults || null);
             this.__properties = flyingon.create(base && base.__properties || null);
-            
-            this.deserialize_list = extend(flyingon.create(null), base && base.deserialize_list);
         }
-        else
+        else if (base)
         {
-            cache = [this.__defaults, this.__properties, this.deserialize_list];
-            
             for (var name in base)
             {
                 this[name] = base[name];
             }
             
-            this.__defaults = extend(cache[0] || flyingon.create(null), this.__defaults);
-            this.__properties = extend(cache[1] || flyingon.create(null), this.__properties);
+            if (cache = base.__defaults)
+            {
+                this.__defaults = flyingon.extend(this.__defaults || flyingon.create(null), cache);
+            }
             
-            this.deserialize_list = extend(cache[2] || flyingon.create(null), this.deserialize_list);
+            if (cache = base.__properties)
+            {
+                this.__properties = flyingon.extend(this.__properties || flyingon.create(null), cache);
+            }
         }
           
-    }).call(self, null, true);
+    }).call(this, null, true);
     
     
     //定义属性及set_XXX方法
-    self.defineProperty = function (name, defaultValue, attributes) {
+    this.defineProperty = function (name, defaultValue, attributes) {
 
         if (name.match(/\W/))
         {
-            throw $errortext('flyingon', 'property name').replace('{0}', name);
+            throw $errortext('flyingon', 'property name error').replace('{0}', name);
         }
 
         var cache = attributes,
@@ -1669,20 +1701,25 @@ $class('Component', function (self) {
             defineProperty(cache, name, attributes, storage);
 
             cache.push('return this;');
+            cache = cache.join('');
 
-            this[name] = new Function('value', 'trigger', cache.join('')); //创建属性方法
+            //创建按需加载属性以提升初始化性能
+            this[name] = attributes.delay !== false ? delay_property(name, cache) : new Function('value', 'trigger', cache);
         }
 
         //扩展至选择器
         if (attributes.query && flyingon.Query)
         {
-            flyingon.Query.prototype[name] = new Function('value', 'return this.value("' + name + '", value);');
+            flyingon.Query.prototype[name] = function (value) {
+                
+                return this.value(name, value);
+            };
         }
 
         return this;
     };
 
-
+    
     function defineProperty(writer, name, attributes, storage) {
 
         var dataType = attributes.dataType,
@@ -1769,8 +1806,35 @@ $class('Component', function (self) {
     };
 
 
+    function delay_property(name, text) {
+        
+        function fn(value, trigger) {
+            
+            var target = this,
+                base = (this.Class || this.constructor).prototype,
+                cache = target[name];
+            
+            while (base && cache === base[name])
+            {
+                target = base;
+                base = base.base;
+            }
+            
+            if (!(cache = fn.__new))
+            {
+                cache = fn.__new = new Function('value', 'trigger', text);
+                text = null;
+            }
+            
+            return (target[name] = cache).call(this, value, trigger);
+        };
+        
+        return fn;
+    };
+    
+
     //属性值变更方法
-    self.__onpropertychange = function (name, value, oldValue) {
+    this.__onpropertychange = function (name, value, oldValue) {
     
         var fn, cache;
         
@@ -1794,11 +1858,14 @@ $class('Component', function (self) {
     
     
     //组件id
-    self.defineProperty('id', '');
+    this.defineProperty('id', '', {
+     
+        delay: false
+    });
     
     
     //获取指定名称的值(数据绑定用)
-    self.get = function (name, context) {
+    this.get = function (name, context) {
         
         var fn = this[name];
         
@@ -1812,7 +1879,7 @@ $class('Component', function (self) {
     
     
     //设置指定名称的值(数据绑定用)
-    self.set = function (name, value, context) {
+    this.set = function (name, value, context) {
         
         var fn = this[name];
         
@@ -1828,7 +1895,7 @@ $class('Component', function (self) {
     
 
     //批量设置属性值
-    self.sets = function (values, trigger) {
+    this.sets = function (values, trigger) {
 
         var fn;
         
@@ -1857,7 +1924,7 @@ $class('Component', function (self) {
 
 
     //获取或设置属性默认值
-    self.defaultValue = function (name, value) {
+    this.defaultValue = function (name, value) {
 
         var defaults = this.__defaults;
 
@@ -1872,7 +1939,7 @@ $class('Component', function (self) {
 
 
     //获取属性值集合
-    self.getProperties = function (filter) {
+    this.getProperties = function (filter) {
 
         var target = this.__properties,
             data = [],
@@ -1892,37 +1959,18 @@ $class('Component', function (self) {
     
     
     //绑定事件处理 注:type不带on
-    //global: 是否全局事件
-    self.on = function (type, fn, global) {
+    this.on = flyingon.on = function (type, fn) {
 
         if (type && typeof fn === 'function')
         {
             var events = this.__events || (this.__events = flyingon.create(null));
 
-            if (global)
-            {
-                var cache = '...global.' + type;
+            (events[type] || (events[type] = [])).push(fn);
 
-                events[cache] = ++events[cache] || 1;
-
-                if (cache = global_events[type])
-                {
-                    cache.push(fn, this);
-                }
-                else
-                {
-                    global_events[type] = [fn, this];
-                }
-            }
-            else
+            //注册自定义事件
+            if (fn = this['on_event_' + type])
             {
-                (events[type] || (events[type] = [])).push(fn);
-                
-                //注册自定义事件
-                if (fn = this['__event_on_' + type])
-                {
-                    fn.call(this, type);
-                }
+                fn.call(this, type);
             }
         }
 
@@ -1931,33 +1979,26 @@ $class('Component', function (self) {
 
     
     //只执行一次绑定的事件
-    self.once = function (type, fn, global) {
+    this.once = flyingon.once = function (type, fn) {
 
         var self = this;
 
         function callback() {
 
             fn.apply(self, arguments);
-            self.off(type, callback, global);
+            self.off(type, callback);
         };
 
-        this.on(type, callback, global);
+        this.on(type, callback);
     };
 
     
     //暂停事件处理
-    self.suspend = function (type, global) {
+    this.suspend = flyingon.suspend = function (type) {
 
-        var events;
+        var events = this.__events;
 
-        if (global) 
-        {
-            if (events = global_events[type])
-            {
-                events.unshift(suspend_fn, this);
-            }
-        }
-        else if ((events = this.__events) && (events = events[type]))
+        if (events && (events = events[type]))
         {
             events.unshift(suspend_fn);
         }
@@ -1967,18 +2008,11 @@ $class('Component', function (self) {
 
     
     //继续事件处理
-    self.resume = function (type, global) {
+    this.resume = flyingon.resume = function (type) {
 
-        var events;
+        var events = this.__events;
 
-        if (global)
-        {
-            if ((events = global_events[type]) && events[0] === suspend_fn)
-            {
-                events.splice(0, 2);
-            }
-        }
-        else if ((events = this.__events) && (events = events[type]) && events[0] === suspend_fn)
+        if (events && (events = events[type]) && events[0] === suspend_fn)
         {
             events.shift();
         }
@@ -1995,52 +2029,14 @@ $class('Component', function (self) {
 
     
     //移除事件处理
-    self.off = function (type, fn, global) {
+    this.off = flyingon.off = function (type, fn) {
 
         var events = this.__events,
             items;
 
         if (events)
         {
-            if (!type)
-            {
-                for (var type in events)
-                {
-                    if (type.substring(0, 10) === '...global.')
-                    {
-                        this.off(type.substring(10), null, true);
-                    }
-                    else
-                    {
-                        this.off(type);
-                    }
-                }
-
-                this.__events = null;
-            }
-            else if (global)
-            {
-                if ((events = events['...global.' + type]) && (items = global_events[type]))
-                {
-                    for (var i = items.length - 1; i >= 0; i--)
-                    {
-                        if (items[i--] === this)
-                        {
-                            if (!fn || fn === items[i])
-                            {
-                                items.splice(i, 2);
-                                events--;
-                            }
-                        }
-                    }
-
-                    if (!items.length)
-                    {
-                        global_events[type] = null;
-                    }
-                }
-            }
-            else 
+            if (type)
             {
                 if (fn)
                 {
@@ -2065,12 +2061,21 @@ $class('Component', function (self) {
                     items.length = 0;
                     events[type] = null;
                 }
-                
+
                 //注销自定义事件
-                if (fn = this['__event_off_' + type])
+                if (fn = this['off_event_' + type])
                 {
                     fn.call(this);
                 }
+            }
+            else
+            {
+                for (var type in events)
+                {
+                    this.off(type);
+                }
+
+                this.__events = null;
             }
         }
 
@@ -2079,38 +2084,16 @@ $class('Component', function (self) {
 
     
     //分发事件
-    self.trigger = function (e) {
+    this.trigger = function (e) {
 
         var type = e.type || (e = arguments[0] = new flyingon.Event(e)).type,
-            events = global_events[type],
+            target = flyingon,
+            events,
             fn;
 
-        e.target = this;
+        e.target = target.__parent = this;
 
-        //处理全局事件
-        if (events)
-        {
-            for (var i = 0, _ = events.length; i < _; i++)
-            {
-                if ((fn = events[i++]) && !fn.disabled)
-                {
-                    if (fn.apply(events[i - 1], arguments) === false)
-                    {
-                        e.defaultPrevented = true;
-                    }
-
-                    if (e.cancelBubble)
-                    {
-                        return !e.defaultPrevented;
-                    }
-                }
-            }
-        }
-
-        //冒泡
-        var target = this;
-
-        while (target)
+        do
         {
             if ((events = target.__events) && (events = events[type]))
             {
@@ -2130,9 +2113,8 @@ $class('Component', function (self) {
                     }
                 }
             }
-
-            target = target.__parent;
         }
+        while (target = target.__parent);
 
         return !e.defaultPrevented;
     };
@@ -2140,7 +2122,7 @@ $class('Component', function (self) {
 
     
     //序列化方法
-    self.serialize = function (writer) {
+    this.serialize = function (writer) {
 
         var cache;
         
@@ -2162,14 +2144,13 @@ $class('Component', function (self) {
     
         
     //反序列化方法
-    self.deserialize = function (reader, values) {
+    this.deserialize = function (reader, values) {
 
-        var list = this.deserialize_list,
-            fn;
+        var fn;
         
         for (var name in values)
         {
-            if (fn = list[name])
+            if (fn = this['deserialize_' + name])
             {
                 if (fn !== true)
                 {
@@ -2189,11 +2170,11 @@ $class('Component', function (self) {
 
             
     //设置不序列化xtype属性
-    self.deserialize_list.xtype = true;
+    this.deserialize_xtype = true;
 
 
             
-    self.deserialize_list.bindings = function (reader, values) {
+    this.deserialize_bindings = function (reader, values) {
 
         for (var name in values)
         {
@@ -2291,7 +2272,7 @@ $class('Component', function (self) {
     
     
     //同步数据绑定 从源对象同步数据至目标对象
-    self.syncBinding = function (name, value) {
+    this.syncBinding = function (name, value) {
         
         var items = this.__to_bindings,
             item,
@@ -2328,7 +2309,7 @@ $class('Component', function (self) {
     
     
     //添加数据绑定
-    self.addBinding = function (name, source, expression, twoway) {
+    this.addBinding = function (name, source, expression, twoway) {
       
         if (name && source)
         {
@@ -2336,13 +2317,13 @@ $class('Component', function (self) {
         }
         else
         {
-            throw $errortext('flyingon', 'binding name')
+            throw $errortext('flyingon', 'binding name error')
         }
     };
     
     
     //移除数据绑定
-    self.removeBinding = function (name, source) {
+    this.removeBinding = function (name, source) {
       
         var bindings = this.__bindings,
             binding;
@@ -2387,7 +2368,7 @@ $class('Component', function (self) {
     
     
     //以当前对象的参照复制生成新对象
-    self.clone = function () {
+    this.clone = function () {
 
         var target = new this.Class(),
             storage = this.__storage;
@@ -2407,7 +2388,7 @@ $class('Component', function (self) {
     
 
     //销毁对象
-    self.dispose = function () {
+    this.dispose = function () {
 
         var bindings = this.__bindings,
             cache;
@@ -2443,7 +2424,7 @@ $class('Component', function (self) {
 
 
 //事件基类
-$class('Event', function (self) {
+$class('Event', function () {
 
 
     $constructor(function (type) {
@@ -2453,37 +2434,37 @@ $class('Event', function (self) {
 
 
     //事件类型
-    self.type = null;
+    this.type = null;
 
 
     //触发事件目标对象
-    self.target = null;
+    this.target = null;
 
 
     //是否取消冒泡
-    self.cancelBubble = false;
+    this.cancelBubble = false;
 
     
     //是否阻止默认动作
-    self.defaultPrevented = false;
+    this.defaultPrevented = false;
 
 
     //阻止事件冒泡
-    self.stopPropagation = function () {
+    this.stopPropagation = function () {
 
         this.cancelBubble = true;
     };
 
 
     //禁止默认事件
-    self.preventDefault = function () {
+    this.preventDefault = function () {
 
         this.defaultPrevented = true;
     };
 
 
     //阻止事件冒泡及禁止默认事件
-    self.stopImmediatePropagation = function () {
+    this.stopImmediatePropagation = function () {
 
         this.cancelBubble = this.defaultPrevented = true;
     };
@@ -2493,14 +2474,14 @@ $class('Event', function (self) {
 
 
 //读序列化类
-$class('SerializeReader', function (self) {
+$class('SerializeReader', function () {
 
 
     var class_list = flyingon.__class_list,
         Array = window.Array;
     
 
-    self.deserialize = function (values) {
+    this.deserialize = function (values) {
 
         if (values)
         {
@@ -2522,7 +2503,7 @@ $class('SerializeReader', function (self) {
     };
 
 
-    self.read = function (value) {
+    this.read = function (value) {
 
         if (value && typeof value === 'object')
         {
@@ -2533,7 +2514,7 @@ $class('SerializeReader', function (self) {
     };
 
 
-    self.read_array = function (values) {
+    this.read_array = function (values) {
 
         if (values)
         {
@@ -2551,7 +2532,7 @@ $class('SerializeReader', function (self) {
     };
 
 
-    self.read_object = function (values, type) {
+    this.read_object = function (values, type) {
 
         if (values)
         {
@@ -2599,7 +2580,7 @@ $class('SerializeReader', function (self) {
     };
 
     
-    self.read_properties = function (target, values) {
+    this.read_properties = function (target, values) {
       
         for (var name in values)
         {
@@ -2608,7 +2589,7 @@ $class('SerializeReader', function (self) {
     };
     
     
-    self.read_reference = function (name, callback) {
+    this.read_reference = function (name, callback) {
       
         var all = this.all,
             cache;
@@ -2628,7 +2609,7 @@ $class('SerializeReader', function (self) {
     };
       
     
-    self.__class_init = function (Class) {
+    this.__class_init = function (Class) {
     
         var reader = Class.instance = new Class();
 
@@ -2643,7 +2624,7 @@ $class('SerializeReader', function (self) {
 
 
 //写序列化类
-$class('SerializeWriter', function (self) {
+$class('SerializeWriter', function () {
 
 
     var Array = window.Array,
@@ -2656,7 +2637,7 @@ $class('SerializeWriter', function (self) {
     });
     
 
-    self.serialize = function (target) {
+    this.serialize = function (target) {
 
         if (target && typeof target === 'object')
         {
@@ -2680,7 +2661,7 @@ $class('SerializeWriter', function (self) {
     };
 
 
-    self.write = function (value) {
+    this.write = function (value) {
 
         if (value != null)
         {
@@ -2718,7 +2699,7 @@ $class('SerializeWriter', function (self) {
     };
 
 
-    self.write_array = function (array) {
+    this.write_array = function (array) {
 
         var data = this.data;
         
@@ -2750,7 +2731,7 @@ $class('SerializeWriter', function (self) {
     };
 
 
-    self.write_object = function (target) {
+    this.write_object = function (target) {
 
         var data = this.data;
         
@@ -2783,7 +2764,7 @@ $class('SerializeWriter', function (self) {
     };
 
 
-    self.write_properties = function (values) {
+    this.write_properties = function (values) {
 
         if (values)
         {
@@ -2810,14 +2791,14 @@ $class('SerializeWriter', function (self) {
     };
     
     
-    self.write_property = function (name, value) {
+    this.write_property = function (name, value) {
       
         this.data.push('"' + name + '":');
         this.write(value);
     };
     
     
-    self.write_reference = function (name, target) {
+    this.write_reference = function (name, target) {
         
         if (name && target)
         {
@@ -2825,7 +2806,7 @@ $class('SerializeWriter', function (self) {
             
             if (!id || typeof id === 'function' && !(id = target.id()))
             {
-                throw $errortext('serialize id').replace('{0}', target);
+                throw $errortext('serialize no id').replace('{0}', target);
             }
             
             this.data.push('"' + name + '":');
@@ -2835,7 +2816,7 @@ $class('SerializeWriter', function (self) {
 
     
         
-    self.__class_init = function (Class) {
+    this.__class_init = function (Class) {
     
         var writer = Class.instance = new Class();
 
@@ -2851,33 +2832,33 @@ $class('SerializeWriter', function (self) {
 
 
 //异步处理接口
-$class('Async', function (self) {
+$class('Async', function () {
 
 
 
     //注册成功执行函数或成功执行通知
-    self.done = function (fn) {
+    this.done = function (fn) {
 
         return registry(this, fn, 1);
     };
 
 
     //注册执行失败函数或执行失败通知
-    self.fail = function (fn) {
+    this.fail = function (fn) {
 
         return registry(this, fn, 2);
     };
 
 
     //注册执行结束函数
-    self.always = function (fn) {
+    this.always = function (fn) {
 
         return registry(this, fn, 3);
     };
 
 
     //注册执行进度函数
-    self.progress = function (fn) {
+    this.progress = function (fn) {
 
         return registry(this, fn, 8);
     };
@@ -2906,21 +2887,21 @@ $class('Async', function (self) {
 
 
     //成功执行通知
-    self.resolve = function (value) {
+    this.resolve = function (value) {
 
         return this.__change_to(1, arguments);
     };
 
 
     //失败执行通知
-    self.reject = function (error) {
+    this.reject = function (error) {
 
         return this.__change_to(2, arguments);
     };
 
 
     //执行进度通知
-    self.notify = function (value) {
+    this.notify = function (value) {
 
         return this.__change_to(8, arguments);
     };
@@ -2932,7 +2913,7 @@ $class('Async', function (self) {
     //4: error
     //7: always
     //8: progress
-    self.__change_to = function (state, parameters) {
+    this.__change_to = function (state, parameters) {
 
         var data = this.__data || (this.__data = []),
             index = 0,
@@ -2957,7 +2938,7 @@ $class('Async', function (self) {
 
     
 //Ajax类
-$class('Ajax', [Object, flyingon.Async], function (self) {
+$class('Ajax', [Object, flyingon.Async], function () {
 
 
 
@@ -2965,28 +2946,28 @@ $class('Ajax', [Object, flyingon.Async], function (self) {
 
 
     //method
-    self.method = 'GET';
+    this.method = 'GET';
 
     //text/plain || json || script || xml
-    self.dataType = 'text/plain';
+    this.dataType = 'text/plain';
 
     //内容类型
-    self.contentType = 'application/x-www-form-urlencoded';
+    this.contentType = 'application/x-www-form-urlencoded';
 
     //自定义http头
-    self.header = null;
+    this.header = null;
 
     //是否异步
-    self.async = true;
+    this.async = true;
 
     //请求用户名
-    self.user = void 0;
+    this.user = void 0;
 
     //请求密码
-    self.password = void 0;
+    this.password = void 0;
 
     //超时时间
-    self.timeout = 0;
+    this.timeout = 0;
 
 
     //发送请求
@@ -3217,17 +3198,6 @@ flyingon.ajaxPost = function (url, options) {
 
 
 
-Array.prototype.remove || (Array.prototype.remove = function (item) {
-
-    var index = this.indexOf(item);
-    
-    if (index >= 0)
-    {
-        this.splice(index, 1);
-    }
-});
-
-
 Array.prototype.indexOf || (Array.prototype.indexOf = function (item) {
 
     for (var i = 0, _ = this.length; i < _; i++)
@@ -3242,6 +3212,7 @@ Array.prototype.indexOf || (Array.prototype.indexOf = function (item) {
 });
 
 
+
 Array.prototype.lastIndexOf || (Array.prototype.lastIndexOf = function (item) {
 
     for (var i = this.length - 1; i >= 0; i--)
@@ -3254,6 +3225,7 @@ Array.prototype.lastIndexOf || (Array.prototype.lastIndexOf = function (item) {
     
     return -1;
 });
+
 
 
 Function.prototype.bind || (Function.prototype.bind = function (context) {
@@ -3317,6 +3289,102 @@ flyingon.isArray = Array.isArray || (function () {
     };
 
 })();
+
+
+
+//扩展ES6 Set类
+window.Set || (window.Set = $class(function () {
+    
+    
+    $constructor(function () {
+    
+        this.__items = [];
+    });
+    
+    
+    function indexOf(items, item) {
+    
+        var index = 0,
+            length = items.length;
+        
+        if (item === item) //非NaN
+        {
+            while (index < length)
+            {
+                if (items[index++] === item)
+                {
+                    return --index;
+                }
+            }
+        }
+        else //NaN
+        {
+            while (index < length)
+            {
+                if ((item = items[index++]) === item)
+                {
+                    return --index;
+                }
+            }
+        }
+        
+        return -1;
+    };
+    
+    
+    this.size = 0;
+    
+    
+    this.has = function (item) {
+        
+        return indexOf(this.__items, item) >= 0;
+    };
+    
+    
+    this.add = function (item) {
+        
+        var items = this.__items;
+        
+        if (indexOf(items, item) < 0)
+        {
+            items.push(item);
+            this.size++;
+        }
+        
+        return this;
+    };
+    
+    
+    this['delete'] = function (item) {
+        
+        var items = this.__items,
+            index = indexOf(items, item);
+        
+        if (index >= 0)
+        {
+            items.splice(index, 1);
+            this.size--;
+            
+            return true;
+        }
+        
+        return false;
+    };
+    
+    
+    this.clear = function () {
+        
+        this.size = this.__items.length = 0;
+    };
+    
+    
+    this.keys = this.values = function () {
+      
+        return this.__items;
+    };
+    
+    
+}));
 
 
 
@@ -3886,10 +3954,10 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 //offset2: 相反方向偏移
 flyingon.dom_align = function (target, source, position, align, reverse, offset1, offset2) {
 
-    var width = source.offsetWidth,
-        height = source.offsetHeight,
+    var width = target.offsetWidth,
+        height = target.offsetHeight,
         style = target.style,
-        rect = target.getBoundingClientRect(),
+        rect = source.getBoundingClientRect(),
         x1 = rect.left,
         y1 = rect.top,
         x2 = rect.right,
@@ -3996,7 +4064,38 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
 
 
 
-//布局相关基础方法
+//dom节点集合
+$class('NodeList', Array, function () {
+    
+        
+    this.addClass = function (name) {
+      
+        name = ' ' + name;
+        
+        for (var i = 0, _ = this.length; i < _; i++)
+        {
+            this[i].className += name;
+        }
+    };
+    
+    
+    this.removeClass = function (name) {
+        
+        name = ' ' + name;
+        
+        for (var i = 0, _ = this.length; i < _; i++)
+        {
+            var dom = this[i];
+            dom.className = dom.className.replace(name, '');
+        }
+    };
+    
+    
+});
+
+
+
+//单位换算
 (function (flyingon) {
 
 
@@ -4178,10 +4277,10 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 break;
         }
 
-        target.width = target.left + target.right
+        target.width = target.left + target.right;
         target.height = target.top + target.bottom;
-        target.cache = !isNaN(target.width, target.height);
-            
+        target.cache = (width = target.width + target.height) === width; //非NaN则缓存
+
         return target;
     };
     
@@ -4191,56 +4290,40 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
 
 
 //可定位对象接口
-flyingon.ILocatable = function (self, control) {
+$class('ILocatable', [Object, flyingon.Component], function () {
    
     
-    var ILocatable = flyingon.ILocatable,
-        extend_list = ILocatable.__extend_list,
-        extend = flyingon.extend,
-        pixel = flyingon.pixel,
+    var pixel = flyingon.pixel,
         pixel_sides = flyingon.pixel_sides;
 
     
-    //记录被扩展的目标
-    (ILocatable.__target_list || (ILocatable.__target_list = [])).push(self);
-    
-    
-    //接口标记
-    self['flyingon.ILocatable'] = true;
+    this.locationProperty = function (name, defaultValue, attributes) {
+        
+        attributes = attributes || {};
+        attributes.group = 'location';
+        attributes.query = true;
+        attributes.set = (attributes.set ? attributes.set + '\n\t' : '') 
+            + 'if (!this.__update_dirty)\n\t'
+            + '{\n\t\t'
+                + 'this.__update_dirty = true;\n\t\t'
+                + 'this.invalidate();\n\t'
+            + '}';
 
-    
-    self.locationProperty = function (name, defaultValue, attributes) {
-        
-        var set;
-            
-        if (control)
-        {
-            attributes = attributes || {};
-            attributes.group = 'location';
-            attributes.query = true;
-            attributes.set = ((set = attributes.set) ? set + '\n\t' : '') 
-                + 'if (!this.__update_dirty)\n\t'
-                + '{\n\t\t'
-                    + 'this.__update_dirty = true;\n\t\t'
-                    + 'this.invalidate();\n\t'
-                + '}';
-        }
-        
         this.defineProperty(name, defaultValue, attributes);
     };
     
         
     //默认设置重绘状态
-    self.__update_dirty = true;
+    this.__update_dirty = true;
     
     //控件默认宽度(width === 'default'时的宽度)
-    self.defaultWidth = 100;
+    this.defaultWidth = 100;
 
     //控件默认高度(height === 'default'时的高度)
-    self.defaultHeight = 21;
+    this.defaultHeight = 21;
 
     //是否可见
-    self.locationProperty('visible', true, {
+    this.locationProperty('visible', true, {
      
         set: 'this.dom.style.display = value ? "" : "none";'
     });
@@ -4250,64 +4333,58 @@ flyingon.ILocatable = function (self, control) {
     //left      左边对齐
     //center    横向居中对齐
     //right     右边对齐
-    self.locationProperty('alignX', 'left');
+    this.locationProperty('alignX', 'left');
 
     //控件纵向对齐方式
     //top       顶部对齐
     //middle    纵向居中对齐
     //bottom    底部对齐
-    self.locationProperty('alignY', 'top');
+    this.locationProperty('alignY', 'top');
 
 
-    self.locationProperty('left', '0');
+    this.locationProperty('left', '0');
 
-    self.locationProperty('top', '0');
+    this.locationProperty('top', '0');
 
-    self.locationProperty('width', 'default');
+    this.locationProperty('width', 'default');
 
-    self.locationProperty('height', 'default');
-
-
-    self.locationProperty('minWidth', '0');
-
-    self.locationProperty('maxWidth', '0');
-
-    self.locationProperty('minHeight', '0');
-
-    self.locationProperty('maxHeight', '0');
+    this.locationProperty('height', 'default');
 
 
-    self.locationProperty('margin', '0');
+    this.locationProperty('minWidth', '0');
 
-    self.locationProperty('border', '0', {
+    this.locationProperty('maxWidth', '0');
+
+    this.locationProperty('minHeight', '0');
+
+    this.locationProperty('maxHeight', '0');
+
+
+    this.locationProperty('margin', '0');
+
+    this.locationProperty('border', '0', {
     
         set: 'this.dom.style.borderWidth = value > 0 ? value + "px" : value;\n\t'
     });
 
-    self.locationProperty('padding', '0', {
+    this.locationProperty('padding', '0', {
      
         set: 'this.__style_padding(value > 0 ? value + "px" : value);'
     });
     
     
     //设置dom padding方法
-    self.__style_padding = function (value) {
+    this.__style_padding = function (value) {
     
         this.dom.style.padding = value;
     };
 
-
-    if (extend_list)
-    {
-        for (var name in extend_list)
-        {
-            self.locationProperty.apply(self, extend_list[name]);
-        }
-    }
+    
+    this.invalidate = function () {};
 
 
     //获取定位属性值
-    self.locationValue = function (name) {
+    this.locationValue = function (name) {
       
         var values = this.__location_values,
             value;
@@ -4349,7 +4426,7 @@ flyingon.ILocatable = function (self, control) {
     
     
     //获取盒模型
-    self.boxModel = function (width, height) {
+    this.boxModel = function (width, height) {
       
         var box = this.__boxModel,
             storage = this.__storage || this.__defaults,
@@ -4426,7 +4503,7 @@ flyingon.ILocatable = function (self, control) {
     
     
     //测量大小(不可以手动调用或重载此函数，由布局系统自动调用)
-    self.measure = function (
+    this.measure = function (
         box, //盒模型
         available_width, //可用宽度 
         available_height, //可用高度
@@ -4527,7 +4604,7 @@ flyingon.ILocatable = function (self, control) {
     
     
     //检测宽高范围
-    self.__check_size = function (box, width, height) {
+    this.__check_size = function (box, width, height) {
       
         //处理最小及最大宽度
         if (width < box.minWidth)
@@ -4555,14 +4632,14 @@ flyingon.ILocatable = function (self, control) {
     
     
     //测量自动大小
-    self.measure_auto = function (box, auto_width, auto_height) {
+    this.measure_auto = function (box, auto_width, auto_height) {
         
         return false;
     };
     
     
     //定位(不可以手动调用或重载此函数，由布局系统自动调用)
-    self.locate = function (box, x, y, align_width, align_height) {
+    this.locate = function (box, x, y, align_width, align_height) {
         
         var margin = box.margin,
             value;
@@ -4619,20 +4696,20 @@ flyingon.ILocatable = function (self, control) {
     };
             
     
-};
+});
 
 
 
 //容器组件接口
-flyingon.IContainer = function (self) {
+flyingon.IContainer = function () {
     
     
-    self.arrange = function () {
+    this.arrange = function () {
         
     };
     
     
-    self.arrange_range = function (border, padding) {
+    this.arrange_range = function (border, padding) {
       
         var width = this.offsetWidth - border.width - padding.width,
             height = this.offsetHeight - border.height - padding.height;
@@ -4649,42 +4726,34 @@ flyingon.IContainer = function (self) {
 
 
 //子布局
-$class('Sublayout', [Object, flyingon.Component], function (self) {
+$class('Sublayout', flyingon.ILocatable, function (base) {
        
     
+    //扩展容器组件接口
+    flyingon.IContainer.call(this);
+    
+    
     //子项占比
-    self.defineProperty('scale', 0, {
+    this.defineProperty('scale', 0, {
      
         minValue: 0
     });
     
     
     //布局
-    self.defineProperty('layout', null, {
+    this.defineProperty('layout', null, {
      
         storage: 'this.__layout'
     });
     
     
-    //扩展可定位对象接口
-    flyingon.ILocatable(self);
-    
-    
-    //扩展容器组件接口
-    flyingon.IContainer(self);
-    
-    
-    var measure = self.measure,
-        locate = self.locate;
-    
-    
     //指定默认大小
-    self.defaultWidth = self.defaultHeight = 200;
+    this.defaultWidth = this.defaultHeight = 200;
     
     
-    self.measure = function (box) {
+    this.measure = function (box) {
     
-        measure.apply(this, arguments);
+        base.measure.apply(this, arguments);
         
         this.arrange_range(box.border, box.padding);
         this.arrange();
@@ -4701,16 +4770,16 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
     };
     
     
-    self.arrange = function () {
+    this.arrange = function () {
       
         var items = this.__items;
         this.__layout_.init(this, false, false, items[0], items[1], items[2], true);
     };
     
         
-    self.locate = function () {
+    this.locate = function () {
         
-        var cache = locate.apply(this, arguments),
+        var cache = base.locate.apply(this, arguments),
             x = this.offsetLeft,
             y = this.offsetTop,
             items, 
@@ -4739,7 +4808,7 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
     };
     
         
-    self.serialize = function (writer) {
+    this.serialize = function (writer) {
         
         var cache;
         
@@ -4755,7 +4824,7 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
     };
     
     
-    self.deserialize_list.layout = function (reader, values) {
+    this.deserialize_layout = function (reader, values) {
     
         this.__layout_ = (this.__layout = values) && flyingon.findLayout(values, reader);
     };
@@ -4766,7 +4835,7 @@ $class('Sublayout', [Object, flyingon.Component], function (self) {
 
 
 //布局基类
-$class('Layout', [Object, flyingon.Component], function (self) {
+$class('Layout', flyingon.Component, function (base, self) {
 
     
 
@@ -4816,28 +4885,17 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
 
     //布局类型
-    self.type = null;
+    this.type = null;
 
     
     //定义排列属性方法
-    self.arrangeProperty = self.defineProperty;
+    this.arrangeProperty = this.defineProperty;
     
 
     //定义定位属性方法
-    self.locationProperty = function (name, defaultValue, attributes) {
+    this.locationProperty = function (name, defaultValue, attributes) {
 
-        var ILocatable = flyingon.ILocatable,
-            list = ILocatable.__target_list;
-        
-        (ILocatable.__extend_list || (ILocatable.__extend_list = {}))[name] = arguments;
-
-        if (list)
-        {
-            for (var i = list.length - 1; i >= 0; i--)
-            {
-                list[i].locationProperty(name, defaultValue, attributes);
-            }
-        }
+        flyingon.ILocatable.prototype.locationProperty(name, defaultValue, attributes);
     };
     
 
@@ -4845,28 +4903,28 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     //是否竖排
     //true      竖排
     //false     横排
-    self.arrangeProperty('vertical', false);
+    this.arrangeProperty('vertical', false);
 
     //镜像布局变换
     //none:     不进行镜像变换
     //x:        沿x轴镜像变换
     //y:        沿y轴镜像变换
     //center:   沿中心镜像变换
-    self.arrangeProperty('mirror', 'none');
+    this.arrangeProperty('mirror', 'none');
 
     //布局间隔宽度
     //length	规定以具体单位计的值 比如像素 厘米等
     //number%   控件客户区宽度的百分比
-    self.arrangeProperty('spacingX', '0');
+    this.arrangeProperty('spacingX', '0');
 
     //布局间隔高度
     //length	规定以具体单位计的值 比如像素 厘米等
     //number%   控件客户区高度的百分比
-    self.arrangeProperty('spacingY', '0');
+    this.arrangeProperty('spacingY', '0');
 
 
     //子项
-    self.arrangeProperty('subitems', null, {
+    this.arrangeProperty('subitems', null, {
 
         storage: 'this.__subitems',
         set: 'this.__subitems_ = !!value;'
@@ -4874,7 +4932,7 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
     
     //子布局
-    self.arrangeProperty('sublayouts', null, {
+    this.arrangeProperty('sublayouts', null, {
        
         storage: 'this.__sublayouts',
         set: 'this.__sublayouts_ = !!value;'
@@ -4882,7 +4940,7 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
 
     //自适应布局
-    self.arrangeProperty('adaptation', null, {
+    this.arrangeProperty('adaptation', null, {
 
         storage: 'this.__adaptation',
         set: 'this.__adaptation_ = !!value;'
@@ -4890,17 +4948,17 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
         
     //滚动条大小
-    self.hscroll_height = flyingon.hscroll_height;
+    this.hscroll_height = flyingon.hscroll_height;
     
-    self.vscroll_width = flyingon.vscroll_width;
+    this.vscroll_width = flyingon.vscroll_width;
     
     
     //计算css单位为象素值方法
-    self.pixel = flyingon.pixel;
+    this.pixel = flyingon.pixel;
     
     
     //初始化排列
-    self.init = function (container, hscroll, vscroll, items, start, end, sublayout) {
+    this.init = function (container, hscroll, vscroll, items, start, end, sublayout) {
         
         var index = items.length;
         
@@ -5201,13 +5259,13 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
     };
     
         
     //排列检测
-    self.arrange_check = function (maxWidth, maxHeight, data) {
+    this.arrange_check = function (maxWidth, maxHeight, data) {
         
         var container = data[0],
             arrange;
@@ -5242,7 +5300,7 @@ $class('Layout', [Object, flyingon.Component], function (self) {
     
     
     //序列化方法
-    self.serialize = function (writer) {
+    this.serialize = function (writer) {
 
         var cache;
 
@@ -5271,11 +5329,11 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
     
     //设置不反序列化type属性
-    self.deserialize_list.type = true;
+    this.deserialize_type = true;
     
             
 
-    self.__class_init = function (Class) {
+    this.__class_init = function (Class) {
 
         if (self !== this)
         {
@@ -5299,14 +5357,14 @@ $class('Layout', [Object, flyingon.Component], function (self) {
 
 
 //单列布局类
-$class('LineLayout', flyingon.Layout, function (self, base) {
+$class('LineLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'line';
+    this.type = 'line';
     
         
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var x = container.arrangeLeft,
             y = container.arrangeTop,
@@ -5400,18 +5458,18 @@ $class('LineLayout', flyingon.Layout, function (self, base) {
 
 
 //流式布局类
-$class('FlowLayout', flyingon.Layout, function (self, base) {
+$class('FlowLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'flow';
+    this.type = 'flow';
 
 
     //是否需要处理滚动条
-    self.scroll = true;
+    this.scroll = true;
     
     
     //竖直布局行宽
-    self.arrangeProperty('lineWidth', 0, {
+    this.arrangeProperty('lineWidth', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -5419,18 +5477,18 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
 
     
     //水平布局行高
-    self.arrangeProperty('lineHeight', 0, {
+    this.arrangeProperty('lineHeight', 0, {
      
         dataType: 'integer',
         minValue: 0
     });
 
     
-    self.locationProperty('newline', false);
+    this.locationProperty('newline', false);
         
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var pixel = this.pixel,
             x = container.arrangeLeft,
@@ -5565,10 +5623,10 @@ $class('FlowLayout', flyingon.Layout, function (self, base) {
 
 
 //停靠布局类
-$class('DockLayout', flyingon.Layout, function (self, base) {
+$class('DockLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'dock';
+    this.type = 'dock';
     
     
     //控件停靠方式(此值仅在当前布局类型为停靠布局(dock)时有效)
@@ -5577,11 +5635,11 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
     //right:    右停靠
     //bottom:   底部停靠
     //fill:     充满
-    self.locationProperty('dock', 'left');
+    this.locationProperty('dock', 'left');
 
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var pixel = this.pixel,
             x = container.arrangeLeft,
@@ -5682,14 +5740,14 @@ $class('DockLayout', flyingon.Layout, function (self, base) {
 
 
 //层叠布局类
-$class('CascadeLayout', flyingon.Layout, function (self, base) {
+$class('CascadeLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'cascade';
+    this.type = 'cascade';
     
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var x = container.arrangeLeft,
             y = container.arrangeTop,
@@ -5727,14 +5785,14 @@ $class('CascadeLayout', flyingon.Layout, function (self, base) {
 
 
 //绝对定位布局类
-$class('AbsoluteLayout', flyingon.Layout, function (self, base) {
+$class('AbsoluteLayout', flyingon.Layout, function (base) {
 
 
-    self.type = 'absolute';
+    this.type = 'absolute';
     
     
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var x = container.arrangeLeft,
             y = container.arrangeTop,
@@ -5775,114 +5833,124 @@ $class('AbsoluteLayout', flyingon.Layout, function (self, base) {
 flyingon.Layout.parse = (function () {
     
     
-    var parse_list = {},
-        regex = /[*%\[\]{}()/!]|[\w.]+|\.{3}/g,
-        pixel = flyingon.pixel;
+    function Item() {};
     
     
-    function parse(items, token, tokens, index) {
+    var fn = Item.prototype,
         
-        if (token > 0)
+        parse_cache = {},
+        
+        regex_parse = /[*%.!\w]+|[\[\]{}<>=]/g,
+        
+        regex_loop = /\(([^()]+)\)\s*x(\d+)/g,
+                
+        parse = parseFloat;
+    
+            
+    fn.enabled = true;
+
+    fn.clone = function () {
+
+        var item = new Item(),
+            cache;
+
+        item.value = this.value;
+        item.unit = this.unit;
+
+        if (!item.enabled)
         {
-            switch (tokens[index])
+            item.enabled = false;
+        }
+
+        if (cache = this.table)
+        {
+            item.table = clone_items(cache);
+        }
+
+        if (cache = this.items)
+        {
+            item.items = clone_items(cache);
+        }
+
+        return item;
+    };
+        
+    
+    function clone_items(items) {
+        
+        var list = [],
+            cache;
+        
+        for (var i = 0, _ = items.length; i < _; i++)
+        {
+            list.push(items[i].clone());
+        }
+        
+        if (cache = items.parameters)
+        {
+            list.parameters = flyingon.extend({}, cache);
+        }
+        
+        return list;
+    };    
+    
+    
+    function parse_loop(text) {
+    
+        var regex = regex_loop,
+            loop;
+        
+        function fn(_, text, length) {
+            
+            var items = [];
+            
+            do
             {
-                case '*':
-                    parse_star(items, token);
-                    return ++index;
-                    
-                case '%':
-                    parse_percent(items, token);
-                    return ++index;
+                items.push(text);
             }
-        }
-        else if ((token = pixel(token)) > 0)
+            while (--length > 0);
+            
+            loop = true;
+            
+            return items.join(' ');
+        };
+        
+        do
         {
-            items.push({ value: token });
+            loop = false;
+            text = text.replace(regex, fn);
         }
+        while (loop);
         
-        return index;
+        return text;
     };
     
     
-    function parse_star(items, token) {
+    function parse_items(items, tokens, index, end) {
       
-        var value = +token || 100,
-            item = { value: value, weight: true };
+        var item, token;
         
-        item.weight += value;
-        items.push(item);
-    };
-    
-    
-    function parse_percent(items, token) {
-      
-        var value = +token || 100,
-            item = { value: value, percent: true };
-        
-        item.percent += value;
-        items.push(item);
-    };
-    
-    
-    function parse_loop(items, token, tokens, index) {
-        
-    };
-    
-    
-    function parse_rows(target, tokens, index) {
-      
-        var list = parse_rows,
-            rows = target.rows = [],
-            row;
-        
-        rows.weight = rows.percent = 0;
-        
-        while (token = tokens[index++])
-        {
-            index = (list[token] || parse)(rows, token, tokens, index);
-        }
-        
-        return index;
-    };
-    
-    
-    function parse_columns(items, token, tokens, index) {
-      
-        var list = parse_columns,
-            row = items[items.length - 1] || {},
-            columns = row.columns = [];
-        
-        columns.weight = columns.percent = 0;
-        
-        while (token = tokens[index++])
-        {
-            if (token !== ']')
-            {
-                index = (list[token] || parse)(columns, token, tokens, index);
-            }
-            else
-            {
-                return index;
-            }
-        }
-        
-        return index;
-    };
-    
-    
-    function parse_table(items, token, tokens, index) {
-      
-        while (token = tokens[index++])
+        while ((token = tokens[index++]) !== void 0)
         {
             switch (token)
             {
-                case '}':
-                    return index;
-                    
-                case '(':
+                case '[':
+                    index = parse_items(item ? (item.items = []) : [], tokens, index, ']');
+                    break;
+
+                case '{':
+                    index = parse_items(item ? (item.table = []) : [], tokens, index, '}');
                     break;
                     
+                case '<':
+                    index = parse_parameters(items, tokens, index);
+                    break;
+
+                case end:
+                    return index;
+
                 default:
+                    item = parse_item(items, token) || item;
                     break;
             }
         }
@@ -5891,27 +5959,71 @@ flyingon.Layout.parse = (function () {
     };
     
     
-    parse_rows['*'] = parse_columns['*'] = parse_star;
+    function parse_parameters(items, tokens, index) {
+        
+        var token;
+        
+        while ((token = tokens[index++]) !== void 0)
+        {
+            switch (token)
+            {
+                case '=':
+                    if (token = tokens[index - 2])
+                    {
+                        (items.parameters || (items.parameters = {}))[token] = tokens[index++];
+                    }
+                    break;
+                    
+                case '>':
+                    return index;
+            }
+        }
+    };
     
-    parse_rows['...'] = parse_columns['...'] = parse_loop;
     
-    parse_rows['['] = parse_columns;
-    
-    parse_columns['{'] = parse_table;
-    
+    function parse_item(items, token) {
+      
+        var item = new Item(), 
+            value;
+        
+        if (token.indexOf('!') >= 0)
+        {
+            item.enabled = false;
+            token = token.replace('!', '');   
+        }
+        
+        if (token === '*')
+        {
+            item.value = 100;
+            item.unit = '*';
+        }
+        else if ((value = parse(token)) === value)
+        {
+            item.value = value;
+            item.unit = token.replace(value, '');
+        }
+        else
+        {
+            return;
+        }
+        
+        items.push(item);
+        return item;
+    };
+      
     
     return function (text) {
         
-        var cache = parse_list[text];
+        var items = parse_cache[text];
         
-        if (!cache)
+        if (items)
         {
-            parse_rows(cache = {}, text.match(regex), 0);
-            cache = cache.rows;
+            return clone_items(items);
         }
         
-        return cache;
-    };    
+        parse_items(items = [], parse_loop(text).match(regex_parse), 0, ']');
+        return parse_cache[text] = items;
+    };
     
     
 })();
@@ -5919,27 +6031,27 @@ flyingon.Layout.parse = (function () {
 
 
 //网格布局类
-$class('GridLayout', flyingon.Layout, function (self, base) {
+$class('GridLayout', flyingon.Layout, function (base) {
 
 
     var regex = /[*%]|[\w.]+/g;
         
     
-    self.type = 'grid';
+    this.type = 'grid';
 
 
     //均匀网格布局行数
     //number	整数值 
     //string    自定义行 如:'20px 30% 20* *'表示4行 第一行固定宽度为20px 第2行使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
-    self.arrangeProperty('rows', '3');
+    this.arrangeProperty('rows', '3');
 
     //均匀网格布局列数
     //number	整数值 
     //string    自定义列 如:'20px 30% 20* *'表示4列 第一列固定宽度为20px 第2列使用可用空间的30% 第3,4行使用全部剩余空间,第3行占比20/120 第4行占比100/120
-    self.arrangeProperty('columns', '3');
+    this.arrangeProperty('columns', '3');
     
     //自动增加循环数 0表示不自动增长
-    self.arrangeProperty('increase', 0, {
+    this.arrangeProperty('increase', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -5948,7 +6060,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     //横跨行数
     //number	整数值(负整数表示横跨至倒数第几列)
-    self.locationProperty('rowspan', 0, {
+    this.locationProperty('rowSpan', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -5956,7 +6068,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     //纵跨列数
     //number	整数值(负整数表示横跨至倒数第几列)
-    self.locationProperty('colspan', 0, {
+    this.locationProperty('colSpan', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -5964,7 +6076,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
     //间隔网格数
     //number	整数值
-    self.locationProperty('spacing', 0, {
+    this.locationProperty('spaces', 0, {
      
         dataType: 'integer',
         minValue: 0
@@ -5972,7 +6084,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
 
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
         var rows = this.__rows || (this.__rows = parse(this.rows() || '3')),
             columns = this.__columns || (this.__columns = parse(this.columns() || '3')),
@@ -6005,16 +6117,16 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
         {
             list1 = columns;
             list2 = rows;
-            span1 = 'colspan';
-            span2 = 'rowspan';
+            span1 = 'colSpan';
+            span2 = 'rowSpan';
             
         }
         else
         {
             list1 = rows;
             list2 = columns;
-            span1 = 'rowspan';
-            span2 = 'colspan';
+            span1 = 'rowSpan';
+            span2 = 'colSpan';
         }
         
         length1 = list1.length;
@@ -6024,7 +6136,7 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
         {
             if ((item = items[i]).locationValue('visible'))
             {
-                if (cache = item.locationValue('spacing'))
+                if (cache = item.locationValue('spaces'))
                 {
                     list2.index += cache;
                 }
@@ -6372,44 +6484,111 @@ $class('GridLayout', flyingon.Layout, function (self, base) {
 
 
 //表格布局类
-$class('TableLayout', flyingon.Layout, function (self, base) {
+$class('TableLayout', flyingon.Layout, function (base) {
 
     
-    //布局示例: *[* * *] *[* {(spacingX=50% spacingY=50%)*[* ..2] ..2} *] *[* * *]
-    //loop 3 back 2
-    var regex = /\w+|[*%\[\]{}()=]|../g;
-    
-    
-    
-    self.type = 'table';
+    this.type = 'table';
 
 
-    //表格布局定义(此值仅对表格布局(table)有效)
     //行列格式: row[column ...] ... row,column可选值: 
     //整数            固定行高或列宽 
     //数字+%          总宽度或高度的百分比 
     //数字+*          剩余空间的百分比, 数字表示权重, 省略时权重默认为100
     //数字+css单位    指定单位的行高或列宽
     //列可嵌套表或表组 表或表组可指定参数
-    //参数集: (name1=value1, ...)   多个参数之间用逗号分隔
-    //嵌套表: {(参数集) row[column ...] ...} 参数集可省略
-    //嵌套表组: <(参数集) { ... } ...> 参数集可省略 多个嵌套表之间用空格分隔
-    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* * {(spacingWidth=50% spacingHeight=50%) *[* * *] *[* * *] *[* * *]} *] *[* * *]'
-    self.arrangeProperty('table', '*[* * *] *[* * *] *[* * *]', 'last-value');
+    //参数集: <name1=value1 ...>   多个参数之间用逗号分隔
+    //嵌套表: {<参数集> row[column ...] ...} 参数集可省略
+    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* * {<spacingX=50% spacingY=50%> *[* * *] *[* * *] *[* * *]} *] *[* * *]'
+    
+    
+    
+    this.arrangeProperty('header', '', {
+    
+        set: 'this.__header = null;'
+    });
+    
+    
+    //内容区表格行定义
+    this.arrangeProperty('body', '*[* * *] *[* * *] *[* * *]', {
+     
+        set: 'this.__body = null;'
+    });
+    
+    
+    //自动增长行数
+    this.arrangeProperty('increase', '', {
+       
+        set: 'this.__increase = null;'
+    });
+    
+    
+    //尾部优先排列行数
+    this.arrangeProperty('footer', '', {
+       
+        set: 'this.__footer = null;'
+    });
 
 
+    
     //排列布局
-    self.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
+    this.arrange = function (container, hscroll, vscroll, items, start, end, vertical) {
 
-
+        var table = this.__table || (this.__table = flyingon.Layout.parse(this.table())),
+            increase = this.increase(),
+            tails = this.tails(),
+            total;
+        
+        if (increase > 0 && (total = check_increase(table, end - start + 1)) > 0)
+        {
+            auto_increase(table = table.slice(0), total);
+        }
     };
 
         
-    function parse(items, tokeys, index) {
+    function check_increase(table, total) {
+        
+        for (var i = table.length - 1; i >= 0; i--)
+        {
+            var row = table[i],
+                items = row.items,
+                length = 0;
+            
+            for (var j = items.length - 1; j >= 0; j--)
+            {
+                var item = items[j];
+                
+                if (item.enabled)
+                {
+                    if (item.table)
+                    {
+                        length -= check_increase(item.table, increase, tails, 0);
+                    }
+                    else
+                    {
+                        length++;
+                    }
+                }
+            }
+            
+            total -= length;
+        }
+        
+        return total;
+    };
+    
+    
+    function auto_increase(table, increase, tails, total) {
+        
+        var start = table.length - increase - tails,
+            end = start + increase;
+        
+        if (start < 0)
+        {
+            start = 0;
+        }
         
         
     };
-
 
 
 });
@@ -6417,7 +6596,7 @@ $class('TableLayout', flyingon.Layout, function (self, base) {
 
 
 //UI事件
-$class('UIEvent', [Object, flyingon.Event], function (self) {
+$class('UIEvent', [Object, flyingon.Event], function () {
    
         
     $constructor(function (type, event) {
@@ -6428,7 +6607,7 @@ $class('UIEvent', [Object, flyingon.Event], function (self) {
     
         
     //阻止dom事件冒泡
-    self.dom_stopPropagation = function () {
+    this.dom_stopPropagation = function () {
 
         var e = this.dom_event;
 
@@ -6440,7 +6619,7 @@ $class('UIEvent', [Object, flyingon.Event], function (self) {
 
 
     //禁止默认dom事件
-    self.dom_preventDefault = function () {
+    this.dom_preventDefault = function () {
 
         var e = this.dom_event;
 
@@ -6452,7 +6631,7 @@ $class('UIEvent', [Object, flyingon.Event], function (self) {
 
 
     //阻止dom事件冒泡及禁止默认dom事件
-    self.dom_stopImmediatePropagation = function () {
+    this.dom_stopImmediatePropagation = function () {
 
         var e = this.dom_event;
 
@@ -6570,7 +6749,7 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
 
 
 //控件类
-$class('Control', [Object, flyingon.Component], function (self) {
+$class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
     
 
@@ -6584,11 +6763,11 @@ $class('Control', [Object, flyingon.Component], function (self) {
         
     
     //盒模型大小是否包含边框
-    self.box_border = false;
+    this.box_border = false;
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
-    self.createDomTemplate = (function () {
+    this.createDomTemplate = (function () {
 
         var host = document.createElement('div');
 
@@ -6645,7 +6824,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //控件类初始化处理
-    self.__class_init = function (Class, self, base) {
+    this.__class_init = function (Class, base) {
      
         var dom = this.dom_template;
         
@@ -6654,7 +6833,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
             if (base && dom === base.dom_template)
             {
                 var name1 = base.xtype.replace(/\./g, '-'),
-                    name2 = self.xtype.replace(/\./g, '-');
+                    name2 = this.xtype.replace(/\./g, '-');
                 
                 dom = this.dom_template = base.dom_template.cloneNode(true);
                 
@@ -6678,14 +6857,14 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //父控件
-    self.defineProperty('parent', function () {
+    this.defineProperty('parent', function () {
 
         return this.__parent || null;
     });
     
     
     //获取或设置当前控件在父控件中的索引号
-    self.index = function (index) {
+    this.index = function (index) {
         
         var parent = this.__parent,
             children;
@@ -6740,7 +6919,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //id
-    self.defineProperty('id', '', {
+    this.defineProperty('id', '', {
 
         set: 'this.dom.id = value;'
     });
@@ -6748,7 +6927,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //指定class名 与html一样
-    self.defineProperty('className', '', {
+    this.defineProperty('className', '', {
 
         attributes: 'query',
         set: 'this.dom.className = this.__default_class + (value ? value + " " : "");'
@@ -6757,14 +6936,14 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //是否包含指定class
-    self.hasClass = function (name) {
+    this.hasClass = function (name) {
 
         return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
     };
 
 
     //添加class
-    self.addClass = function (name) {
+    this.addClass = function (name) {
 
         if (name)
         {
@@ -6776,7 +6955,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //移除class
-    self.removeClass = function (name) {
+    this.removeClass = function (name) {
 
         if (name)
         {
@@ -6789,7 +6968,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
     //切换class 有则移除无则添加
-    self.toggleClass = function (name) {
+    this.toggleClass = function (name) {
 
         if (name)
         {
@@ -6810,6 +6989,7 @@ $class('Control', [Object, flyingon.Component], function (self) {
     };
 
 
+    /*
     //IE7点击滚动条时修改className会造成滚动条无法拖动,需在改变className后设置focus获取焦点解决此问题
     //IE8以下无Object.defineProperty方法
     flyingon.each('disabled,active,hover,focus,checked', function (name) {
@@ -6833,21 +7013,17 @@ $class('Control', [Object, flyingon.Component], function (self) {
             + '}');
 
     }, self);
+    */
 
-
-    
-    //扩展可布局对象接口
-    flyingon.ILocatable(self, true);
-    
-    
         
-    self.locationProperty('overflowX', '', {
+        
+    this.locationProperty('overflowX', '', {
        
         set: '(this.dom_body || this.dom).style.overflowX = value;'
     });
     
     
-    self.locationProperty('overflowY', '', {
+    this.locationProperty('overflowY', '', {
        
         set: '(this.dom_body || this.dom).style.overflowY = value;'
     });
@@ -7163,24 +7339,32 @@ $class('Control', [Object, flyingon.Component], function (self) {
       
      
     //使布局无效
-    self.invalidate = function (dirty) {
+    this.invalidate = function (target) {
         
-        var parent = this.__parent;
+        var parent;
         
-        if (parent && (dirty = dirty || 2) > parent.__arrange_dirty || 0)
+        if ((target || (target = this.__parent)) && target.__arrange_dirty !== 2)
         {
-            parent.invalidate(1);
+            target.__arrange_dirty = 2;
             
-            if (data === 2)
+            while ((parent = target.__parent) && !parent.__arrange_dirty)
             {
-                parent.__arrange_dirty = dirty;
+                parent.__arrange_dirty = 1;
+                target = parent;
+            }
+            
+            if (target['flyingon.ITopControl'])
+            {
+                flyingon.update_delay(this);
             }
         }
+        
+        return this;
     };
     
     
     //渲染dom
-    self.render = function () {
+    this.render = function () {
       
         var style = this.dom.style,
             width = this.offsetWidth,
@@ -7207,20 +7391,97 @@ $class('Control', [Object, flyingon.Component], function (self) {
         style.top = this.offsetTop + 'px';
         style.width = width + 'px';
         style.height = style.lineHeight = height + 'px';
+        
+        return this;
     };
         
         
     //重绘(默认与渲染dom相同)
-    self.update = self.render;
+    this.update = this.render;
     
     
     
-    var dispose = self.dispose;
+    
+    
+    var dispose = this.dispose;
         
-    self.dispose = function () {
+    
+    //从dom容器中移除
+    this.detach = function (dispose) {
+     
+        var dom = this.dom,
+            parent = dom.parentNode;
+
+        if (parent)
+        {
+            parent.removeChild(dom);
+        }
+        
+        if (parent = this.__parent)
+        {
+            parent.remove(this, dispose);
+        }
+        else if (dispose)
+        {
+            this.dispose();
+        }
+        
+        return this;
+    };
+    
+        
+    this.dispose = function () {
     
         this.dom = this.dom.control = this.__parent = null;
         dispose.call(this);
+    };
+    
+    
+    
+    var update_list = [],
+        update_delay;
+        
+    
+    //更新
+    function update() {
+        
+        var list = update_list,
+            index = 0,
+            item;
+        
+        while (item = list[index++])
+        {
+            item.update();
+            item.__update_delay = false;
+        }
+        
+        list.length = 0;
+        
+        if (index = update_delay)
+        {
+            clearTimeout(index);
+            update_delay = 0;
+        }
+    };
+    
+    
+    //延时更新
+    flyingon.update_delay = function (control, delay) {
+      
+        if (control && !control.__update_delay)
+        {
+            control.__update_delay = true;
+            update_list.push(control);
+            
+            if (delay === false)
+            {
+                update();
+            }
+            else if (!update_delay)
+            {
+                update_delay = setTimeout(update, delay || 30); //30毫秒后定时刷新
+            }
+        }
     };
     
 
@@ -7229,66 +7490,30 @@ $class('Control', [Object, flyingon.Component], function (self) {
 
 
 //顶级控件接口
-flyingon.ITopControl = function (self) {
+flyingon.ITopControl = function () {
     
     
-    var update_list = [],
-        delay;
-        
     
     //接口标记
-    self['flyingon.ITopControl'] = true;
+    this['flyingon.ITopControl'] = true;
     
-    
-    //更新
-    function update() {
-        
-        var list = update_list,
-            i = list.length - 1;
-        
-        while (i >= 0)
-        {
-            list[i--].update();
-        }
-        
-        list.length = 0;
-        
-        if (i = delay)
-        {
-            clearTimeout(i);
-            delay = 0;
-        }
-    };
     
     
     //使布局无效
-    self.invalidate = function (dirty, time) {
+    this.invalidate = function () {
       
-        if (this.arrange)
+        if (this.__arrange_dirty < 2)
         {
-            if (!this.__arrange_dirty)
-            {
-                update_list.push(this);
-            }
-
-            this.__arrange_dirty = dirty || 2;
+            this.__arrange_dirty = 2;
         }
 
-        if (time === 0)
-        {
-            update();
-        }
-        else
-        {
-            delay || (delay = setTimeout(update, time || 30)); //30毫秒后定时刷新
-        }
-        
+        flyingon.update_delay(this);
         return this;
     };
     
         
     //更新布局
-    self.update = function () {
+    this.update = function () {
       
         var dom = this.dom;
         
@@ -7307,7 +7532,7 @@ flyingon.ITopControl = function (self) {
                 this.__update_dirty = false;
             }
 
-            if (this.arrange)
+            if (this.__arrange_dirty)
             {
                 this.arrange();
             }
@@ -7318,42 +7543,33 @@ flyingon.ITopControl = function (self) {
     
         
     //显示控件至dom容器
-    self.show = function (dom_host) {
+    this.show = function (dom_host) {
         
         var dom = this.dom;
 
         dom.style.position = 'relative';
         (dom_host || document.body).appendChild(dom);
 
-        this.invalidate(2, 0);
-        return this;
-    };
-    
-    
-    //从dom容器中移除
-    self.detach = function () {
-     
-        var dom = this.dom,
-            parent = dom.parentNode;
-
-        if (parent)
+        if (this.__arrange_dirty < 2)
         {
-            parent.removeChild(dom);
+            this.__arrange_dirty = 2;
         }
+        
+        flyingon.update_delay(this, false);
         
         return this;
     };
     
-    
+        
 };
 
 
 
 
-$class('HtmlControl', flyingon.Control, function (self, base) {
+$class('HtmlControl', flyingon.Control, function (base) {
    
         
-    self.defineProperty('text', '', {
+    this.defineProperty('text', '', {
         
         set: 'this.dom.innerHTML = value;'
     });
@@ -7362,17 +7578,17 @@ $class('HtmlControl', flyingon.Control, function (self, base) {
 
 
 //容器控件接口
-flyingon.IContainerControl = function (self, base) {
+flyingon.IContainerControl = function (base) {
 
 
 
     //接口标记
-    self['flyingon.IContainerControl'] = true;
+    this['flyingon.IContainerControl'] = true;
     
         
 
     //当前布局
-    self.defineProperty('layout', null, {
+    this.defineProperty('layout', null, {
      
         set: 'this.__layout = value && typeof value === "object";this.invalidate();'
     });
@@ -7380,7 +7596,7 @@ flyingon.IContainerControl = function (self, base) {
     
 
     //子控件集合
-    self.defineProperty('children', function (index) {
+    this.defineProperty('children', function (index) {
 
         var children = this.__children;
         
@@ -7395,18 +7611,18 @@ flyingon.IContainerControl = function (self, base) {
     
     
     //子控件类型
-    self.control_type = flyingon.Control;
+    this.control_type = flyingon.Control;
     
 
     //添加子控件
-    self.append = function (control) {
+    this.append = function (control) {
 
         if (control && check_control(this, control))
         {
             (this.__children || this.children()).push(control);
             control.__parent = this;
             
-            if (this.__dom_content)
+            if (this.__dom_scroll)
             {
                 if (this.__arrange_dirty !== 2)
                 {
@@ -7422,7 +7638,7 @@ flyingon.IContainerControl = function (self, base) {
 
 
     //在指定位置插入子控件
-    self.insert = function (index, control) {
+    this.insert = function (index, control) {
 
         if (control && check_control(this, control))
         {
@@ -7433,7 +7649,7 @@ flyingon.IContainerControl = function (self, base) {
             children.splice(index, 0, control);
             control.__parent = this;
 
-            if (this.__dom_content)
+            if (this.__dom_scroll)
             {
                 if (this.__arrange_dirty !== 2)
                 {
@@ -7492,7 +7708,7 @@ flyingon.IContainerControl = function (self, base) {
     
 
     //移除子控件或从父控件中移除
-    self.remove = function (control, dispose) {
+    this.remove = function (control, dispose) {
             
         var children, index;
         
@@ -7512,7 +7728,7 @@ flyingon.IContainerControl = function (self, base) {
 
 
     //移除指定位置的子控件
-    self.removeAt = function (index, dispose) {
+    this.removeAt = function (index, dispose) {
 
         var children, control;
 
@@ -7532,7 +7748,7 @@ flyingon.IContainerControl = function (self, base) {
 
 
     //清除子控件
-    self.clear = function (dispose) {
+    this.clear = function (dispose) {
       
         var children = this.__children,
             length;
@@ -7572,7 +7788,7 @@ flyingon.IContainerControl = function (self, base) {
         }
         else
         {
-            if (this.__dom_content)
+            if (this.__dom_scroll)
             {
                 this.dom.removeChild(control.dom);
             }
@@ -7584,27 +7800,27 @@ flyingon.IContainerControl = function (self, base) {
     
 
     //控件内容大小的dom
-    var content_dom = document.createElement('div');
+    var scroll_dom = document.createElement('div');
     
-    content_dom.style.cssText = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;visibility:hidden;';
+    scroll_dom.style.cssText = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;visibility:hidden;';
     
     
     //扩展容器组件接口
-    flyingon.IContainer(self);
+    flyingon.IContainer.call(this);
     
     
     //设置渲染大小时不包含padding
-    self.__no_padding = true;
+    this.__no_padding = true;
     
     
     //padding变更时不同步dom
-    self.__style_padding = function (value) {
+    this.__style_padding = function (value) {
     
     };
     
     
     //测量自动大小
-    self.measure_auto = function (box, auto_width, auto_height) {
+    this.measure_auto = function (box, auto_width, auto_height) {
         
         this.arrange();
 
@@ -7621,11 +7837,11 @@ flyingon.IContainerControl = function (self, base) {
     
         
     //设置默认排列标记
-    self.__arrange_dirty = 0;
+    this.__arrange_dirty = 0;
     
     
     //排列子控件
-    self.arrange = function (dirty) {
+    this.arrange = function (dirty) {
 
         var children = this.__children,
             length;
@@ -7665,11 +7881,11 @@ flyingon.IContainerControl = function (self, base) {
             cache;
             
         //初始化dom
-        if (!self.__dom_content)
+        if (!self.__dom_scroll)
         {
             cache = document.createDocumentFragment();
             
-            cache.appendChild(self.__dom_content = content_dom.cloneNode(false));
+            cache.appendChild(self.__dom_scroll = scroll_dom.cloneNode(false));
 
             for (var i = 0, _ = children.length; i < _; i++)
             {
@@ -7748,7 +7964,7 @@ flyingon.IContainerControl = function (self, base) {
 
         //使用positon:relatvie left,top或margin:bottom,right定位时在IE6,7不正常
         //style.margin = height + 'px 0 0 ' + width + 'px';
-        style = self.__dom_content.style;
+        style = self.__dom_scroll.style;
         style.left = (self.contentWidth - 1) + 'px';
         style.top = (self.contentHeight - 1) + 'px';
 
@@ -7766,7 +7982,7 @@ flyingon.IContainerControl = function (self, base) {
     
         
     //排列子项
-    self.arrange_children = function (children) {
+    this.arrange_children = function (children) {
 
         for (var i = 0, _ = children.length; i < _; i++)
         {
@@ -7781,7 +7997,7 @@ flyingon.IContainerControl = function (self, base) {
     
            
     
-    self.serialize = function (writer) {
+    this.serialize = function (writer) {
         
         var children;
         
@@ -7794,13 +8010,13 @@ flyingon.IContainerControl = function (self, base) {
     };
     
     
-    self.deserialize_list.children = function (reader, values) {
+    this.deserialize_children = function (reader, values) {
       
         this.__children = reader.read_array(values);
     };
 
 
-    self.dispose = function () {
+    this.dispose = function () {
 
         var children = this.__children;
 
@@ -7812,7 +8028,7 @@ flyingon.IContainerControl = function (self, base) {
             }
         }
 
-        this.__dom_content = null;
+        this.__dom_scroll = null;
         base.dispose.call(this);
     };
 
@@ -7821,17 +8037,17 @@ flyingon.IContainerControl = function (self, base) {
 
 
     
-$class('Panel', flyingon.Control, function (self, base) {
+$class('Panel', flyingon.Control, function (base) {
 
 
-    self.defaultWidth = 400;
+    this.defaultWidth = 400;
     
     
-    self.defaultHeight = 400;
+    this.defaultHeight = 400;
     
     
     //扩展接口标记
-    flyingon.IContainerControl(self, base);
+    flyingon.IContainerControl.call(this);
     
     
     
@@ -7840,10 +8056,10 @@ $class('Panel', flyingon.Control, function (self, base) {
     
 
 
-$class('Page', flyingon.Panel, function (self, base) {
+$class('Page', flyingon.Panel, function (base) {
    
     
-    flyingon.ITopControl(self);
+    flyingon.ITopControl.call(this);
     
     
 });

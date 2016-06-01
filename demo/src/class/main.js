@@ -66,12 +66,13 @@ $namespace('flyingon.test', function (test) {
 
 
             //注册全局事件(可优先捕获任意对象触发的事件)
-            obj1.on('my_event', function (e) {
+            flyingon.on('my_event', function (e, data) {
 
+                alert('global events:' + event.type + data);
+                
                 //停止冒泡
-                e.stopPropagation();
-
-            }, true);
+                //e.stopPropagation();
+            });
 
             //注册事件(支持事件冒泡)
             obj2.on('my_event', function (event, data) {
@@ -82,8 +83,8 @@ $namespace('flyingon.test', function (test) {
             //触发事件
             obj2.trigger('my_event', '+dddddd'); //弹出"my_event+dddddd"
 
-            //注销obj1上的所有my_event全局事件
-            //obj1.off('my_event', null, true);
+            //注销所有my_event全局事件
+            flyingon.off('my_event');
 
             //注销obj3上的所有my_event事件
             obj2.off('my_event');
