@@ -110,7 +110,7 @@ flyingon.parseJSON = window.JSON && JSON.parse || (function () {
 //全局动态执行js, 防止局部执行增加作用域而带来变量冲突的问题
 //注1: 这个函数只能放在全局区, 否则IE低版本下作用域会有问题而导致变量冲突
 //注2: IE的execScript方法没有返回值, 且在某些版本下可能有问题, 故此处不使用
-flyingon.globalEval = function (text) {
+flyingon.globalEval = /*window.execScript && */function (text) {
     
     return window['eval'].call(window, text);
 };
@@ -1222,7 +1222,7 @@ flyingon.absoluteUrl = (function () {
     //定义类方法
     //name:             类型名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
     //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口
-    //fn:               类代码, 函数, 参数(self:类原型, base:父类原型)
+    //fn:               类代码, 函数, 参数(:父类原型, self:当前类原型)
     function $class(name, superclass, fn) {
 
 
@@ -1334,15 +1334,27 @@ flyingon.absoluteUrl = (function () {
         }
 
         
+        //如果有构造函数生成器
+        if (fn = prototype.$constructor)
+        {
+            fn = fn();
+        }
+                
+        
         //处理类及构造函数
         if (cache = data[0])
         {
+            if (fn)
+            {
+                cache.unshift(fn);
+            }
+            
             Class = cache.length > 1 || cache[0].superclass ? class_create(cache) : cache[0];
             Class.__constructor_list = cache; 
         }
         else
         {
-            Class = function () {};
+            Class = fn || function () {};
         }
         
         
@@ -2181,7 +2193,7 @@ $class('Component', function () {
     function Binding(target, name, source, expression, twoway) {
 
         var bindings = target.__bindings || (target.__bindings = {}),
-            fields = this.fields = [],
+            keys = this.keys = [],
             cache;
         
         this.target = target;
@@ -2204,10 +2216,10 @@ $class('Component', function () {
 
                 if (name)
                 {
-                    if (!fields[name])
+                    if (!keys[name])
                     {
-                        fields[name] = true;
-                        fields.push(name);
+                        keys[name] = true;
+                        keys.push(name);
                     }
 
                     return 'source.get("' + name + '")';
@@ -2217,7 +2229,7 @@ $class('Component', function () {
                 return text;
             });
 
-            if (cache === false || !(this.expression = fields[0]))
+            if (cache === false || !(this.expression = keys[0]))
             {
                 twoway = false; //表达式不支持双向绑定
                 this.get = new Function('source', 'return ' + expression);
@@ -2225,12 +2237,12 @@ $class('Component', function () {
         }
         else
         {
-            (this.fields = {})[expression] = true;
+            (this.keys = {})[expression] = true;
         }
 
         this.twoway = twoway; //是否支持双向绑定 false:仅单向绑定
         
-        if (fields.length)
+        if (keys.length)
         {
             (bindings = source.__to_bindings || (source.__to_bindings = [])).push(this);
         }
@@ -2278,7 +2290,7 @@ $class('Component', function () {
             {
                 item = items[i];
                 
-                if (!name || item.fields[name])
+                if (!name || item.keys[name])
                 {
                     if (cache = item.get) //自定义表达式
                     {

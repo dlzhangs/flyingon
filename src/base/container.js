@@ -1,36 +1,8 @@
 
 //容器控件接口
-flyingon.IContainerControl = function (base) {
+$class('IContainerControl', function () {
 
 
-
-    //接口标记
-    this['flyingon.IContainerControl'] = true;
-    
-        
-
-    //当前布局
-    this.defineProperty('layout', null, {
-     
-        set: 'this.__layout = value && typeof value === "object";this.invalidate();'
-    });
-    
-    
-
-    //子控件集合
-    this.defineProperty('children', function (index) {
-
-        var children = this.__children;
-        
-        if (index === void 0)
-        {
-            return children || (this.__children = []);
-        }
-
-        return children && children[index];
-    });
-        
-    
     
     //子控件类型
     this.control_type = flyingon.Control;
@@ -226,21 +198,12 @@ flyingon.IContainerControl = function (base) {
     
     scroll_dom.style.cssText = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;visibility:hidden;';
     
-    
-    //扩展容器组件接口
-    flyingon.IContainer.call(this);
-    
+        
     
     //设置渲染大小时不包含padding
     this.__no_padding = true;
     
-    
-    //padding变更时不同步dom
-    this.__style_padding = function (value) {
-    
-    };
-    
-    
+        
     //测量自动大小
     this.measure_auto = function (box, auto_width, auto_height) {
         
@@ -300,6 +263,11 @@ flyingon.IContainerControl = function (base) {
     function arrange(self, children) {
         
         var layout = self.__layout,
+            style, 
+            hscroll, 
+            vscroll,
+            right,
+            bottom,
             cache;
             
         //初始化dom
@@ -329,18 +297,18 @@ flyingon.IContainerControl = function (base) {
             layout = flyingon.findLayout(self.layout());
         }
         
-        var style, hscroll, vscroll;
 
-        cache = self.__boxModel || self.boxModel();
-
-        self.arrange_range(cache.border, cache = cache.padding);
+        self.arrange_range(cache = { left: 0, top: 0, width: 0, height: 0 });
+        
+        right = cache.left + cache.width;
+        bottom = cache.top + cache.height;
 
         switch (self.overflowX())
         {
             case 'scroll':
-                if ((self.arrangeHeight -= layout.hscroll_height) < 0)
+                if ((cache.height -= flyingon.hscroll_height) < 0)
                 {
-                    self.arrangeHeight = 0;
+                    cache.height = 0;
                 }
                 break;
 
@@ -352,9 +320,9 @@ flyingon.IContainerControl = function (base) {
         switch (self.overflowY())
         {
             case 'scroll':
-                if ((self.arrangeWidth -= layout.vscroll_width) < 0)
+                if ((cache.width -= flyingon.vscroll_width) < 0)
                 {
-                    self.arrangeWidth = 0;
+                    cache.width = 0;
                 }
                 break;
 
@@ -364,7 +332,7 @@ flyingon.IContainerControl = function (base) {
         }
 
         //初始化布局
-        layout.init(self, hscroll, vscroll, children);
+        layout.init(cache, self.padding(), hscroll, vscroll, children);
 
         //处理滚动条: 注overflow==='auto'在chrome下在未超出原滚动条时不会消失
         if (hscroll || vscroll)
@@ -373,22 +341,20 @@ flyingon.IContainerControl = function (base) {
 
             if (hscroll)
             {
-                hscroll = cache.left + self.arrangeWidth + cache.right >= self.contentWidth;
-                style.overflowX = hscroll ? 'hidden' : 'scroll';
+                style.overflowX = right >= cache.maxWidth ? 'hidden' : 'scroll';
             }
 
             if (vscroll)
             {
-                vscroll = cache.top + self.arrangeHeight + cache.bottom >= self.contentHeight;
-                style.overflowY = vscroll ? 'hidden' : 'scroll';
+                style.overflowY = bottom >= cache.maxHeight ? 'hidden' : 'scroll';
             }
         }
 
         //使用positon:relatvie left,top或margin:bottom,right定位时在IE6,7不正常
         //style.margin = height + 'px 0 0 ' + width + 'px';
         style = self.__dom_scroll.style;
-        style.left = (self.contentWidth - 1) + 'px';
-        style.top = (self.contentHeight - 1) + 'px';
+        style.left = (cache.maxWidth - 1) + 'px';
+        style.top = (cache.maxHeight - 1) + 'px';
 
         //最后渲染
         for (var i = children.length - 1; i >= 0; i--)
@@ -400,6 +366,25 @@ flyingon.IContainerControl = function (base) {
 
         //排列子项
         self.arrange_children(children);
+    };
+    
+    
+    //计算排列空间范围
+    this.arrange_range = function (arrange) {
+      
+        var border = this.border(),
+            width = this.offsetWidth,
+            height = this.offsetHeight;
+        
+        if (border && border !== '0')
+        {
+            border = flyingon.pixel_sides(border);
+            width -= border.width;
+            height -= border.height;
+        }
+        
+        arrange.width = width;
+        arrange.height = height;
     };
     
         
@@ -418,12 +403,15 @@ flyingon.IContainerControl = function (base) {
     };
     
            
+    var serialize = this.serialize,
+        dispose = this.dispose;
+        
     
     this.serialize = function (writer) {
         
         var children;
         
-        base.serialize.call(this, writer);
+        serialize.call(this, writer);
         
         if (children && children.length)
         {
@@ -451,8 +439,8 @@ flyingon.IContainerControl = function (base) {
         }
 
         this.__dom_scroll = null;
-        base.dispose.call(this);
+        dispose.call(this);
     };
 
 
-};
+});

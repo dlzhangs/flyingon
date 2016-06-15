@@ -1,8 +1,6 @@
 
-$class('Page', flyingon.Panel, function (base) {
+$class('Page', [flyingon.Panel, flyingon.ITopControl], function (base) {
    
-    
-    flyingon.ITopControl.call(this);
     
     
 });

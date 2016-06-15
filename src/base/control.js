@@ -4,18 +4,32 @@
 $class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
     
-
-    $constructor(function () {
-
-        //根据dom模板创建关联的dom元素
-        (this.dom = this.dom_template.cloneNode(true)).control = this;
-    });
-
     
+    this.$constructor = function () {
         
+        return function (dom) {
+    
+            if (dom)
+            {
+                dom.className = this.__default_className + dom.className + ' ';
+                dom.style.cssText += this.default_style;
+            }
+            else
+            {
+                dom = this.dom_template.cloneNode(true);
+            }
+            
+            (this.dom = dom).control = this;
+        };
+    };
+    
+    
     
     //盒模型大小是否包含边框
     this.box_border = false;
+    
+    
+    this.default_style = 'position:absoulte;overflow:auto;margin:0;border-width:0;border-style:solid;';
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
@@ -27,30 +41,14 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
             var name = 'flyingon-Control',
                 cache = this.xtype,
-                dom,
-                style;
+                dom;
             
             host.innerHTML = html;
             
             dom = this.dom_template = host.children[0];
             dom.parentNode.removeChild(dom);
-            
-            if (cache && name !== (cache = cache.replace(/\./g, '-')))
-            {
-                name += ' ' + cache;
-            }
-            
-            if (cache = dom.className)
-            {
-                name += ' ' + cache;
-            }
-
-            this.__default_class = dom.className = name + ' ';
-
-            style = dom.style;
-            style.position = 'absolute';
-            style.margin = '0';
-            
+            dom.style.cssText += this.default_style;
+ 
             //计算盒模型在不同浏览器中的偏差
             //需等document初始化完毕后才可执行
             flyingon.dom_test(function (div) {
@@ -73,36 +71,37 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
         };
 
     })();
+    
+    
+    
+    //默认className
+    this.__default_className = 'flyingon-Control ';
 
 
     //控件类初始化处理
     this.__class_init = function (Class, base) {
      
-        var dom = this.dom_template;
+        var dom = this.dom_template || this.createDomTemplate('<div></div>'),
+            name = 'flyingon-Control ',
+            cache;
         
-        if (dom)
+        if (base && dom === base.dom_template)
         {
-            if (base && dom === base.dom_template)
-            {
-                var name1 = base.xtype.replace(/\./g, '-'),
-                    name2 = this.xtype.replace(/\./g, '-');
-                
-                dom = this.dom_template = base.dom_template.cloneNode(true);
-                
-                if (name1 === 'flyingon-Control')
-                {
-                    dom.className += name2 + ' ';
-                }
-                else
-                {
-                    dom.className = dom.className.replace(name1, name2);
-                }
-            }
+            dom = this.dom_template = base.dom_template.cloneNode(true);
+            dom.className = dom.className.replace(base.__default_className, '');
         }
-        else
+
+        if (this !== self && (cache = Class.xtype))
         {
-            this.createDomTemplate('<div style="border-style:solid;border-width:0;"></div>');
+            name += cache + ' ';
         }
+        
+        if (cache = dom.className)
+        {
+            name += cache + ' ';
+        }
+      
+        this.__default_className = name;
     };
 
 
@@ -182,7 +181,7 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
     this.defineProperty('className', '', {
 
         attributes: 'query',
-        set: 'this.dom.className = this.__default_class + (value ? value + " " : "");'
+        set: 'this.dom.className = this.__default_className + (value ? value + " " : "");'
     });
 
 
@@ -267,23 +266,47 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
     }, self);
     */
 
-        
-        
-    this.locationProperty('overflowX', '', {
-       
-        set: '(this.dom_body || this.dom).style.overflowX = value;'
+    
+
+    //控件层叠顺序
+    //number	整数值 
+    flyingon.locateProperty('zIndex', 0, {
+     
+        set: 'this.dom.style.zIndex = value;'
     });
+
     
     
-    this.locationProperty('overflowY', '', {
-       
-        set: '(this.dom_body || this.dom).style.overflowY = value;'
-    });
+    function layout(name, defaultValue, set) {
+      
+        self.defineProperty(name, '', {
+
+            group: 'layout',
+            query: true,
+            set: set
+        });
+    };
+        
+        
+    //边框宽度
+    layout('border', '0', 'this.dom.style.borderWidth = value > 0 ? value + "px" : value;');
+
+    
+    //内边距
+    layout('padding', '0', 'if (!this.__no_padding) this.dom.style.padding = value > 0 ? value + "px" : value;');
+    
+    
+    //水平方向超出内容时显示方式
+    layout('overflowX', 'auto', '(this.dom_body || this.dom).style.overflowX = value;');
+      
+    
+    //竖直方向超出内容时显示方式
+    layout('overflowY', 'auto', '(this.dom_body || this.dom).style.overflowY = value;');
     
     
     
     //创建样式
-    function style(name, style) {
+    function style(name, set) {
 
         name = name.replace(/-(\w)/g, function (_, x) {
         
@@ -295,23 +318,17 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
             group: 'appearance',
             query: true,
-            set: style || 'this.dom.style.' + name + ' = value;\n'
+            set: set || 'this.dom.style.' + name + ' = value;\n'
         });
     };
 
-
     
-    //控件层叠顺序
-    //number	整数值 
-    style('z-index', 0);
-
-
     //控件上右下左边框样式
     style('border-style');
 
 
     //控件上右下左边框颜色
-    style('border-color', '');
+    style('border-color');
 
 
     //控件上右下左边框圆角
@@ -607,7 +624,7 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
             
             if (target['flyingon.ITopControl'])
             {
-                flyingon.update_delay(this);
+                flyingon.update_delay(target);
             }
         }
         
@@ -621,24 +638,29 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
         var style = this.dom.style,
             width = this.offsetWidth,
             height = this.offsetHeight,
-            box,
-            border,
-            padding;
+            cache;
         
-        if (!this.box_border && (box = this.__boxModel))
+        if (!this.box_border)
         {
-            border = box.border;
-            width -= border.width;
-            height -= border.height;
-            
-            if (!this.__no_padding)
+            if ((cache = this.border()) && cache !== '0')
             {
-                padding = box.padding;
-                width -= padding.width;
-                height -= padding.height;
+                cache = flyingon.pixel_sides(cache);
+                
+                width -= cache.width;
+                height -= cache.height;
+            }
+            
+            if (!this.__no_padding && (cache = this.padding()) && cache !== '0')
+            {
+                cache = flyingon.pixel_sides(cache);
+                
+                width -= cache.width;
+                height -= cache.height;
             }
         }
         
+        style.position = 'absolute';
+        style.margin = '0';
         style.left = this.offsetLeft + 'px';
         style.top = this.offsetTop + 'px';
         style.width = width + 'px';
@@ -742,15 +764,10 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
 
 //顶级控件接口
-flyingon.ITopControl = function () {
+$class('ITopControl', function () {
     
     
-    
-    //接口标记
-    this['flyingon.ITopControl'] = true;
-    
-    
-    
+        
     //使布局无效
     this.invalidate = function () {
       
@@ -771,18 +788,19 @@ flyingon.ITopControl = function () {
         
         if (dom && (dom = dom.parentNode))
         {
-            if (this.__update_dirty)
-            {
-                var width = dom.clientWidth,
-                    height = dom.clientHeight,
-                    box = this.boxModel(width, height);
-
-                this.measure(box, width, height, false);
-                this.locate(box, box.left, box.top, width, height);
-                this.render();
+            var layout = flyingon.Layout.prototype,
+                width = dom.clientWidth,
+                height = dom.clientHeight,
+                arrange = { width: width, height: height },
+                margin = layout.margin(this, arrange),
+                pixel = flyingon.pixel;
+            
+            layout.measure(this, arrange, margin, width, height, false);
+            layout.locate(this, arrange, margin, pixel(this.left()), pixel(this.top()), width, height);
+            
+            this.render();
                 
-                this.__update_dirty = false;
-            }
+            this.__update_dirty = false;   
 
             if (this.__arrange_dirty)
             {
@@ -813,6 +831,6 @@ flyingon.ITopControl = function () {
     };
     
         
-};
+});
 
 

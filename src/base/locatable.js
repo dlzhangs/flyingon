@@ -193,18 +193,15 @@
 
 
 
+
 //可定位对象接口
 $class('ILocatable', [Object, flyingon.Component], function () {
    
     
-    var pixel = flyingon.pixel,
-        pixel_sides = flyingon.pixel_sides;
-
-    
-    this.locationProperty = function (name, defaultValue, attributes) {
+    this.locateProperty = function (name, defaultValue, attributes) {
         
         attributes = attributes || {};
-        attributes.group = 'location';
+        attributes.group = 'locate';
         attributes.query = true;
         attributes.set = (attributes.set ? attributes.set + '\n\t' : '') 
             + 'if (!this.__update_dirty)\n\t'
@@ -220,6 +217,11 @@ $class('ILocatable', [Object, flyingon.Component], function () {
     //默认设置重绘状态
     this.__update_dirty = true;
     
+    
+    //默认位置及大小
+    this.offsetLeft = this.offsetTop = this.offsetWidth = this.offsetHeight = 0;
+        
+    
     //控件默认宽度(width === 'default'时的宽度)
     this.defaultWidth = 100;
 
@@ -227,9 +229,9 @@ $class('ILocatable', [Object, flyingon.Component], function () {
     this.defaultHeight = 21;
 
     //是否可见
-    this.locationProperty('visible', true, {
+    this.locateProperty('visible', true, {
      
-        set: 'this.dom.style.display = value ? "" : "none";'
+        set: 'this.dom && this.dom.style.display = value ? "" : "none";'
     });
         
     
@@ -237,53 +239,38 @@ $class('ILocatable', [Object, flyingon.Component], function () {
     //left      左边对齐
     //center    横向居中对齐
     //right     右边对齐
-    this.locationProperty('alignX', 'left');
+    this.locateProperty('alignX', 'left');
 
     //控件纵向对齐方式
     //top       顶部对齐
     //middle    纵向居中对齐
     //bottom    底部对齐
-    this.locationProperty('alignY', 'top');
+    this.locateProperty('alignY', 'top');
 
 
-    this.locationProperty('left', '0');
+    this.locateProperty('left', '0');
 
-    this.locationProperty('top', '0');
+    this.locateProperty('top', '0');
 
-    this.locationProperty('width', 'default');
+    this.locateProperty('width', 'default');
 
-    this.locationProperty('height', 'default');
-
-
-    this.locationProperty('minWidth', '0');
-
-    this.locationProperty('maxWidth', '0');
-
-    this.locationProperty('minHeight', '0');
-
-    this.locationProperty('maxHeight', '0');
+    this.locateProperty('height', 'default');
 
 
-    this.locationProperty('margin', '0');
+    this.locateProperty('minWidth', '0');
 
-    this.locationProperty('border', '0', {
-    
-        set: 'this.dom.style.borderWidth = value > 0 ? value + "px" : value;\n\t'
-    });
+    this.locateProperty('maxWidth', '0');
 
-    this.locationProperty('padding', '0', {
-     
-        set: 'this.__style_padding(value > 0 ? value + "px" : value);'
-    });
-    
-    
-    //设置dom padding方法
-    this.__style_padding = function (value) {
-    
-        this.dom.style.padding = value;
-    };
+    this.locateProperty('minHeight', '0');
+
+    this.locateProperty('maxHeight', '0');
+
+
+    this.locateProperty('margin', '0');
+
 
     
+    //使布局失效
     this.invalidate = function () {};
 
 
@@ -302,327 +289,29 @@ $class('ILocatable', [Object, flyingon.Component], function () {
     };
     
     
-    //默认盒模型
-    var box_default = {
-        
-        visible: false,
-        alignX: 'center',
-        alignY: 'middle',
-        left: 0,
-        top: 0,
-        width: 'default',
-        height: 'default',
-        minWidth: 0,
-        maxWidth: 0,
-        minHeight: 0,
-        maxHeight: 0
-    };
     
-    box_default.margin = box_default.border = box_default.padding = {
-            
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 0,
-        height: 0
-    };
-    
-    
-    //获取盒模型
-    this.boxModel = function (width, height) {
-      
-        var box = this.__boxModel,
-            storage = this.__storage || this.__defaults,
-            values = this.__location_values,
-            fn = pixel,
-            value;
-        
-        if (values)
-        {
-            if ((value = values.visible) != null ? value : storage.visible)
-            {
-                if (!box || !box.visible)
-                {
-                    box = this.__boxModel = { visible: true };
-                }
-                
-                box.alignX = values.alignX || storage.alignX;
-                box.alignY = values.alignY || storage.alignY;
-
-                box.left = fn((value = values.left) != null ? value : storage.left, width);
-                box.top = fn((value = values.top) != null ? value : storage.top, height);
-
-                box.width = (value = values.width) != null ? value : storage.width;
-                box.height = (value = values.height) != null ? value : storage.height;
-
-                box.minWidth = fn((value = values.minWidth) != null ? value : storage.minWidth, width);
-                box.maxWidth = fn((value = values.maxWidth) != null ? value : storage.maxWidth, width);
-                box.minHeight = fn((value = values.minHeight) != null ? value : storage.minHeight, height);
-                box.maxHeight = fn((value = values.maxHeight) != null ? value : storage.maxHeight, height);
-
-                fn = pixel_sides;
-
-                //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
-                box.margin = fn((value = values.margin) != null ? value : storage.margin, width);
-                box.border = fn((value = values.border) != null ? value : storage.border, width);
-                box.padding = fn((value = values.padding) != null ? value : storage.padding, width);
-                
-                return box;
-            }
-        }
-        else if (storage.visible)
-        {
-            if (!box || !box.visible)
-            {
-                box = this.__boxModel = { visible: true };
-            }
-            
-            box.alignX = storage.alignX;
-            box.alignY = storage.alignY;
-            
-            box.left = fn(storage.left, width);
-            box.top = fn(storage.top, height);
-            
-            box.width = storage.width;
-            box.height = storage.height;
-            
-            box.minWidth = fn(storage.minWidth, width);
-            box.maxWidth = fn(storage.maxWidth, width);
-            box.minHeight = fn(storage.minHeight, height);
-            box.maxHeight = fn(storage.maxHeight, height);
-            
-            fn = pixel_sides;
-            
-            //margin, padding的百分比是以父容器的宽度为参照, border-width不支持百分比
-            box.margin = fn(storage.margin, width);
-            box.border = fn(storage.border, width);
-            box.padding = fn(storage.padding, width);
-            
-            return box;
-        }
-        
-        return this.__boxModel = box_default;
-    };
-    
-    
-    //测量大小(不可以手动调用或重载此函数，由布局系统自动调用)
-    this.measure = function (
-        box, //盒模型
-        available_width, //可用宽度 
-        available_height, //可用高度
-        less_width_to_default, //宽度不足时是否使用默认宽度
-        less_height_to_default, //高度不足时是否使用默认高度
-        default_width_to_fill, //默认宽度是否转为充满
-        default_height_to_fill //默认高度是否转为充满
-    ) {
-        
-        var width = box.width, 
-            height = box.height,
-            auto_width,
-            auto_height;
-
-        //处理宽度
-        switch (width)
-        {
-            case 'default': //默认
-                width = default_width_to_fill ? true : this.defaultWidth;
-                break;
-
-            case 'fill': //充满可用区域
-                width = true;
-                break;
-
-            case 'auto': //根据内容自动调整大小
-                width = less_width_to_default = auto_width = true;
-                break;
-                
-            default:
-                width = pixel(width, available_width);
-                break;
-        }
-
-        //充满可用宽度
-        if (width === true)
-        {
-            if ((available_width -= box.margin.width) > 0) //有可用空间
-            {
-                width = available_width;
-            }
-            else if (less_width_to_default) //可用空间不足时使用默认宽度
-            {
-                width = this.defaultWidth;
-            }
-            else //无空间
-            {
-                width = 0;
-            }
-        }
-
-        //处理高度
-        switch (height)
-        {
-            case 'default': //自动
-                height = default_height_to_fill ? true : this.defaultHeight;
-                break;
-
-            case 'fill': //充满可用区域
-                height = true;
-                break;
-
-            case 'auto': //根据内容自动调整大小
-                height = less_height_to_default = auto_height = true;
-                break;
-
-            default:  //其它值
-                height = pixel(height, available_height);
-                break;
-        }
-
-        //充满可用高度
-        if (height === true)
-        {
-            if ((available_height -= box.margin.height) > 0) //有可用空间
-            {
-                height = available_height;
-            }
-            else if (less_height_to_default) //可用空间不足时使用默认高度
-            {
-                height = this.defaultHeight;
-            }
-            else //无空间
-            {
-                height = 0;
-            }
-        }
-
-        //检测宽高范围
-        this.__check_size(box, width, height);
-
-        //测量自动大小
-        if ((auto_width || auto_height) && this.measure_auto(box, auto_width, auto_height) !== false)
-        {
-            this.__check_size(box, width, height);
-        }
-    };
-    
-    
-    //检测宽高范围
-    this.__check_size = function (box, width, height) {
-      
-        //处理最小及最大宽度
-        if (width < box.minWidth)
-        {
-            width = box.minWidth;
-        }
-        else if (box.maxWidth > 0 && width > box.maxWidth)
-        {
-            width = box.maxWidth;
-        }
-        
-        //处理最小及最大宽度
-        if (height < box.minHeight)
-        {
-            height = box.minHeight;
-        }
-        else if (box.maxHeight > 0 && height > box.maxHeight)
-        {
-            height = box.maxHeight;
-        }
-        
-        this.offsetWidth = width;
-        this.offsetHeight = height
-    };
-    
-    
-    //测量自动大小
-    this.measure_auto = function (box, auto_width, auto_height) {
+    //测量处理
+    this.measure = function (autoWidth, autoHeight) {
         
         return false;
     };
     
     
-    //定位(不可以手动调用或重载此函数，由布局系统自动调用)
-    this.locate = function (box, x, y, align_width, align_height) {
-        
-        var margin = box.margin,
-            value;
-
-        if (align_width > 0 && (value = align_width - margin.width - this.offsetWidth))
-        {
-            switch (box.alignX)
-            {
-                case 'center':
-                    x += value >> 1;
-                    break;
-
-                case 'right':
-                    x += value;
-                    break;
-                    
-                default:
-                    x += margin.left;
-                    break;
-            }
-        }
-        else
-        {
-            x += margin.left;
-        }
-
-        if (align_height > 0 && (value = align_height - margin.height - this.offsetHeight))
-        {
-            switch (box.alignY)
-            {
-                case 'middle':
-                    y += value >> 1;
-                    break;
-
-                case 'bottom':
-                    y += value;
-                    break;
-                    
-                default:
-                    y += margin.top;
-                    break;
-            }
-        }
-        else
-        {
-            y += margin.top;
-        }
-
-        return {
-            
-            right: (this.offsetLeft = x) + this.offsetWidth + margin.right,
-            bottom: (this.offsetTop = y) + this.offsetHeight + margin.bottom
-        };
+    this.locate = function () {
+      
+        return false;
     };
-            
+    
+    
     
 });
 
 
 
-//容器组件接口
-flyingon.IContainer = function () {
-    
-    
-    this.arrange = function () {
-        
-    };
-    
-    
-    this.arrange_range = function (border, padding) {
-      
-        var width = this.offsetWidth - border.width - padding.width,
-            height = this.offsetHeight - border.height - padding.height;
+//定义定位属性方法
+flyingon.locateProperty = function (name, defaultValue, attributes) {
 
-        this.arrangeLeft = padding.left;
-        this.arrangeTop = padding.top;
-        this.arrangeWidth = width >= 0 ? width : 0;
-        this.arrangeHeight = height >= 0 ? height : 0;
-    };
-    
-    
+    flyingon.ILocatable.prototype.locateProperty(name, defaultValue, attributes);
 };
+    
+
