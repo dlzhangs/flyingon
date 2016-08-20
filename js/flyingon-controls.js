@@ -1,9 +1,3 @@
-/*
-* flyingon javascript library v0.0.1
-* https://github.com/freeoasoft/flyingon 
-* Copyright 2014, yaozhengyang
-* licensed under the LGPL Version 3 licenses
-*/
 
 //自动引入样式
 $include('flyingon/css/{skin}/flyingon-controls.css', true);
@@ -362,7 +356,6 @@ $class('PopupLayer', flyingon.Component, function (base) {
 
 
 
-
 $class('Dialog', flyingon.Panel, function (base) {
 
 
@@ -561,4 +554,3 @@ $class('Dialog', flyingon.Panel, function (base) {
 });
 
     
-

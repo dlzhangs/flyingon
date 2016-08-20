@@ -108,11 +108,17 @@ flyingon.parseJSON = window.JSON && JSON.parse || (function () {
 
 
 //全局动态执行js, 防止局部执行增加作用域而带来变量冲突的问题
-//注1: 这个函数只能放在全局区, 否则IE低版本下作用域会有问题而导致变量冲突
-//注2: IE的execScript方法没有返回值, 且在某些版本下可能有问题, 故此处不使用
-flyingon.globalEval = /*window.execScript && */function (text) {
+flyingon.globalEval = function (text) {
     
-    return window['eval'].call(window, text);
+    if (window.execScript)
+    {
+        //ie8不支持call, ie9的this必须是window否则会出错
+        window.execScript(text);
+    }
+    else
+    {
+        window['eval'](text);
+    }
 };
 
 
@@ -220,7 +226,7 @@ flyingon.absoluteUrl = (function () {
         
         regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
 
-        class_list = flyingon.__class_list = {}, //已注册类型集合
+        class_list = flyingon.__class_list = flyingon.create(null), //已注册类型集合
 
         class_stack = [],  //类栈(支持类的内部定义类)
         
@@ -1222,7 +1228,7 @@ flyingon.absoluteUrl = (function () {
     //定义类方法
     //name:             类型名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
     //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口
-    //fn:               类代码, 函数, 参数(:父类原型, self:当前类原型)
+    //fn:               类代码, 函数, 参数(base:父类原型, self:当前类原型)
     function $class(name, superclass, fn) {
 
 
@@ -3200,5 +3206,3 @@ flyingon.ajaxPost = function (url, options) {
 
 
     
-
-

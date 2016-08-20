@@ -1,10 +1,4 @@
 /*
-* flyingon javascript library v0.0.1
-* https://github.com/freeoasoft/flyingon 
-* Copyright 2014, yaozhengyang
-* licensed under the LGPL Version 3 licenses
-*/
-/*
 * flyingon javascript library v0.0.1.0
 * https://github.com/freeoasoft/flyingon
 *
@@ -114,11 +108,17 @@ flyingon.parseJSON = window.JSON && JSON.parse || (function () {
 
 
 //全局动态执行js, 防止局部执行增加作用域而带来变量冲突的问题
-//注1: 这个函数只能放在全局区, 否则IE低版本下作用域会有问题而导致变量冲突
-//注2: IE的execScript方法没有返回值, 且在某些版本下可能有问题, 故此处不使用
-flyingon.globalEval = /*window.execScript && */function (text) {
+flyingon.globalEval = function (text) {
     
-    return window['eval'].call(window, text);
+    if (window.execScript)
+    {
+        //ie8不支持call, ie9的this必须是window否则会出错
+        window.execScript(text);
+    }
+    else
+    {
+        window['eval'](text);
+    }
 };
 
 
@@ -226,7 +226,7 @@ flyingon.absoluteUrl = (function () {
         
         regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
 
-        class_list = flyingon.__class_list = {}, //已注册类型集合
+        class_list = flyingon.__class_list = flyingon.create(null), //已注册类型集合
 
         class_stack = [],  //类栈(支持类的内部定义类)
         
@@ -1228,7 +1228,7 @@ flyingon.absoluteUrl = (function () {
     //定义类方法
     //name:             类型名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
     //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口
-    //fn:               类代码, 函数, 参数(:父类原型, self:当前类原型)
+    //fn:               类代码, 函数, 参数(base:父类原型, self:当前类原型)
     function $class(name, superclass, fn) {
 
 
@@ -3209,7 +3209,6 @@ flyingon.ajaxPost = function (url, options) {
 
 
 
-
 Array.prototype.indexOf || (Array.prototype.indexOf = function (item) {
 
     for (var i = 0, _ = this.length; i < _; i++)
@@ -3855,12 +3854,14 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
     var dom = event.dom || event.target,
         style = dom.style,
+        on = flyingon.dom_on,
+        off = flyingon.dom_off,
         x0 = dom.offsetLeft,
         y0 = dom.offsetTop,
         x1 = event.clientX,
         y1 = event.clientY,
-        on = flyingon.dom_on,
-        off = flyingon.dom_off;
+        distanceX = 0,
+        distanceY = 0;
 
     function start(e) {
         
@@ -3888,16 +3889,6 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
         if (!start || (x < -2 || x > 2 || y < -2 || y > 2) && start(e))
         {
-            if (locked !== true && locked !== 'x')
-            {
-                style.left = (x0 + x) + 'px';
-            }
-            
-            if (locked !== true && locked !== 'y')
-            {
-                style.top = (y0 + y) + 'px';
-            }
-            
             if (move)
             {
                 e.dom = dom;
@@ -3905,8 +3896,23 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
                 e.distanceY = y;
                 
                 move.call(context, e);
+                
+                x = e.distanceX;
+                y = e.distanceY;
             }
-
+            
+            if (locked !== 'x')
+            {
+                distanceX = x;
+                style.left = (x0 + x) + 'px';
+            }
+            
+            if (locked !== 'y')
+            {
+                distanceY = y;
+                style.top = (y0 + y) + 'px';
+            }
+            
             e.stopImmediatePropagation();
         }
     };
@@ -3930,8 +3936,8 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
             if (end)
             {
                 e.dom = dom;
-                e.distanceX = e.clientX - x1;
-                e.distanceY = e.clientY - y1;
+                e.distanceX = distanceX;
+                e.distanceY = distanceY;
                 
                 end.call(context, e);
             }
@@ -4104,7 +4110,6 @@ $class('NodeList', Array, function () {
     
     
 });
-
 
 
 //单位换算
@@ -4422,7 +4427,6 @@ flyingon.locateProperty = function (name, defaultValue, attributes) {
     flyingon.ILocatable.prototype.locateProperty(name, defaultValue, attributes);
 };
     
-
 
 
 
@@ -5708,8 +5712,19 @@ $class(flyingon.Layout, function (base) {
 
 
 
-//布局解析器
-flyingon.Layout.parse = (function () {
+//表格布局类
+$class(flyingon.Layout, function (base) {
+
+        
+    //行列格式: row[column ...] ... row,column可选值: 
+    //整数            固定行高或列宽 
+    //数字+%          总宽度或高度的百分比 
+    //数字+*          剩余空间的百分比, 数字表示权重, 省略时权重默认为100
+    //数字+css单位    指定单位的行高或列宽
+    //列可嵌套表或表组 表或表组可指定参数
+    //参数集: <name1=value1 ...>   多个参数之间用逗号分隔
+    //嵌套表: {<参数集> row[column ...] ...} 参数集可省略
+    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* *{(50% 50%) L*[* * *]^3} *] *[* * *]'
     
     
     var parse_cache = flyingon.create(null),
@@ -5722,7 +5737,61 @@ flyingon.Layout.parse = (function () {
         
         parse = parseFloat;
     
+    
+    
+    this.type = 'table';
+
+    
+    //是否按纵向开始拆分
+    this.defineProperty('vertical', false);
+
+    
+    //头部区域
+    this.defineProperty('header', '', {
+    
+        set: 'this.__header = null;'
+    });
+    
+    
+    //内容区域
+    this.defineProperty('body', '*[* * *]', {
+     
+        set: 'this.__body = null;'
+    });
+
+    
+    //循环内容区域
+    this.defineProperty('loop', 3, {
+       
+        dataType: 'object'
+    });
+    
+    
+    //尾部区域
+    this.defineProperty('footer', '', {
+       
+        set: 'this.__footer = null;'
+    });
+
+
+    
+    //排列布局
+    this.arrange = function (arrange, hscroll, vscroll, items, start, end) {
+
+        var header = this.header(),
+            body = this.__body || (this.__body = parse(this.body())),
+            loop = this.loop(),
+            footer = this.footer(),
+            total;
         
+        header && (header = this.__header || (this.__header = parse(header)));
+        footer && (footer = this.__footer || (this.__footer = parse(footer)));
+        
+        
+    };
+
+        
+            
     //单元格类
     var item_type = $class(function () {
 
@@ -5770,17 +5839,17 @@ flyingon.Layout.parse = (function () {
 
         
         //是否竖直切分
-        this.vertical = true;
+        this.vertical = false;
         
         //水平间距
-        this.spacingX = 0;
+        this.spacingX = '100%';
         
         //竖直间距
-        this.spacingY = 0;
+        this.spacingY = '100%';
         
         
         //固定子项大小合计
-        this.scale = 0;
+        this.values = 0;
         
         //余量权重合计
         this.weight = 0;
@@ -5795,7 +5864,13 @@ flyingon.Layout.parse = (function () {
         //大小
         this.size = 0;
         
+        
+        this.compute = function (width, height, spacingX, spacingY) {
+          
             
+        };
+        
+                
         this.clone = function () {
           
             var target = new this.Class();
@@ -5803,7 +5878,7 @@ flyingon.Layout.parse = (function () {
             target.vertical = this.vertical;
             target.spacingX = this.spacingX;
             target.spacingY = this.spacingY;
-            target.scale = this.scale;
+            target.values = this.values;
             target.weight = this.weight;
             target.percent = this.percent;
             
@@ -5817,6 +5892,28 @@ flyingon.Layout.parse = (function () {
 
     });
     
+    
+    function parse(layout, text) {
+        
+        var items = parse_cache[text],
+            tokens;
+        
+        if (items)
+        {
+            return items.clone();
+        }
+        
+        items = new items_type();
+        tokens = parse_loop(text).match(regex_parse);
+        
+        if (tokens)
+        {
+            items.vertical = tokens[0] === '{';
+            parse_items(items, tokens, 0, items.vertical ? '}' : ']');
+        }
+
+        return parse_cache[text] = items;
+    };
     
     
     function parse_loop(text) {
@@ -5860,12 +5957,12 @@ flyingon.Layout.parse = (function () {
             {
                 case '[':
                     token = new items_type();
+                    token.vertical = true;
                     index = parse_items(item ? (item.items = token) : token, tokens, index, ']');
                     break;
 
                 case '{':
                     token = new items_type();
-                    token.vertical = false;
                     index = parse_items(item ? (item.items = token) : token, tokens, index, '}');
                     break;
                     
@@ -5883,6 +5980,53 @@ flyingon.Layout.parse = (function () {
         }
         
         return index;
+    };
+    
+    
+    function parse_item(items, token) {
+      
+        var item = new item_type(), 
+            value;
+        
+        if (token.indexOf('!') >= 0)
+        {
+            item.enabled = false;
+            token = token.replace('!', '');   
+        }
+        
+        if (token === '*')
+        {
+            item.scale = 100;
+            item.unit = '*';
+            items.weight += 100;
+        }
+        else if ((value = parse(token)) === value) //可转为有效数字
+        {
+            switch (item.unit = token.replace(value, ''))
+            {
+                case '*':
+                    items.weight += value;
+                    break;
+                    
+                case '%':
+                    items.percent += value;
+                    break;
+                    
+                default:
+                    value = pixel(token);
+                    items.values += value;
+                    break;
+            }
+            
+            item.scale = value;
+        }
+        else
+        {
+            return;
+        }
+        
+        items.push(item);
+        return item;
     };
     
     
@@ -5919,207 +6063,8 @@ flyingon.Layout.parse = (function () {
         }
     };
     
-    
-    function parse_item(items, token) {
-      
-        var item = new item_type(), 
-            value;
-        
-        if (token.indexOf('!') >= 0)
-        {
-            item.enabled = false;
-            token = token.replace('!', '');   
-        }
-        
-        if (token === '*')
-        {
-            item.value = 100;
-            item.unit = '*';
-            items.weight += 100;
-        }
-        else if ((value = parse(token)) === value) //可转为有效数字
-        {
-            switch (item.unit = token.replace(value, ''))
-            {
-                case '*':
-                    items.weight += value;
-                    break;
-                    
-                case '%':
-                    items.percent += value;
-                    break;
-                    
-                default:
-                    value = pixel(token);
-                    items.scale += value;
-                    break;
-            }
-            
-            item.scale = value;
-        }
-        else
-        {
-            return;
-        }
-        
-        items.push(item);
-        return item;
-    };
-      
-    
-    return function (text) {
-        
-        var items = parse_cache[text],
-            tokens;
-        
-        if (items && items.clone)
-        {
-            return items.clone();
-        }
-        
-        items = new items_type();
-        tokens = parse_loop(text).match(regex_parse);
-        
-        if (!tokens)
-        {
-            return items;
-        }
-        
-        switch (tokens[0])
-        {
-            case '[':
-                parse_items(items, tokens, 1, ']');
-                break;
-                
-            case '{':
-                items.vertical = false;
-                parse_items(items, tokens, 1, '}');
-                break;
-                
-            default:
-                parse_items(items, tokens, 0, ']');
-                break;
-        }
-        
-        return parse_cache[text] = items;
-    };
-    
-    
-})();
-
-
-
-//表格布局类
-$class(flyingon.Layout, function (base) {
-
-    
-    this.type = 'table';
-
-
-    //行列格式: row[column ...] ... row,column可选值: 
-    //整数            固定行高或列宽 
-    //数字+%          总宽度或高度的百分比 
-    //数字+*          剩余空间的百分比, 数字表示权重, 省略时权重默认为100
-    //数字+css单位    指定单位的行高或列宽
-    //列可嵌套表或表组 表或表组可指定参数
-    //参数集: <name1=value1 ...>   多个参数之间用逗号分隔
-    //嵌套表: {<参数集> row[column ...] ...} 参数集可省略
-    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '{*[* * *] *[* * {(50% 50%) L*[* * *]^3} *] *[* * *]}'
-    
-    
-    
-    //头部区域
-    this.defineProperty('header', '', {
-    
-        set: 'this.__header = null;'
-    });
-    
-    
-    //内容区域
-    this.defineProperty('body', '*[* * *] *[* * *] *[* * *]', {
-     
-        set: 'this.__body = null;'
-    });
-    
-    
-    //自动增长区域
-    this.defineProperty('auto', '', {
-       
-        set: 'this.__auto = null;'
-    });
-    
-    
-    //尾部区域
-    this.defineProperty('footer', '', {
-       
-        set: 'this.__footer = null;'
-    });
-
-
-    
-    //排列布局
-    this.arrange = function (arrange, hscroll, vscroll, items, start, end) {
-
-        var table = this.__table || (this.__table = flyingon.Layout.parse(this.table())),
-            increase = this.increase(),
-            tails = this.tails(),
-            total;
-        
-        if (increase > 0 && (total = check_increase(table, end - start + 1)) > 0)
-        {
-            auto_increase(table = table.slice(0), total);
-        }
-    };
-
-        
-    function check_increase(table, total) {
-        
-        for (var i = table.length - 1; i >= 0; i--)
-        {
-            var row = table[i],
-                items = row.items,
-                length = 0;
-            
-            for (var j = items.length - 1; j >= 0; j--)
-            {
-                var item = items[j];
-                
-                if (item.enabled)
-                {
-                    if (item.table)
-                    {
-                        length -= check_increase(item.table, increase, tails, 0);
-                    }
-                    else
-                    {
-                        length++;
-                    }
-                }
-            }
-            
-            total -= length;
-        }
-        
-        return total;
-    };
-    
-    
-    function auto_increase(table, increase, tails, total) {
-        
-        var start = table.length - increase - tails,
-            end = start + increase;
-        
-        if (start < 0)
-        {
-            start = 0;
-        }
-        
-        
-    };
-
 
 });
-
 
 
 //UI事件
@@ -6269,7 +6214,6 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
 
 
 });
-
 
 
 
@@ -7110,7 +7054,6 @@ $class('ITopControl', function () {
 
 
 
-
 $class('HtmlControl', flyingon.Control, function (base) {
    
         
@@ -7120,7 +7063,6 @@ $class('HtmlControl', flyingon.Control, function (base) {
     });
     
 });
-
 
 //容器控件接口
 $class('IContainerControl', function () {
@@ -7568,7 +7510,6 @@ $class('IContainerControl', function () {
 
 });
 
-
     
 $class('Panel', [flyingon.Control, flyingon.IContainerControl], function () {
 
@@ -7605,10 +7546,8 @@ $class('Panel', [flyingon.Control, flyingon.IContainerControl], function () {
 });
     
 
-
 $class('Page', [flyingon.Panel, flyingon.ITopControl], function (base) {
    
     
     
 });
-

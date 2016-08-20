@@ -1293,7 +1293,7 @@ $class(flyingon.Layout, function (base) {
     //列可嵌套表或表组 表或表组可指定参数
     //参数集: <name1=value1 ...>   多个参数之间用逗号分隔
     //嵌套表: {<参数集> row[column ...] ...} 参数集可省略
-    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '{*[* * *] *[* * {(50% 50%) L*[* * *]^3} *] *[* * *]}'
+    //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* *{(50% 50%) L*[* * *]^3} *] *[* * *]'
     
     
     var parse_cache = flyingon.create(null),
@@ -1323,16 +1323,16 @@ $class(flyingon.Layout, function (base) {
     
     
     //内容区域
-    this.defineProperty('body', '*[* * *] *[* * *] *[* * *]', {
+    this.defineProperty('body', '*[* * *]', {
      
         set: 'this.__body = null;'
     });
+
     
-    
-    //自动增长区域
-    this.defineProperty('auto', '', {
+    //循环内容区域
+    this.defineProperty('loop', 3, {
        
-        set: 'this.__auto = null;'
+        dataType: 'object'
     });
     
     
@@ -1349,13 +1349,13 @@ $class(flyingon.Layout, function (base) {
 
         var header = this.header(),
             body = this.__body || (this.__body = parse(this.body())),
-            auto = this.auto(),
+            loop = this.loop(),
             footer = this.footer(),
             total;
         
         header && (header = this.__header || (this.__header = parse(header)));
-        auto && (auto = this.__auto || (this.__auto = parse(auto)));
         footer && (footer = this.__footer || (this.__footer = parse(footer)));
+        
         
     };
 
@@ -1411,14 +1411,14 @@ $class(flyingon.Layout, function (base) {
         this.vertical = false;
         
         //水平间距
-        this.spacingX = 0;
+        this.spacingX = '100%';
         
         //竖直间距
-        this.spacingY = 0;
+        this.spacingY = '100%';
         
         
         //固定子项大小合计
-        this.scale = 0;
+        this.values = 0;
         
         //余量权重合计
         this.weight = 0;
@@ -1433,6 +1433,12 @@ $class(flyingon.Layout, function (base) {
         //大小
         this.size = 0;
         
+        
+        this.compute = function (width, height, spacingX, spacingY) {
+          
+            
+        };
+        
                 
         this.clone = function () {
           
@@ -1441,7 +1447,7 @@ $class(flyingon.Layout, function (base) {
             target.vertical = this.vertical;
             target.spacingX = this.spacingX;
             target.spacingY = this.spacingY;
-            target.scale = this.scale;
+            target.values = this.values;
             target.weight = this.weight;
             target.percent = this.percent;
             
@@ -1461,7 +1467,7 @@ $class(flyingon.Layout, function (base) {
         var items = parse_cache[text],
             tokens;
         
-        if (items && items.clone)
+        if (items)
         {
             return items.clone();
         }
@@ -1469,13 +1475,12 @@ $class(flyingon.Layout, function (base) {
         items = new items_type();
         tokens = parse_loop(text).match(regex_parse);
         
-        if (!tokens)
+        if (tokens)
         {
-            return items;
+            items.vertical = tokens[0] === '{';
+            parse_items(items, tokens, 0, items.vertical ? '}' : ']');
         }
-        
-        parse_items(items, tokens, 0, items.vertical = layout.vertical() ? ']' : '}');
-        
+
         return parse_cache[text] = items;
     };
     
@@ -1560,7 +1565,7 @@ $class(flyingon.Layout, function (base) {
         
         if (token === '*')
         {
-            item.value = 100;
+            item.scale = 100;
             item.unit = '*';
             items.weight += 100;
         }
@@ -1578,7 +1583,7 @@ $class(flyingon.Layout, function (base) {
                     
                 default:
                     value = pixel(token);
-                    items.scale += value;
+                    items.values += value;
                     break;
             }
             

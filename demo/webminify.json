@@ -1,0 +1,50 @@
+//***********************************************配置示例**********************************************
+//* [
+//*
+//*     //js配置示例
+//*     {
+//*         base: '', //基础路径
+//*         files: ['test1.js', 'test2.js'], //要处理的源文件
+//*         output: 'test.min.js', //生成的目标文件
+//*         minify: true, //是否最小化, 不最小化时只生成及合并文件, 以下配置仅在此值为true时有效
+//*         mangle: false, //是否混淆局部变量名
+//*         mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]}, //排除特定名称混淆
+//*         compress: false, //是否优化压缩
+//*         advanced: true, //是否启用高级压缩功能
+//*         license: '/*license test*/' //版权信息
+//*     },
+//*
+//*     //css配置示例
+//*     {
+//*         base: '', //基础路径
+//*         files: ['test1.css', 'test2.css'], //要处理的源文件
+//*         output: 'test.min.css', //生成的目标文件
+//*         minify: true, //是否最小化, 不最小化时只生成及合并文件, 以下配置仅在此值为true时有效
+//*         advanced: true, //是否启用高级压缩功能
+//*         license: '/*license test*/' //版权信息
+//*     }
+//*
+//* ]
+//*****************************************************************************************************
+
+
+[
+    
+	{
+        base: '',
+        files: ['src/class/main.js'],
+        output: 'js/class/main.min.js',
+        minify: false
+	},
+	
+    {
+        base: '',
+        files: [
+			'src/class/class1.js',
+			'src/class/class2.js'
+		],
+        output: 'js/class/class.min.js',
+        minify: false
+    }
+	
+]

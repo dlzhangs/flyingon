@@ -645,12 +645,14 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
     var dom = event.dom || event.target,
         style = dom.style,
+        on = flyingon.dom_on,
+        off = flyingon.dom_off,
         x0 = dom.offsetLeft,
         y0 = dom.offsetTop,
         x1 = event.clientX,
         y1 = event.clientY,
-        on = flyingon.dom_on,
-        off = flyingon.dom_off;
+        distanceX = 0,
+        distanceY = 0;
 
     function start(e) {
         
@@ -678,16 +680,6 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
         if (!start || (x < -2 || x > 2 || y < -2 || y > 2) && start(e))
         {
-            if (locked !== true && locked !== 'x')
-            {
-                style.left = (x0 + x) + 'px';
-            }
-            
-            if (locked !== true && locked !== 'y')
-            {
-                style.top = (y0 + y) + 'px';
-            }
-            
             if (move)
             {
                 e.dom = dom;
@@ -695,8 +687,23 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
                 e.distanceY = y;
                 
                 move.call(context, e);
+                
+                x = e.distanceX;
+                y = e.distanceY;
             }
-
+            
+            if (locked !== 'x')
+            {
+                distanceX = x;
+                style.left = (x0 + x) + 'px';
+            }
+            
+            if (locked !== 'y')
+            {
+                distanceY = y;
+                style.top = (y0 + y) + 'px';
+            }
+            
             e.stopImmediatePropagation();
         }
     };
@@ -720,8 +727,8 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
             if (end)
             {
                 e.dom = dom;
-                e.distanceX = e.clientX - x1;
-                e.distanceY = e.clientY - y1;
+                e.distanceX = distanceX;
+                e.distanceY = distanceY;
                 
                 end.call(context, e);
             }
