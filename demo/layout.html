@@ -105,6 +105,7 @@
             width: 1000,
             height: 400,
             border: 1,
+            borderStyle: 'solid',
             padding: 8,
             overflowX: 'auto',
             overflowY: 'auto',
@@ -119,6 +120,7 @@
                 id: 'control' + i,
                 text: 'text' + i,
                 border: 1,
+                borderStyle: 'solid',
                 textAlign: 'center',
                 verticalAlign: 'middle'
             }));
@@ -126,7 +128,7 @@
               
         page.show(document.body);
 
-        
+
         flyingon.dom_on(document.body, 'mousedown', function (e) {
             
             var width = page.offsetWidth,

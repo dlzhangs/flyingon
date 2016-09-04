@@ -1,7 +1,8 @@
 
 //子布局
-$class('Sublayout', flyingon.ILocatable, function (base) {
+$class('Sublayout', flyingon.Visual, function (base) {
        
+    
     
     //内边距
     this.defineProperty('padding', '0');
@@ -858,7 +859,7 @@ $class('Layout', flyingon.Component, function (base, self) {
 
         if (cache = this.__storage)
         {
-            writer.write_properties('storage', cache);
+            writer.write_properties(cache);
         }
         
         if (cache = this.__subitems)

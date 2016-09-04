@@ -194,10 +194,11 @@
 
 
 
-//可定位对象接口
-$class('ILocatable', [Object, flyingon.Component], function () {
+//可视组件基类
+$class('Visual', [Object, flyingon.Component], function () {
    
     
+        
     this.locateProperty = function (name, defaultValue, attributes) {
         
         attributes = attributes || {};
@@ -234,7 +235,7 @@ $class('ILocatable', [Object, flyingon.Component], function () {
         set: 'this.dom && this.dom.style.display = value ? "" : "none";'
     });
         
-    
+
     //控件横向对齐方式
     //left      左边对齐
     //center    横向居中对齐
@@ -311,7 +312,7 @@ $class('ILocatable', [Object, flyingon.Component], function () {
 //定义定位属性方法
 flyingon.locateProperty = function (name, defaultValue, attributes) {
 
-    flyingon.ILocatable.prototype.locateProperty(name, defaultValue, attributes);
+    flyingon.Visual.prototype.locateProperty(name, defaultValue, attributes);
 };
     
 

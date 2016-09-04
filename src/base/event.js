@@ -1,56 +1,6 @@
-//UI事件
-$class('UIEvent', [Object, flyingon.Event], function () {
-   
-        
-    $constructor(function (type, event) {
-
-        this.type = type;
-        this.dom_event = event;
-    });
-    
-        
-    //阻止dom事件冒泡
-    this.dom_stopPropagation = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.cancelBubble = true;
-        }
-    };
-
-
-    //禁止默认dom事件
-    this.dom_preventDefault = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.defaultPrevented = true;
-        }
-    };
-
-
-    //阻止dom事件冒泡及禁止默认dom事件
-    this.dom_stopImmediatePropagation = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.cancelBubble = e.defaultPrevented = true;
-        }
-    };
-
-    
-});
-
 
 //鼠标事件类型
-$class("MouseEvent", [Object, flyingon.UIEvent], function () {
-
+$class('MouseEvent', flyingon.Event, function () {
 
 
     $constructor(function (event) {
@@ -99,17 +49,16 @@ $class("MouseEvent", [Object, flyingon.UIEvent], function () {
         this.screenX = event.screenX;
         this.screenY = event.screenY;
 
-    });
+    }, true);
 
-
+    
 });
 
 
 
 
 //键盘事件类型
-$class("KeyEvent", [Object, flyingon.UIEvent], function () {
-
+$class('KeyEvent', flyingon.Event, function () {
 
 
     $constructor(function (event) {
@@ -141,9 +90,9 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
         //键码
         this.which = event.which || event.charCode || event.keyCode;
 
-    });
+    }, true);
 
-
+    
 });
 
 

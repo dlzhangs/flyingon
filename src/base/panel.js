@@ -1,10 +1,10 @@
-    
+
 $class('Panel', [flyingon.Control, flyingon.IContainerControl], function () {
 
 
-    
+        
     this.defaultWidth = this.defaultHeight = 400;
-    
+        
     
     
     //当前布局

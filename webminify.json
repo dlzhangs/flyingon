@@ -53,8 +53,10 @@
         base: '',
         files: [
 			'src/base/flyingon.js',
+            'src/base/serialize.js',
+            'src/base/component.js',
 			'src/base/utils.js',
-			'src/base/locatable.js',
+			'src/base/visual.js',
 			'src/base/layout.js',
 			'src/base/event.js',
 			'src/base/control.js',

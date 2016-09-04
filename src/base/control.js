@@ -1,35 +1,28 @@
 
 
 //控件类
-$class('Control', [Object, flyingon.ILocatable], function (base, self) {
+$class('Control', flyingon.Visual, function (base, self) {
 
     
     
-    this.$constructor = function () {
+    $constructor(function (dom) {
+
+        if (dom)
+        {
+            dom.className = this.__default_className + dom.className + ' ';
+        }
+        else
+        {
+            dom = this.dom_template.cloneNode(true);
+        }
+
+        (this.dom = dom).control = this;
+    });
+    
+    
         
-        return function (dom) {
-    
-            if (dom)
-            {
-                dom.className = this.__default_className + dom.className + ' ';
-                dom.style.cssText += this.default_style;
-            }
-            else
-            {
-                dom = this.dom_template.cloneNode(true);
-            }
-            
-            (this.dom = dom).control = this;
-        };
-    };
-    
-    
-    
     //盒模型大小是否包含边框
     this.box_border = false;
-    
-    
-    this.default_style = 'position:absoulte;overflow:auto;margin:0;border-width:0;border-style:solid;';
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
@@ -47,8 +40,7 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
             
             dom = this.dom_template = host.children[0];
             dom.parentNode.removeChild(dom);
-            dom.style.cssText += this.default_style;
- 
+
             //计算盒模型在不同浏览器中的偏差
             //需等document初始化完毕后才可执行
             flyingon.dom_test(function (div) {
@@ -764,7 +756,7 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
 
 //顶级控件接口
-$class('ITopControl', function () {
+$interface('ITopControl', function () {
     
     
         
@@ -792,11 +784,10 @@ $class('ITopControl', function () {
                 width = dom.clientWidth,
                 height = dom.clientHeight,
                 arrange = { width: width, height: height },
-                margin = layout.margin(this, arrange),
-                pixel = flyingon.pixel;
+                margin = layout.margin(this, arrange);
             
             layout.measure(this, arrange, margin, width, height, false);
-            layout.locate(this, arrange, margin, pixel(this.left()), pixel(this.top()), width, height);
+            layout.locate(this, arrange, margin, 0, 0, width, height);
             
             this.render();
                 
@@ -815,10 +806,12 @@ $class('ITopControl', function () {
     //显示控件至dom容器
     this.show = function (dom_host) {
         
-        var dom = this.dom;
+        var host = dom_host || document.body,
+            dom = this.dom;
 
         dom.style.position = 'relative';
-        (dom_host || document.body).appendChild(dom);
+
+        host.appendChild(dom);
 
         if (this.__arrange_dirty < 2)
         {

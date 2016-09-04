@@ -1,6 +1,6 @@
 
 //容器控件接口
-$class('IContainerControl', function () {
+$interface('IContainerControl', function () {
 
 
     

@@ -26,23 +26,6 @@ flyingon.version = '0.0.1.0';
 
 
 
-//复制源对象成员至目标对象
-flyingon.extend = function (target, source) {
-    
-    target = target || {};
-    
-    if (source)
-    {
-        for (var name in source)
-        {
-            target[name] = source[name];
-        }
-    }
-    
-    return target;
-};
-
-
 //以指定原型创建对象
 flyingon.create = Object.create || (function () {
 
@@ -60,6 +43,34 @@ flyingon.create = Object.create || (function () {
     };
 
 })();
+
+
+//复制源对象成员至目标对象
+flyingon.extend = function (target, source, deep) {
+    
+    target = target || {};
+    
+    if (source)
+    {
+        if (deep)
+        {
+            for (var name in source)
+            {
+                var value = source[name];
+                target[name] = value && typeof value === 'object' ? flyingon.extend(target[name], value) : value;
+            }
+        }
+        else
+        {
+            for (var name in source)
+            {
+                target[name] = source[name];
+            }
+        }
+    }
+    
+    return target;
+};
 
 
 //编码对象
@@ -164,7 +175,7 @@ flyingon.absoluteUrl = (function () {
 
 
 
-//依赖,名字空间及类
+//资源加载及名字空间
 (function (window, document, flyingon) {
 
 
@@ -220,20 +231,10 @@ flyingon.absoluteUrl = (function () {
 
         regex_namespace = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/, //名字空间名称检测
 
-        namespace_stack = [], //名字空间栈
-        
-        namespace_current = flyingon,
-        
-        regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
+        namespace_stack = []; //名字空间栈
 
-        class_list = flyingon.__class_list = flyingon.create(null), //已注册类型集合
-
-        class_stack = [],  //类栈(支持类的内部定义类)
-        
-        class_data; //当前类定义信息(支持类的内部定义类)
-        
-        
     
+                    
     
     //实始化起始路径
     flyingon_path = include_path = (function () {
@@ -1156,18 +1157,83 @@ flyingon.absoluteUrl = (function () {
         try
         {
             //记录当前名字空间
-            namespace_stack.push(namespace_current = target);
+            namespace_stack.push($namespace.current = target);
 
             callback.call(target, target, flyingon);
         }
         finally
         {
-            namespace_current = namespace_stack.pop() || flyingon;
+            $namespace.current = namespace_stack.pop() || flyingon;
         }
     };
 
     
+    
+    //输出外部接口
+    //分开赋值解决chrome调试时类名过长的问题
+    flyingon.$include = window.$include = $include;
+    flyingon.$i18ntext = window.$i18ntext = $i18ntext;
+    flyingon.$errortext = window.$errortext = $errortext;
+    flyingon.$require = window.$require = $require;
+    flyingon.$namespace = window.$namespace = $namespace;
+    
 
+})(window, document, flyingon);
+
+
+    
+
+//类,属性及事件
+(function (flyingon) {
+    
+
+
+    var regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
+
+        class_list = flyingon.__class_list = flyingon.create(null), //已注册类型集合
+
+        class_stack = [],  //类栈(支持类的内部定义类)
+        
+        class_data, //当前类定义信息(支持类的内部定义类)
+        
+        defaults = flyingon.create(null); //默认方法集合
+        
+    
+    
+    //定义接口方法
+    function $interface(name, fn) {
+        
+        if (!regex_class.test(name))
+        {
+            throw $errortext('flyingon', 'interface name error');
+        }
+        
+        var prototype = flyingon.create(null),
+            namespace = $namespace.current || flyingon,
+            xtype = namespace.namespace_name + '.' + name;
+        
+        prototype[xtype] = true;
+
+        fn.call(prototype);
+        
+        fn = function (target) {
+          
+            var cache = prototype;
+            
+            for (var name in cache)
+            {
+                target[name] = cache[name];
+            }
+        };
+        
+        fn.xtype = xtype;
+        fn.prototype = prototype;
+ 
+        return namespace[name] = fn;
+    };
+    
+    
+    
     //注册或获取注册的类型
     flyingon.registry_class = function (xtype, Class) {
 
@@ -1180,8 +1246,8 @@ flyingon.absoluteUrl = (function () {
             return class_list[xtype];
         }
     };
-
-
+    
+    
 
     //开放定义构造函数的方法
     function $constructor(fn, replace) {
@@ -1225,9 +1291,10 @@ flyingon.absoluteUrl = (function () {
     };
     
 
+
     //定义类方法
-    //name:             类型名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
-    //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口
+    //name:             类名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
+    //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口, 接口只会复制其原型上的方法
     //fn:               类代码, 函数, 参数(base:父类原型, self:当前类原型)
     function $class(name, superclass, fn) {
 
@@ -1236,7 +1303,8 @@ flyingon.absoluteUrl = (function () {
             Class, 
             base, 
             prototype, 
-            namespace, 
+            namespace,
+            list,
             cache;
 
         
@@ -1266,7 +1334,7 @@ flyingon.absoluteUrl = (function () {
         //获取父类原型及创建类原型
         if (superclass && typeof superclass !== 'function')
         {
-            cache = superclass;
+            list = superclass;
             superclass = superclass[0];
         }
         
@@ -1288,32 +1356,36 @@ flyingon.absoluteUrl = (function () {
         //创建原型
         prototype = flyingon.create(base = superclass.prototype);
 
+    
+        //生成默认值集合
+        prototype.__defaults = flyingon.create(base && base.__defaults || null);
+
+        //生成属性集合
+        prototype.__properties = flyingon.create(base && base.__properties || null);
+    
         
-        //扩展父类接口
-        if (cache && cache.length > 1)
-        {
-            class_superclass(prototype, cache);
-        }
-        
-        
-        //初始化原型
-        if (cache = base && base.__prototype_init)
-        {
-            cache.call(prototype, base, true);
-        }
-        
-                
         //设置base属性
         prototype.base = base;
-        
-        //定义类型检测方法
-        prototype.is = is;
 
-        //定义默认toString方法
-        prototype.toString = toString;
+            
+        //复制默认方法
+        cache = defaults;
+
+        for (var key in cache)
+        {
+            prototype[key] = cache[key];
+        }
         
+        
+        //扩展父类接口
+        if (list && list.length > 1)
+        {
+            class_superclass(prototype, list);
+        }
+        
+    
         //获取当前名字空间
-        namespace = namespace_current;
+        namespace = $namespace.current || flyingon;
 
         //xtype
         if (name)
@@ -1325,7 +1397,7 @@ flyingon.absoluteUrl = (function () {
         try
         {        
             //进栈
-            (cache = class_stack).push(data);
+            (list = class_stack).push(data);
             
             //执行扩展
             fn.call(prototype, base, prototype);
@@ -1333,41 +1405,29 @@ flyingon.absoluteUrl = (function () {
         finally
         {
             //出栈
-            cache.pop();
+            list.pop();
             
             //回退类定义数据
-            class_data = cache[cache.length - 1];
+            class_data = list[list.length - 1];
         }
 
-        
-        //如果有构造函数生成器
-        if (fn = prototype.$constructor)
-        {
-            fn = fn();
-        }
                 
-        
         //处理类及构造函数
-        if (cache = data[0])
+        if (list = data[0])
         {
-            if (fn)
-            {
-                cache.unshift(fn);
-            }
-            
-            Class = cache.length > 1 || cache[0].superclass ? class_create(cache) : cache[0];
-            Class.__constructor_list = cache; 
+            Class = list.length > 1 || list[0].superclass ? class_create(list) : list[0];
+            Class.__constructor_list = list; 
         }
         else
         {
-            Class = fn || function () {};
+            Class = function () {};
         }
         
         
         //初始化静态成员
-        if (cache = data[1])
+        if (list = data[1])
         {
-            class_static(Class, cache);            
+            class_static(Class, list);            
         }
 
 
@@ -1414,49 +1474,35 @@ flyingon.absoluteUrl = (function () {
         return Class;
     };
 
+    
 
     //处理类接口
     function class_superclass(prototype, list) {
         
-        var data = class_data,
+        var extend = flyingon.extend,
             target, 
             cache;
         
         for (var i = 1, _ = list.length; i < _; i++)
         {
-            if ((target = list[i]) && typeof target === 'function')
+            if (target = list[i])
             {
-                //复制构造函数
-                if (cache = target.__constructor_list)
+                target = target.prototype || target;
+    
+                for (cache in target)
                 {
-                    if (cache[0].replace || !data[0])
-                    {
-                        data[0] = cache.slice(0);
-                    }
-                    else
-                    {
-                        cache.push.apply(data[0], cache);
-                    }
+                    prototype[cache] = target[cache];
                 }
                 
-                //复制成员
-                if (target = target.prototype)
+                if (cache = target.__defaults)
                 {
-                    if (cache = target.__prototype_init)
-                    {
-                        cache.call(prototype, target);
-                    }
-                    else
-                    {
-                        for (cache in target)
-                        {
-                            prototype[cache] = target[cache];
-                        }
-                    }
+                    extend(prototype.__defaults, cache);
+                    extend(prototype.__properties, target.__properties);
                 }
             }
         }
     };
+
     
     
     //处理类静态成员
@@ -1539,101 +1585,36 @@ flyingon.absoluteUrl = (function () {
         return Class;
     };
 
+    
 
+    
     //检测当前对象是否指定类型
-    function is(type) {
+    defaults.is = function (type) {
 
         return type && (this instanceof type || ((type = type.xtype) && this[type]));
     };
 
 
     //默认toString方法
-    function toString() {
+    defaults.toString = function () {
 
         return '[object ' + this.xtype + ']';
     };
-
-    
-    
-    //输出外部接口
-    //分开赋值解决chrome调试时类名过长的问题
-    (function (data) {
-        
-        for (var name in data)
-        {
-            flyingon[name] = window[name] = data[name];
-        }
-        
-    })({
-        $include: $include,
-        $i18ntext: $i18ntext,
-        $errortext: $errortext,
-        $require: $require,
-        $namespace: $namespace,
-        $class: $class,
-        $constructor: $constructor,
-        $static: $static
-    });
-    
-
-})(window, document, flyingon);
-
-
-
-//组件基类
-$class('Component', function () {
-
-
-
-    var regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; //绑定表达式解析器 
-                    
-
-    
-    //初始化原型
-    (this.__prototype_init = function (base, superclass) {
-        
-        var cache;
-        
-        if (superclass)
-        {
-            this.__defaults = flyingon.create(base && base.__defaults || null);
-            this.__properties = flyingon.create(base && base.__properties || null);
-        }
-        else if (base)
-        {
-            for (var name in base)
-            {
-                this[name] = base[name];
-            }
-            
-            if (cache = base.__defaults)
-            {
-                this.__defaults = flyingon.extend(this.__defaults || flyingon.create(null), cache);
-            }
-            
-            if (cache = base.__properties)
-            {
-                this.__properties = flyingon.extend(this.__properties || flyingon.create(null), cache);
-            }
-        }
-          
-    }).call(this, null, true);
     
     
     //定义属性及set_XXX方法
-    this.defineProperty = function (name, defaultValue, attributes) {
+    defaults.defineProperty = function (name, defaultValue, attributes) {
 
         if (name.match(/\W/))
         {
             throw $errortext('flyingon', 'property name error').replace('{0}', name);
         }
 
-        var cache = attributes,
-            storage;
+        var cache = attributes;
 
-        //初始化attributes
-        attributes = { name: name, dataType: 'object' };
-
+        //初始化attributes并生成属性元数据
+        this.__properties[name] = attributes = { name: name, dataType: 'object' };
+     
         //处理默认值
         if (typeof defaultValue === 'function')
         {
@@ -1644,48 +1625,23 @@ $class('Component', function () {
         {
             attributes.defaultValue = defaultValue;
         }
+        
+        this.__defaults[name] = defaultValue;
 
         //根据默认值生成数据类型
-        if (defaultValue !== void 0)
+        if (!attributes.dataType)
         {
-            this.__defaults[name] = defaultValue;
-
-            if (!cache || !cache.dataType)
+            attributes.dataType = typeof defaultValue;
+        }
+        
+        if (cache && typeof cache === 'object')
+        {
+            for (var key in cache)
             {
-                attributes.dataType = typeof defaultValue;
+                attributes[key] = cache[key];
             }
         }
-
-        if (cache)
-        {
-            switch (typeof cache)
-            {
-                case 'string':
-                    attributes.attributes = cache; 
-                    break;
-
-                case 'object':
-                    for (var key in cache)
-                    {
-                        attributes[key] = cache[key];
-                    }
-                    break;
-            }
-
-            if (cache = cache.attributes)
-            {
-                cache = cache.split(',');
-
-                for (var i = 0, _ = cache.length; i < _; i++)
-                {
-                    attributes[cache[i]] = true;
-                }
-            }
-        }
-
-        //生成属性元数据
-        this.__properties[name] = attributes;
-
+   
         //直接设置函数
         if (cache = attributes.fn)
         {
@@ -1693,30 +1649,15 @@ $class('Component', function () {
         }
         else //动态生成方法
         {
-            if (storage = attributes.storage)
-            {
-                cache = ['var oldValue = ' + storage + ';\n\n'
-                    + 'if (value === void 0)\n{\n\t'
-                        + 'return oldValue !== void 0 ? oldValue : this.__defaults["' + name + '"];\n'
-                    + '}\n\n'];
-            }
-            else
-            {
-                storage = 'storage["' + name + '"]';
-                
-                cache = ['var storage = this.__storage || (this.__storage = flyingon.create(this.__defaults)), oldValue = ' + storage + ';\n\n'
-                    + 'if (value === void 0)\n{\n\t'
-                        + 'return oldValue;\n'
-                    + '}\n\n'];
-            }
-
-            defineProperty(cache, name, attributes, storage);
-
-            cache.push('return this;');
-            cache = cache.join('');
-
             //创建按需加载属性以提升初始化性能
-            this[name] = attributes.delay !== false ? delay_property(name, cache) : new Function('value', 'trigger', cache);
+            this[name] = function (value, trigger) {
+
+                var target = this.constructor,
+                    fn = attributes.fn || defineProperty(name, attributes);
+                
+                target = target && target.prototype || this;
+                return (target[name] = fn).call(this, value, trigger);
+            };
         }
 
         //扩展至选择器
@@ -1727,15 +1668,32 @@ $class('Component', function () {
                 return this.value(name, value);
             };
         }
-
-        return this;
     };
 
-    
-    function defineProperty(writer, name, attributes, storage) {
-
+        
+    function defineProperty(name, attributes) {
+        
         var dataType = attributes.dataType,
+            storage, 
+            data,
             cache;
+        
+        if (storage = attributes.storage)
+        {
+            data = ['var oldValue = ' + storage + ';\n\n'
+                + 'if (value === void 0)\n{\n\t'
+                    + 'return oldValue !== void 0 ? oldValue : this.__defaults["' + name + '"];\n'
+                + '}\n\n'];
+        }
+        else
+        {
+            storage = 'storage["' + name + '"]';
+
+            data = ['var storage = this.__storage || (this.__storage = flyingon.create(this.__defaults)), oldValue = ' + storage + ';\n\n'
+                + 'if (value === void 0)\n{\n\t'
+                    + 'return oldValue;\n'
+                + '}\n\n'];
+        }
 
         //基本类型转换(根据默认值的类型自动转换)
         if (dataType !== 'object')
@@ -1745,19 +1703,19 @@ $class('Component', function () {
             switch (dataType)
             {
                 case 'boolean':
-                    writer.push('value = !!value;\n\n');
+                    data.push('value = !!value;\n\n');
                     break;
 
                 case 'integer':
-                    writer.push('value = value >>> 0;\n\n');
+                    data.push('value = value >>> 0;\n\n');
                     break;
 
                 case 'number':
-                    writer.push('value = (+value || 0);\n\n');
+                    data.push('value = (+value || 0);\n\n');
                     break;
 
                 case 'string':
-                    writer.push('value = "" + value;\n\n');
+                    data.push('value = "" + value;\n\n');
                     break;
             }
         }
@@ -1765,13 +1723,13 @@ $class('Component', function () {
         //最小值限定(小于指定值则自动转为指定值)
         if ((cache = attributes.minValue) != null)
         {
-            writer.push('if (value < ' + cache + ') value = ' + cache + ';\n\n');
+            data.push('if (value < ' + cache + ') value = ' + cache + ';\n\n');
         }
 
         //最大值限定(大于指定值则自动转为指定值)
         if ((cache = attributes.maxValue) != null)
         {
-            writer.push('if (value > ' + cache + ') value = ' + cache + ';\n\n');
+            data.push('if (value > ' + cache + ') value = ' + cache + ';\n\n');
         }
 
         //自定义值检测代码
@@ -1783,18 +1741,18 @@ $class('Component', function () {
                 cache = cache.substring(cache.indexOf('{') + 1, cache.lastIndexOf('}'));
             }
             
-            writer.push(cache);
-            writer.push('\n\n');
+            data.push(cache);
+            data.push('\n\n');
         }
 
         //对比新旧值
-        writer.push('if (oldValue !== value)\n{\n\t');
+        data.push('if (oldValue !== value)\n{\n\t');
 
         //赋值
-        writer.push(storage + ' = value;\n\n\t');
+        data.push(storage + ' = value;\n\n\t');
 
         //属性变更通知
-        writer.push('if (trigger !== false && this.__onpropertychange("' + name + '", value, oldValue) === false)\n\t'
+        data.push('if (trigger !== false && this.__onpropertychange("' + name + '", value, oldValue) === false)\n\t'
             + '{\n\t\t'
                 + storage + ' = oldValue;\n\t\t'
                 + 'return this;\n\t'
@@ -1809,44 +1767,22 @@ $class('Component', function () {
                 cache = cache.substring(cache.indexOf('{') + 1, cache.lastIndexOf('}'));
             }
          
-            writer.push('\n\n\t');
-            writer.push(cache);
+            data.push('\n\n\t');
+            data.push(cache);
         }
 
         //闭合
-        writer.push('\n}\n\n');
-    };
+        data.push('\n}\n\n');
 
-
-    function delay_property(name, text) {
+        data.push('return this;');
         
-        function fn(value, trigger) {
-            
-            var target = this,
-                base = (this.Class || this.constructor).prototype,
-                cache = target[name];
-            
-            while (base && cache === base[name])
-            {
-                target = base;
-                base = base.base;
-            }
-            
-            if (!(cache = fn.__new))
-            {
-                cache = fn.__new = new Function('value', 'trigger', text);
-                text = null;
-            }
-            
-            return (target[name] = cache).call(this, value, trigger);
-        };
-        
-        return fn;
+        //创建属性函数
+        return attributes.fn = new Function('value', 'trigger', data.join(''));
     };
-    
+        
 
     //属性值变更方法
-    this.__onpropertychange = function (name, value, oldValue) {
+    defaults.__onpropertychange = function (name, value, oldValue) {
     
         var fn, cache;
         
@@ -1854,30 +1790,11 @@ $class('Component', function () {
         {
             return false;
         }
-                
-        //从源对象同步数据至目标对象
-        if (cache = this.__to_bindings)
-        {
-            this.syncBinding(name, value);
-        }
-        
-        //从目标对象回推数据至源对象
-        if ((cache = this.__bindings) && (cache = cache[name]) && cache.twoway)
-        {
-            cache.source.set(cache.expression || cache.name, value);
-        }
     };
     
-    
-    //组件id
-    this.defineProperty('id', '', {
-     
-        delay: false
-    });
-    
-    
+        
     //获取指定名称的值(数据绑定用)
-    this.get = function (name, context) {
+    defaults.get = function (name, context) {
         
         var fn = this[name];
         
@@ -1891,7 +1808,7 @@ $class('Component', function () {
     
     
     //设置指定名称的值(数据绑定用)
-    this.set = function (name, value, context) {
+    defaults.set = function (name, value, context) {
         
         var fn = this[name];
         
@@ -1903,11 +1820,13 @@ $class('Component', function () {
         {
             this[name] = value;
         }
+        
+        return this;
     };
     
 
     //批量设置属性值
-    this.sets = function (values, trigger) {
+    defaults.sets = function (values, trigger) {
 
         var fn;
         
@@ -1936,7 +1855,7 @@ $class('Component', function () {
 
 
     //获取或设置属性默认值
-    this.defaultValue = function (name, value) {
+    defaults.defaultValue = function (name, value) {
 
         var defaults = this.__defaults;
 
@@ -1951,7 +1870,7 @@ $class('Component', function () {
 
 
     //获取属性值集合
-    this.getProperties = function (filter) {
+    defaults.getProperties = function (filter) {
 
         var target = this.__properties,
             data = [],
@@ -1971,7 +1890,7 @@ $class('Component', function () {
     
     
     //绑定事件处理 注:type不带on
-    this.on = flyingon.on = function (type, fn) {
+    defaults.on = flyingon.on = function (type, fn) {
 
         if (type && typeof fn === 'function')
         {
@@ -1991,7 +1910,7 @@ $class('Component', function () {
 
     
     //只执行一次绑定的事件
-    this.once = flyingon.once = function (type, fn) {
+    defaults.once = flyingon.once = function (type, fn) {
 
         var self = this;
 
@@ -2006,7 +1925,7 @@ $class('Component', function () {
 
     
     //暂停事件处理
-    this.suspend = flyingon.suspend = function (type) {
+    defaults.suspend = flyingon.suspend = function (type) {
 
         var events = this.__events;
 
@@ -2020,7 +1939,7 @@ $class('Component', function () {
 
     
     //继续事件处理
-    this.resume = flyingon.resume = function (type) {
+    defaults.resume = flyingon.resume = function (type) {
 
         var events = this.__events;
 
@@ -2041,7 +1960,7 @@ $class('Component', function () {
 
     
     //移除事件处理
-    this.off = flyingon.off = function (type, fn) {
+    defaults.off = flyingon.off = function (type, fn) {
 
         var events = this.__events,
             items;
@@ -2096,7 +2015,7 @@ $class('Component', function () {
 
     
     //分发事件
-    this.trigger = function (e) {
+    defaults.trigger = function (e) {
 
         var type = e.type || (e = arguments[0] = new flyingon.Event(e)).type,
             target = flyingon,
@@ -2132,6 +2051,490 @@ $class('Component', function () {
     };
 
 
+
+    //以当前对象的参照复制生成新对象
+    defaults.clone = function () {
+
+        var target = new this.Class(),
+            storage = this.__storage;
+
+        if (storage)
+        {
+            var values = target.__storage = flyingon.create(this.__defaults);
+
+            for (var name in storage)
+            {
+                values[name] = storage[name];
+            }
+        }
+
+        return target;
+    };
+    
+
+    //销毁对象
+    defaults.dispose = function () {
+
+        if (this.__events)
+        {
+            this.off();
+        }
+    };
+    
+    
+    
+    //输出外部接口
+    //分开赋值解决chrome调试时类名过长的问题
+    flyingon.$interface = window.$interface = $interface;
+    flyingon.$class = window.$class = $class;
+    flyingon.$constructor = window.$constructor = $constructor;
+    flyingon.$static = window.$static = $static;
+    
+
+
+})(flyingon);
+
+
+
+
+//事件基类
+$class('Event', function () {
+
+    
+    $constructor(function (type) {
+
+        this.type = type;
+    });
+    
+    
+    //事件类型
+    this.type = null;
+
+
+    //触发事件目标对象
+    this.target = null;
+
+
+    //是否取消冒泡
+    this.cancelBubble = false;
+
+    
+    //是否阻止默认动作
+    this.defaultPrevented = false;
+
+
+    //阻止事件冒泡
+    this.stopPropagation = function () {
+
+        this.cancelBubble = true;
+    };
+
+
+    //禁止默认事件
+    this.preventDefault = function () {
+
+        this.defaultPrevented = true;
+    };
+
+
+    //阻止事件冒泡及禁止默认事件
+    this.stopImmediatePropagation = function () {
+
+        this.cancelBubble = this.defaultPrevented = true;
+    };
+
+    
+    this.__class_init = function (Class) {
+      
+        Class.load = function (type) {
+         
+            var event = new Class(type),
+                i = 0,
+                length = arguments.length;
+            
+            while (i < length)
+            {
+                event[arguments[i++]] = arguments[i++];
+            }
+            
+            return event;
+        };
+    };
+    
+    
+});
+
+
+
+//异步处理基类
+$class('Async', function () {
+
+
+
+    //注册成功执行函数或成功执行通知
+    this.done = function (fn) {
+
+        return registry(this, fn, 1);
+    };
+
+
+    //注册执行失败函数或执行失败通知
+    this.fail = function (fn) {
+
+        return registry(this, fn, 2);
+    };
+
+
+    //注册执行结束函数
+    this.always = function (fn) {
+
+        return registry(this, fn, 3);
+    };
+
+
+    //注册执行进度函数
+    this.progress = function (fn) {
+
+        return registry(this, fn, 8);
+    };
+
+
+    //注册回调函数
+    function registry(self, fn, state) {
+
+        if (typeof fn === 'function')
+        {
+            var data = self.__data || (self.__data = []);
+
+            //如果已执行则立即调用函数
+            if ((state & data.state) === data.state)
+            {
+                fn.apply(self, data.parameters);
+            }
+            else
+            {
+                data.push(state, fn);
+            }
+        }
+
+        return self;
+    };
+
+
+    //成功执行通知
+    this.resolve = function (value) {
+
+        return this.__change_to(1, arguments);
+    };
+
+
+    //失败执行通知
+    this.reject = function (error) {
+
+        return this.__change_to(2, arguments);
+    };
+
+
+    //执行进度通知
+    this.notify = function (value) {
+
+        return this.__change_to(8, arguments);
+    };
+
+
+    //切换状态
+    //1: done
+    //2: fail
+    //4: error
+    //7: always
+    //8: progress
+    this.__change_to = function (state, parameters) {
+
+        var data = this.__data || (this.__data = []),
+            index = 0,
+            length = data.length;
+
+        data.state = state;
+        data.parameters = parameters;
+
+        while (index < length)
+        {
+            if ((state & data[index++]) === state)
+            {
+                data[index++].apply(this, parameters);
+            }
+        }
+
+        return this;
+    };
+
+
+});
+
+    
+//Ajax类
+$class('Ajax', [Object, flyingon.Async], function () {
+
+
+    var ajax_fn;
+
+    
+    //发送请求
+    $constructor(function (url, options) {
+
+        var self = this,
+            ajax = this.ajax = new (ajax_fn || ajax_init())(),
+            data,
+            cache;
+
+        if (options)
+        {
+            for (var name in options)
+            {
+                if (name !== 'data')
+                {
+                    this[name] = options[name];
+                }
+                else
+                {
+                    data = options[name];
+                }
+            }
+        }
+        else
+        {
+            options = {};
+        }
+
+        //执行发送前全局start事件
+        if (cache = flyingon.Ajax.start)
+        {
+            for (var i = 0, _ = cache.length; i < _; i++)
+            {
+                cache[i].call(this, options);
+            }
+        }
+
+        if ((cache = this.timeout) > 0)
+        {
+            this.__timer = setTimeout(function () {
+
+                request.abort();
+                self.fail('timeout');
+
+            }, cache);
+        }
+
+        ajax.onreadystatechange = function () {
+
+            callback(self, this, url, options);
+        };
+
+        if (cache = this.method)
+        {
+            cache = cache.toUpperCase();
+        }
+        else
+        {
+            cache = 'GET';
+        }
+
+        if (data)
+        {
+            if (cache === 'GET')
+            {
+                url += (url.indexOf('?') >= 0 ? '&' : '?') + flyingon.encode(data);
+                data = null;
+            }
+            else if (typeof data === 'object')
+            {
+                data = flyingon.encode(data);
+            }
+        }
+
+        ajax.open(this.method, url, this.async, this.user, this.password);
+
+        if (cache = this.header)
+        {
+            for (var name in cache)
+            {
+                ajax.setRequestHeader(name, cache[name]);
+            }
+        }
+
+        ajax.setRequestHeader('Content-Type', this.contentType);
+
+        if (data)
+        {
+            ajax.setRequestHeader('Content-Length', data.length);
+        }
+
+        ajax.send(data);
+    });
+
+
+    //method
+    this.method = 'GET';
+
+    //text/plain || json || script || xml
+    this.dataType = 'text/plain';
+
+    //内容类型
+    this.contentType = 'application/x-www-form-urlencoded';
+
+    //自定义http头
+    this.header = null;
+
+    //是否异步
+    this.async = true;
+
+    //请求用户名
+    this.user = void 0;
+
+    //请求密码
+    this.password = void 0;
+
+    //超时时间
+    this.timeout = 0;
+    
+    
+
+    function ajax_init() {
+
+        var cache = window.XMLHttpRequest;
+
+        if (cache)
+        {
+            return ajax_fn = function () { 
+
+                return new cache(); 
+            };
+        }
+
+        if (cache = window.ActiveXObject)
+        {
+            var items = ['MSXML2.XMLHTTP.4.0', 'MSXML2.XMLHTTP', 'Microsoft.XMLHTTP'];
+
+            for (var i = 0, _ = items.length; i < _; i++)
+            {
+                try
+                {
+                    (ajax_fn = function () { 
+
+                        return new cache(items[i]); 
+                    })();
+
+                    return ajax_fn;
+                }
+                catch (e)
+                {
+                }
+            }
+        }
+
+        if (cache = window.createRequest)
+        {
+            return ajax_fn = cache;
+        }
+    };
+
+
+    //处理响应结果
+    function callback(self, ajax, url, options) {
+
+        var cache = ajax.readyState;
+
+        if (cache === 4)
+        {
+            if (cache = self.__timer)
+            {
+                clearTimeout(cache);
+                self.__timer = 0;
+            }
+
+            if (ajax.status < 300)
+            {
+                if ((cache = self.dataType).indexOf('json') >= 0)
+                {
+                    self.resolve(flyingon.parseJSON(ajax.responseText));
+                }
+                else if (cache.indexOf('script') >= 0)
+                {
+                    flyingon.globalEval(ajax.responseText); //全局执行js避免变量冲突
+                    self.resolve(url);
+                }
+                else if (cache.indexOf('xml') >= 0)
+                {
+                    self.resolve(ajax.responseXML);
+                }
+                else
+                {
+                    self.resolve(ajax.responseText);
+                }
+            }
+            else
+            {
+                self.reject('ajax', ajax);
+            }
+
+            //执行全局ajax执行结束事件
+            if (cache = flyingon.Ajax.end)
+            {
+                for (var i = 0, _ = cache.length; i < _; i++)
+                {
+                    cache[i].call(self, options);
+                }
+            }
+        }
+        else
+        {
+            self.notify(ajax, cache);
+        }
+    };
+
+
+});
+
+
+//自定义ajax开始提交方法
+flyingon.ajaxStart = function (fn) {
+
+    (flyingon.Ajax.start || (flyingon.Ajax.start = [])).push(fn);
+};
+
+
+//自定义ajax执行结束方法
+flyingon.ajaxEnd = function (fn) {
+
+    (flyingon.Ajax.end || (flyingon.Ajax.end = [])).push(fn);
+};
+
+
+//ajax提交(默认为GET方式提交)
+flyingon.ajax = function (url, options) {
+
+    return new flyingon.Ajax(url, options);
+};
+
+
+//POST提交
+//在IE6时会可能会出错, asp.net服务端可实现IHttpAsyncHandler接口解决些问题 
+flyingon.ajaxPost = function (url, options) {
+
+    options = options || {};
+    options.method = 'POST';
+
+    return new flyingon.Ajax(url, options);
+};
+
+
+    
+
+
+//序列化接口
+$interface('ISerialize', function () {
+    
+        
     
     //序列化方法
     this.serialize = function (writer) {
@@ -2146,11 +2549,6 @@ $class('Component', function () {
         if (cache = this.__storage)
         {
             writer.write_properties(cache);
-        }
-        
-        if (cache = this.__bindings)
-        {
-            writer.write_property('bindings', cache);
         }
     };
     
@@ -2183,8 +2581,419 @@ $class('Component', function () {
             
     //设置不序列化xtype属性
     this.deserialize_xtype = true;
+    
+});
 
 
+
+//读序列化类
+$class('SerializeReader', function () {
+
+
+    var class_list = flyingon.__class_list,
+        Array = window.Array;
+    
+
+    this.deserialize = function (values) {
+
+        if (values)
+        {
+            if (typeof values === 'string')
+            {
+                values = flyingon.parseJSON(values);
+            }
+
+            if (typeof values === 'object')
+            {
+                this.all = null;
+                values = values instanceof Array ? this.read_array(values) : this.read_object(values);
+                
+                this.callback = null;
+            }
+        }
+
+        return values;
+    };
+
+
+    this.read = function (value) {
+
+        if (value && typeof value === 'object')
+        {
+            return value instanceof Array ? this.read_array(value) : this.read_object(value);
+        }
+
+        return value;
+    };
+
+
+    this.read_array = function (values) {
+
+        if (values)
+        {
+            var array = [];
+
+            for (var i = 0, _ = values.length; i < _; i++)
+            {
+                array.push(this.read(values[i]));
+            }
+
+            return array;
+        }
+
+        return null;
+    };
+
+
+    this.read_object = function (values, type) {
+
+        if (values)
+        {
+            var target, id, cache;
+
+            if (type)
+            {
+                if ((target = new type()).deserialize)
+                {
+                    target.deserialize(this, values);
+                }
+                else
+                {
+                    this.read_properties(target, values); 
+                }
+            }
+            else if ((id = values.xtype) && (target = class_list[id]))
+            {
+                (target = new target()).deserialize(this, values);
+            }
+            else
+            {
+                this.read_properties(target = {}, values); 
+            }
+            
+            if (id = values.id)
+            {
+                (this.all || (this.all = {}))[id] = target;
+                
+                if ((cache = this.callback) && (cache = cache[id]))
+                {
+                    for (var i = cache.length - 1; i >= 0; i--)
+                    {
+                        cache[i](target);
+                    }
+                    
+                    this.callback[id] = null;
+                }
+            }
+
+            return target;
+        }
+
+        return null;
+    };
+
+    
+    this.read_properties = function (target, values) {
+      
+        for (var name in values)
+        {
+            target[name] = this.read(values[name]);
+        }
+    };
+    
+    
+    this.read_reference = function (name, callback) {
+      
+        var all = this.all,
+            cache;
+        
+        if (all && (cache = all[name]))
+        {
+            callback(cache)
+        }
+        else if (cache = this.callback)
+        {
+            (cache[name] || (cache[name] = [])).push(callback);
+        }
+        else
+        {
+            (this.callback = {})[name] = [callback];
+        }
+    };
+      
+    
+    this.__class_init = function (Class) {
+    
+        var reader = Class.instance = new Class();
+
+        Class.deserialize = function (values) {
+
+            return reader.deserialize(values);
+        };
+    };
+    
+
+});
+
+
+//写序列化类
+$class('SerializeWriter', function () {
+
+
+    var Array = window.Array,
+        has = Object.prototype.hasOwnProperty;
+
+    
+    $static('serialize', function (target) {
+    
+        return new flyingon.SerializeWriter().serialize(target);
+    });
+    
+
+    this.serialize = function (target) {
+
+        if (target && typeof target === 'object')
+        {
+            var data = this.data = [];
+            
+            if (target instanceof Array)
+            {
+                this.write_array(target);
+            }
+            else
+            {
+                this.write_object(target);
+            }
+
+            data.pop();
+            
+            return data.join('');
+        }
+        
+        return '' + target;
+    };
+
+
+    this.write = function (value) {
+
+        if (value != null)
+        {
+            switch (typeof value)
+            {
+                case 'boolean':
+                    this.data.push(value ? true : false, ',');
+                    break;
+
+                case 'number':
+                    this.data.push(+value || 0, ',');
+                    break;
+
+                case 'string':
+                case 'function':
+                    this.data.push('"' + ('' + value).replace(/\"/g, '\\"') + '"', ',');
+                    break;
+
+                default:
+                    if (value instanceof Array)
+                    {
+                        this.write_array(value);
+                    }
+                    else
+                    {
+                        this.write_object(value);
+                    }
+                    break;
+            }
+        }
+        else
+        {
+            this.data.push(null, ',');
+        }
+    };
+
+
+    this.write_array = function (array) {
+
+        var data = this.data;
+        
+        if (array != null)
+        {
+            var length = array.length;
+
+            if (length > 0)
+            {
+                data.push('[');
+                
+                for (var i = 0; i < length; i++)
+                {
+                    this.write(array[i]);
+                }
+                
+                data.pop();
+                data.push(']', ',');
+            }
+            else
+            {
+                data.push('[]', ',');
+            }
+        }
+        else
+        {
+            data.push(null, ',');
+        }
+    };
+
+
+    this.write_object = function (target) {
+
+        var data = this.data;
+        
+        if (target != null)
+        {
+            data.push('{');
+
+            if (target.serialize)
+            {
+                target.serialize(this);
+            }
+            else
+            {
+                this.write_properties(target);
+            }
+
+            if (data.pop() === ',')
+            {
+                data.push('}', ',')
+            }
+            else
+            {
+                data.push('{}', ',');
+            }
+        }
+        else
+        {
+            data.push(null, ',');
+        }
+    };
+
+
+    this.write_properties = function (values) {
+
+        if (values)
+        {
+            var data = this.data;
+            
+            for (var name in values)
+            {
+                if (has.call(values, name))
+                {
+                    data.push('"', name, '":');
+                    this.write(values[name]);
+                }
+            }
+        }
+    };
+    
+    
+    this.write_property = function (name, value) {
+      
+        this.data.push('"', name, '":');
+        this.write(value);
+    };
+    
+    
+    this.write_reference = function (name, target) {
+        
+        if (name && target)
+        {
+            var id = target.id;
+            
+            if (!id || typeof id === 'function' && !(id = target.id()))
+            {
+                throw $errortext('serialize no id').replace('{0}', target);
+            }
+            
+            this.data.push('"', name, '":');
+            this.write(id);
+        }
+    };
+
+    
+        
+    this.__class_init = function (Class) {
+    
+        var writer = Class.instance = new Class();
+
+        Class.deserialize = function (target) {
+
+            return writer.deserialize(target);
+        };
+    };
+    
+
+});
+
+
+
+//组件基类
+$class('Component', flyingon.ISerialize, function () {
+  
+    
+
+    var regex_binding = /"(?:\\"|[^"])*?"|'(?:\\'|[^'])*?'|null|true|false|undefined|\d+\w*|(\w+)|[^'"\w\s]+/g; //绑定表达式解析器 
+              
+    
+    
+    //定义id属性
+    this.defineProperty('id', '');
+    
+
+    //序列化方法
+    this.serialize = function (writer) {
+
+        var cache;
+        
+        if (cache = this.xtype)
+        {
+            writer.write_property('xtype', cache);
+        }
+        
+        if (cache = this.__storage)
+        {
+            writer.write_properties(cache);
+        }
+        
+        if (cache = this.__bindings)
+        {
+            writer.write_property('bindings', cache);
+        }
+    };
+    
+
+    //属性值变更方法
+    this.__onpropertychange = function (name, value, oldValue) {
+    
+        var fn, cache;
+        
+        if ((fn = this.onpropertychange) && fn.call(this, name, value, oldValue) === false)
+        {
+            return false;
+        }
+                
+        //从源对象同步数据至目标对象
+        if (cache = this.__to_bindings)
+        {
+            this.syncBinding(name, value);
+        }
+        
+        //从目标对象回推数据至源对象
+        if ((cache = this.__bindings) && (cache = cache[name]) && cache.twoway)
+        {
+            cache.source.set(cache.expression || cache.name, value);
+        }
+    };
+    
+    
             
     this.deserialize_bindings = function (reader, values) {
 
@@ -2377,28 +3186,7 @@ $class('Component', function () {
         }
     };
     
-    
-    
-    //以当前对象的参照复制生成新对象
-    this.clone = function () {
-
-        var target = new this.Class(),
-            storage = this.__storage;
-
-        if (storage)
-        {
-            var values = target.__storage = flyingon.create(this.__defaults);
-
-            for (var name in storage)
-            {
-                values[name] = storage[name];
-            }
-        }
-
-        return target;
-    };
-    
-
+        
     //销毁对象
     this.dispose = function () {
 
@@ -2430,782 +3218,10 @@ $class('Component', function () {
         }
     };
     
-
+        
 });
 
 
-
-//事件基类
-$class('Event', function () {
-
-
-    $constructor(function (type) {
-
-        this.type = type;
-    });
-
-
-    //事件类型
-    this.type = null;
-
-
-    //触发事件目标对象
-    this.target = null;
-
-
-    //是否取消冒泡
-    this.cancelBubble = false;
-
-    
-    //是否阻止默认动作
-    this.defaultPrevented = false;
-
-
-    //阻止事件冒泡
-    this.stopPropagation = function () {
-
-        this.cancelBubble = true;
-    };
-
-
-    //禁止默认事件
-    this.preventDefault = function () {
-
-        this.defaultPrevented = true;
-    };
-
-
-    //阻止事件冒泡及禁止默认事件
-    this.stopImmediatePropagation = function () {
-
-        this.cancelBubble = this.defaultPrevented = true;
-    };
-
-
-});
-
-
-//读序列化类
-$class('SerializeReader', function () {
-
-
-    var class_list = flyingon.__class_list,
-        Array = window.Array;
-    
-
-    this.deserialize = function (values) {
-
-        if (values)
-        {
-            if (typeof values === 'string')
-            {
-                values = flyingon.parseJSON(values);
-            }
-
-            if (typeof values === 'object')
-            {
-                this.all = null;
-                values = values instanceof Array ? this.read_array(values) : this.read_object(values);
-                
-                this.callback = null;
-            }
-        }
-
-        return values;
-    };
-
-
-    this.read = function (value) {
-
-        if (value && typeof value === 'object')
-        {
-            return value instanceof Array ? this.read_array(value) : this.read_object(value);
-        }
-
-        return value;
-    };
-
-
-    this.read_array = function (values) {
-
-        if (values)
-        {
-            var array = [];
-
-            for (var i = 0, _ = values.length; i < _; i++)
-            {
-                array.push(this.read(values[i]));
-            }
-
-            return array;
-        }
-
-        return null;
-    };
-
-
-    this.read_object = function (values, type) {
-
-        if (values)
-        {
-            var target, id, cache;
-
-            if (type)
-            {
-                if ((target = new type()).deserialize)
-                {
-                    target.deserialize(this, values);
-                }
-                else
-                {
-                    this.read_properties(target, values); 
-                }
-            }
-            else if ((id = values.xtype) && (target = class_list[id]))
-            {
-                (target = new target()).deserialize(this, values);
-            }
-            else
-            {
-                this.read_properties(target = {}, values); 
-            }
-            
-            if (id = values.id)
-            {
-                (this.all || (this.all = {}))[id] = target;
-                
-                if ((cache = this.callback) && (cache = cache[id]))
-                {
-                    for (var i = cache.length - 1; i >= 0; i--)
-                    {
-                        cache[i](target);
-                    }
-                    
-                    this.callback[id] = null;
-                }
-            }
-
-            return target;
-        }
-
-        return null;
-    };
-
-    
-    this.read_properties = function (target, values) {
-      
-        for (var name in values)
-        {
-            target[name] = this.read(values[name]);
-        }
-    };
-    
-    
-    this.read_reference = function (name, callback) {
-      
-        var all = this.all,
-            cache;
-        
-        if (all && (cache = all[name]))
-        {
-            callback(cache)
-        }
-        else if (cache = this.callback)
-        {
-            (cache[name] || (cache[name] = [])).push(callback);
-        }
-        else
-        {
-            (this.callback = {})[name] = [callback];
-        }
-    };
-      
-    
-    this.__class_init = function (Class) {
-    
-        var reader = Class.instance = new Class();
-
-        Class.deserialize = function (values) {
-
-            return reader.deserialize(values);
-        };
-    };
-    
-
-});
-
-
-//写序列化类
-$class('SerializeWriter', function () {
-
-
-    var Array = window.Array,
-        object = Object.prototype;
-
-    
-    $static('serialize', function (target) {
-    
-        return new flyingon.SerializeWriter().serialize(target);
-    });
-    
-
-    this.serialize = function (target) {
-
-        if (target && typeof target === 'object')
-        {
-            var data = this.data = [];
-            
-            if (target instanceof Array)
-            {
-                this.write_array(target);
-            }
-            else
-            {
-                this.write_object(target);
-            }
-
-            data.pop();
-            
-            return data.join('');
-        }
-        
-        return '' + target;
-    };
-
-
-    this.write = function (value) {
-
-        if (value != null)
-        {
-            switch (typeof value)
-            {
-                case 'boolean':
-                    this.data.push(value ? true : false, ',');
-                    break;
-
-                case 'number':
-                    this.data.push(+value || 0, ',');
-                    break;
-
-                case 'string':
-                case 'function':
-                    this.data.push('"' + ('' + value).replace(/\"/g, '\\"') + '"', ',');
-                    break;
-
-                default:
-                    if (value instanceof Array)
-                    {
-                        this.write_array(value);
-                    }
-                    else
-                    {
-                        this.write_object(value);
-                    }
-                    break;
-            }
-        }
-        else
-        {
-            this.data.push(null, ',');
-        }
-    };
-
-
-    this.write_array = function (array) {
-
-        var data = this.data;
-        
-        if (array != null)
-        {
-            var length = array.length;
-
-            if (length > 0)
-            {
-                data.push('[');
-                
-                for (var i = 0; i < length; i++)
-                {
-                    this.write(array[i]);
-                }
-                
-                data.pop();
-                data.push(']', ',');
-            }
-            else
-            {
-                data.push('[]', ',');
-            }
-        }
-        else
-        {
-            data.push(null, ',');
-        }
-    };
-
-
-    this.write_object = function (target) {
-
-        var data = this.data;
-        
-        if (target != null)
-        {
-            data.push('{');
-
-            if (target.serialize)
-            {
-                target.serialize(this);
-            }
-            else
-            {
-                this.write_properties(target);
-            }
-
-            if (data.pop() === ',')
-            {
-                data.push('}', ',')
-            }
-            else
-            {
-                data.push('{}', ',');
-            }
-        }
-        else
-        {
-            data.push(null, ',');
-        }
-    };
-
-
-    this.write_properties = function (values) {
-
-        if (values)
-        {
-            var data = this.data,
-                prototype = values.constructor,
-                value;
-            
-            if (prototype && (prototype = prototype.prototype) && prototype === object)
-            {
-                prototype = null;
-            }
-            
-            for (var name in values)
-            {
-                value = values[name];
-                
-                if (!prototype || value !== prototype[name])
-                {
-                    data.push('"' + name + '":');
-                    this.write(value);
-                }
-            }
-        }
-    };
-    
-    
-    this.write_property = function (name, value) {
-      
-        this.data.push('"' + name + '":');
-        this.write(value);
-    };
-    
-    
-    this.write_reference = function (name, target) {
-        
-        if (name && target)
-        {
-            var id = target.id;
-            
-            if (!id || typeof id === 'function' && !(id = target.id()))
-            {
-                throw $errortext('serialize no id').replace('{0}', target);
-            }
-            
-            this.data.push('"' + name + '":');
-            this.write(id);
-        }
-    };
-
-    
-        
-    this.__class_init = function (Class) {
-    
-        var writer = Class.instance = new Class();
-
-        Class.deserialize = function (target) {
-
-            return writer.deserialize(target);
-        };
-    };
-    
-
-});
-
-
-
-//异步处理接口
-$class('Async', function () {
-
-
-
-    //注册成功执行函数或成功执行通知
-    this.done = function (fn) {
-
-        return registry(this, fn, 1);
-    };
-
-
-    //注册执行失败函数或执行失败通知
-    this.fail = function (fn) {
-
-        return registry(this, fn, 2);
-    };
-
-
-    //注册执行结束函数
-    this.always = function (fn) {
-
-        return registry(this, fn, 3);
-    };
-
-
-    //注册执行进度函数
-    this.progress = function (fn) {
-
-        return registry(this, fn, 8);
-    };
-
-
-    //注册回调函数
-    function registry(self, fn, state) {
-
-        if (typeof fn === 'function')
-        {
-            var data = self.__data || (self.__data = []);
-
-            //如果已执行则立即调用函数
-            if ((state & data.state) === data.state)
-            {
-                fn.apply(self, data.parameters);
-            }
-            else
-            {
-                data.push(state, fn);
-            }
-        }
-
-        return self;
-    };
-
-
-    //成功执行通知
-    this.resolve = function (value) {
-
-        return this.__change_to(1, arguments);
-    };
-
-
-    //失败执行通知
-    this.reject = function (error) {
-
-        return this.__change_to(2, arguments);
-    };
-
-
-    //执行进度通知
-    this.notify = function (value) {
-
-        return this.__change_to(8, arguments);
-    };
-
-
-    //切换状态
-    //1: done
-    //2: fail
-    //4: error
-    //7: always
-    //8: progress
-    this.__change_to = function (state, parameters) {
-
-        var data = this.__data || (this.__data = []),
-            index = 0,
-            length = data.length;
-
-        data.state = state;
-        data.parameters = parameters;
-
-        while (index < length)
-        {
-            if ((state & data[index++]) === state)
-            {
-                data[index++].apply(this, parameters);
-            }
-        }
-
-        return this;
-    };
-
-
-});
-
-    
-//Ajax类
-$class('Ajax', [Object, flyingon.Async], function () {
-
-
-
-    var ajax_fn;
-
-
-    //method
-    this.method = 'GET';
-
-    //text/plain || json || script || xml
-    this.dataType = 'text/plain';
-
-    //内容类型
-    this.contentType = 'application/x-www-form-urlencoded';
-
-    //自定义http头
-    this.header = null;
-
-    //是否异步
-    this.async = true;
-
-    //请求用户名
-    this.user = void 0;
-
-    //请求密码
-    this.password = void 0;
-
-    //超时时间
-    this.timeout = 0;
-
-
-    //发送请求
-    $constructor(function (url, options) {
-
-        var self = this,
-            ajax = this.ajax = new (ajax_fn || ajax_init())(),
-            data,
-            cache;
-
-        if (options)
-        {
-            for (var name in options)
-            {
-                if (name !== 'data')
-                {
-                    this[name] = options[name];
-                }
-                else
-                {
-                    data = options[name];
-                }
-            }
-        }
-        else
-        {
-            options = {};
-        }
-
-        //执行发送前全局start事件
-        if (cache = flyingon.Ajax.start)
-        {
-            for (var i = 0, _ = cache.length; i < _; i++)
-            {
-                cache[i].call(this, options);
-            }
-        }
-
-        if ((cache = this.timeout) > 0)
-        {
-            this.__timer = setTimeout(function () {
-
-                request.abort();
-                self.fail('timeout');
-
-            }, cache);
-        }
-
-        ajax.onreadystatechange = function () {
-
-            callback(self, this, url, options);
-        };
-
-        if (cache = this.method)
-        {
-            cache = cache.toUpperCase();
-        }
-        else
-        {
-            cache = 'GET';
-        }
-
-        if (data)
-        {
-            if (cache === 'GET')
-            {
-                url += (url.indexOf('?') >= 0 ? '&' : '?') + flyingon.encode(data);
-                data = null;
-            }
-            else if (typeof data === 'object')
-            {
-                data = flyingon.encode(data);
-            }
-        }
-
-        ajax.open(this.method, url, this.async, this.user, this.password);
-
-        if (cache = this.header)
-        {
-            for (var name in cache)
-            {
-                ajax.setRequestHeader(name, cache[name]);
-            }
-        }
-
-        ajax.setRequestHeader('Content-Type', this.contentType);
-
-        if (data)
-        {
-            ajax.setRequestHeader('Content-Length', data.length);
-        }
-
-        ajax.send(data);
-    });
-
-
-    function ajax_init() {
-
-        var cache = window.XMLHttpRequest;
-
-        if (cache)
-        {
-            return ajax_fn = function () { 
-
-                return new cache(); 
-            };
-        }
-
-        if (cache = window.ActiveXObject)
-        {
-            var items = ['MSXML2.XMLHTTP.4.0', 'MSXML2.XMLHTTP', 'Microsoft.XMLHTTP'];
-
-            for (var i = 0, _ = items.length; i < _; i++)
-            {
-                try
-                {
-                    (ajax_fn = function () { 
-
-                        return new cache(items[i]); 
-                    })();
-
-                    return ajax_fn;
-                }
-                catch (e)
-                {
-                }
-            }
-        }
-
-        if (cache = window.createRequest)
-        {
-            return ajax_fn = cache;
-        }
-    };
-
-
-    //处理响应结果
-    function callback(self, ajax, url, options) {
-
-        var cache = ajax.readyState;
-
-        if (cache === 4)
-        {
-            if (cache = self.__timer)
-            {
-                clearTimeout(cache);
-                self.__timer = 0;
-            }
-
-            if (ajax.status < 300)
-            {
-                if ((cache = self.dataType).indexOf('json') >= 0)
-                {
-                    self.resolve(flyingon.parseJSON(ajax.responseText));
-                }
-                else if (cache.indexOf('script') >= 0)
-                {
-                    flyingon.globalEval(ajax.responseText); //全局执行js避免变量冲突
-                    self.resolve(url);
-                }
-                else if (cache.indexOf('xml') >= 0)
-                {
-                    self.resolve(ajax.responseXML);
-                }
-                else
-                {
-                    self.resolve(ajax.responseText);
-                }
-            }
-            else
-            {
-                self.reject('ajax', ajax);
-            }
-
-            //执行全局ajax执行结束事件
-            if (cache = flyingon.Ajax.end)
-            {
-                for (var i = 0, _ = cache.length; i < _; i++)
-                {
-                    cache[i].call(self, options);
-                }
-            }
-        }
-        else
-        {
-            self.notify(ajax, cache);
-        }
-    };
-
-
-});
-
-
-//自定义ajax开始提交方法
-flyingon.ajaxStart = function (fn) {
-
-    (flyingon.Ajax.start || (flyingon.Ajax.start = [])).push(fn);
-};
-
-
-//自定义ajax执行结束方法
-flyingon.ajaxEnd = function (fn) {
-
-    (flyingon.Ajax.end || (flyingon.Ajax.end = [])).push(fn);
-};
-
-
-//ajax提交(默认为GET方式提交)
-flyingon.ajax = function (url, options) {
-
-    return new flyingon.Ajax(url, options);
-};
-
-
-//POST提交
-//在IE6时会可能会出错, asp.net服务端可实现IHttpAsyncHandler接口解决些问题 
-flyingon.ajaxPost = function (url, options) {
-
-    options = options || {};
-    options.method = 'POST';
-
-    return new flyingon.Ajax(url, options);
-};
-
-
-    
 
 
 
@@ -3396,6 +3412,28 @@ window.Set || (window.Set = $class(function () {
     
     
 }));
+
+
+
+//动态添加样式表
+flyingon.style = function (cssText) {
+  
+    var dom = document.createElement('style');  
+    
+    dom.setAttribute('type', 'text/css');  
+  
+    if (dom.styleSheet) // IE  
+    {
+        dom.styleSheet.cssText = cssText;  
+    }
+    else // w3c  
+    {
+        dom.appendChild(document.createTextNode(cssText));  
+    }
+  
+    document.getElementsByTagName('head')[0].appendChild(dom);
+    return dom;
+};
 
 
 
@@ -3901,16 +3939,20 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
                 y = e.distanceY;
             }
             
-            if (locked !== 'x')
-            {
-                distanceX = x;
-                style.left = (x0 + x) + 'px';
-            }
+            distanceX = x;
+            distanceY = y;
             
-            if (locked !== 'y')
+            if (locked !== true)
             {
-                distanceY = y;
-                style.top = (y0 + y) + 'px';
+                if (locked !== 'x')
+                {
+                    style.left = (x0 + x) + 'px';
+                }
+
+                if (locked !== 'y')
+                {
+                    style.top = (y0 + y) + 'px';
+                }
             }
             
             e.stopImmediatePropagation();
@@ -4307,10 +4349,11 @@ $class('NodeList', Array, function () {
 
 
 
-//可定位对象接口
-$class('ILocatable', [Object, flyingon.Component], function () {
+//可视组件基类
+$class('Visual', [Object, flyingon.Component], function () {
    
     
+        
     this.locateProperty = function (name, defaultValue, attributes) {
         
         attributes = attributes || {};
@@ -4347,7 +4390,7 @@ $class('ILocatable', [Object, flyingon.Component], function () {
         set: 'this.dom && this.dom.style.display = value ? "" : "none";'
     });
         
-    
+
     //控件横向对齐方式
     //left      左边对齐
     //center    横向居中对齐
@@ -4424,15 +4467,16 @@ $class('ILocatable', [Object, flyingon.Component], function () {
 //定义定位属性方法
 flyingon.locateProperty = function (name, defaultValue, attributes) {
 
-    flyingon.ILocatable.prototype.locateProperty(name, defaultValue, attributes);
+    flyingon.Visual.prototype.locateProperty(name, defaultValue, attributes);
 };
     
 
 
 
 //子布局
-$class('Sublayout', flyingon.ILocatable, function (base) {
+$class('Sublayout', flyingon.Visual, function (base) {
        
+    
     
     //内边距
     this.defineProperty('padding', '0');
@@ -5289,7 +5333,7 @@ $class('Layout', flyingon.Component, function (base, self) {
 
         if (cache = this.__storage)
         {
-            writer.write_properties('storage', cache);
+            writer.write_properties(cache);
         }
         
         if (cache = this.__subitems)
@@ -6067,59 +6111,9 @@ $class(flyingon.Layout, function (base) {
 });
 
 
-//UI事件
-$class('UIEvent', [Object, flyingon.Event], function () {
-   
-        
-    $constructor(function (type, event) {
-
-        this.type = type;
-        this.dom_event = event;
-    });
-    
-        
-    //阻止dom事件冒泡
-    this.dom_stopPropagation = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.cancelBubble = true;
-        }
-    };
-
-
-    //禁止默认dom事件
-    this.dom_preventDefault = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.defaultPrevented = true;
-        }
-    };
-
-
-    //阻止dom事件冒泡及禁止默认dom事件
-    this.dom_stopImmediatePropagation = function () {
-
-        var e = this.dom_event;
-
-        if (e)
-        {
-            e.cancelBubble = e.defaultPrevented = true;
-        }
-    };
-
-    
-});
-
 
 //鼠标事件类型
-$class("MouseEvent", [Object, flyingon.UIEvent], function () {
-
+$class('MouseEvent', flyingon.Event, function () {
 
 
     $constructor(function (event) {
@@ -6168,17 +6162,16 @@ $class("MouseEvent", [Object, flyingon.UIEvent], function () {
         this.screenX = event.screenX;
         this.screenY = event.screenY;
 
-    });
+    }, true);
 
-
+    
 });
 
 
 
 
 //键盘事件类型
-$class("KeyEvent", [Object, flyingon.UIEvent], function () {
-
+$class('KeyEvent', flyingon.Event, function () {
 
 
     $constructor(function (event) {
@@ -6210,9 +6203,9 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
         //键码
         this.which = event.which || event.charCode || event.keyCode;
 
-    });
+    }, true);
 
-
+    
 });
 
 
@@ -6220,35 +6213,28 @@ $class("KeyEvent", [Object, flyingon.UIEvent], function () {
 
 
 //控件类
-$class('Control', [Object, flyingon.ILocatable], function (base, self) {
+$class('Control', flyingon.Visual, function (base, self) {
 
     
     
-    this.$constructor = function () {
+    $constructor(function (dom) {
+
+        if (dom)
+        {
+            dom.className = this.__default_className + dom.className + ' ';
+        }
+        else
+        {
+            dom = this.dom_template.cloneNode(true);
+        }
+
+        (this.dom = dom).control = this;
+    });
+    
+    
         
-        return function (dom) {
-    
-            if (dom)
-            {
-                dom.className = this.__default_className + dom.className + ' ';
-                dom.style.cssText += this.default_style;
-            }
-            else
-            {
-                dom = this.dom_template.cloneNode(true);
-            }
-            
-            (this.dom = dom).control = this;
-        };
-    };
-    
-    
-    
     //盒模型大小是否包含边框
     this.box_border = false;
-    
-    
-    this.default_style = 'position:absoulte;overflow:auto;margin:0;border-width:0;border-style:solid;';
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
@@ -6266,8 +6252,7 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
             
             dom = this.dom_template = host.children[0];
             dom.parentNode.removeChild(dom);
-            dom.style.cssText += this.default_style;
- 
+
             //计算盒模型在不同浏览器中的偏差
             //需等document初始化完毕后才可执行
             flyingon.dom_test(function (div) {
@@ -6983,7 +6968,7 @@ $class('Control', [Object, flyingon.ILocatable], function (base, self) {
 
 
 //顶级控件接口
-$class('ITopControl', function () {
+$interface('ITopControl', function () {
     
     
         
@@ -7011,11 +6996,10 @@ $class('ITopControl', function () {
                 width = dom.clientWidth,
                 height = dom.clientHeight,
                 arrange = { width: width, height: height },
-                margin = layout.margin(this, arrange),
-                pixel = flyingon.pixel;
+                margin = layout.margin(this, arrange);
             
             layout.measure(this, arrange, margin, width, height, false);
-            layout.locate(this, arrange, margin, pixel(this.left()), pixel(this.top()), width, height);
+            layout.locate(this, arrange, margin, 0, 0, width, height);
             
             this.render();
                 
@@ -7034,10 +7018,12 @@ $class('ITopControl', function () {
     //显示控件至dom容器
     this.show = function (dom_host) {
         
-        var dom = this.dom;
+        var host = dom_host || document.body,
+            dom = this.dom;
 
         dom.style.position = 'relative';
-        (dom_host || document.body).appendChild(dom);
+
+        host.appendChild(dom);
 
         if (this.__arrange_dirty < 2)
         {
@@ -7065,7 +7051,7 @@ $class('HtmlControl', flyingon.Control, function (base) {
 });
 
 //容器控件接口
-$class('IContainerControl', function () {
+$interface('IContainerControl', function () {
 
 
     
@@ -7510,13 +7496,13 @@ $class('IContainerControl', function () {
 
 });
 
-    
+
 $class('Panel', [flyingon.Control, flyingon.IContainerControl], function () {
 
 
-    
+        
     this.defaultWidth = this.defaultHeight = 400;
-    
+        
     
     
     //当前布局

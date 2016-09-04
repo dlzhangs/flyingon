@@ -5,9 +5,9 @@ $namespace('flyingon.test', function (test) {
     
     
     //定义基类: freeoasoft.test.BaseClass (注:仅在名字空间内才可定义类)
-    $class('BaseClass', flyingon.Component, function () {
+    $class('BaseClass', function () {
 
-
+        
         //定义构造函数(注:仅在定义类时有效)
         $constructor(function (p1, p2) {
 

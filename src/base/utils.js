@@ -190,6 +190,28 @@ window.Set || (window.Set = $class(function () {
 
 
 
+//动态添加样式表
+flyingon.style = function (cssText) {
+  
+    var dom = document.createElement('style');  
+    
+    dom.setAttribute('type', 'text/css');  
+  
+    if (dom.styleSheet) // IE  
+    {
+        dom.styleSheet.cssText = cssText;  
+    }
+    else // w3c  
+    {
+        dom.appendChild(document.createTextNode(cssText));  
+    }
+  
+    document.getElementsByTagName('head')[0].appendChild(dom);
+    return dom;
+};
+
+
+
 //dom样式扩展
 (function (document, flyingon) {
     
@@ -692,16 +714,20 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
                 y = e.distanceY;
             }
             
-            if (locked !== 'x')
-            {
-                distanceX = x;
-                style.left = (x0 + x) + 'px';
-            }
+            distanceX = x;
+            distanceY = y;
             
-            if (locked !== 'y')
+            if (locked !== true)
             {
-                distanceY = y;
-                style.top = (y0 + y) + 'px';
+                if (locked !== 'x')
+                {
+                    style.left = (x0 + x) + 'px';
+                }
+
+                if (locked !== 'y')
+                {
+                    style.top = (y0 + y) + 'px';
+                }
             }
             
             e.stopImmediatePropagation();

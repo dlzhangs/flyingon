@@ -1,11 +1,11 @@
 
 
-$class('Dialog', flyingon.Panel, function (base) {
+$class('Dialog', [flyingon.Panel, flyingon.ITopControl], function (base) {
 
 
     //已打开的窗口集合
     var dialog_list = [],
-        show;
+        show = this.show;
 
     
     
@@ -18,11 +18,6 @@ $class('Dialog', flyingon.Panel, function (base) {
     
     this.createDomTemplate('<div></div>');
     
-    
-    //扩展顶级控件接口
-    flyingon.ITopControl.call(this);
-
-    show = this.show;
     
 
     this.defaultWidth = 400;
