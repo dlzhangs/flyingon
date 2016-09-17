@@ -1,4 +1,21 @@
 
+//Dom事件类型
+$class('DomEvent', flyingon.Event, function () {
+    
+    
+    $constructor(function (type, dom_event) {
+    
+        this.type = type;
+        this.dom_event = dom_event;
+        
+    }, true);
+    
+    
+});
+
+
+
+
 //鼠标事件类型
 $class('MouseEvent', flyingon.Event, function () {
 

@@ -3,7 +3,9 @@ flyingon.error({
     
     "include cycle": "include cycle > 10!",
     "namespace name error": "namespace name can use lowercase letters and numbers and begin with a lowercase letter, add use \".\" to separated!",
-    "class name error": "class name can use only letters and numbers and begin with a upper letter",
+    "interface name error": "interface name use only letters and numbers and begin with a \"I\" and upper letter!",
+    "interface target error": "interface extend must be input a target object!",
+    "class name error": "class name can use only letters and numbers and begin with a upper letter!",
     "class fn error": "class fn must be a function!",
     "json parse error": "json parse error!",
     "property name error": "property name \"{0}\" is not legal!",

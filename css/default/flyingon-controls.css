@@ -1,9 +1,17 @@
-.flyingon-PopupLayer {
+
+/***********************弹出层样式***********************/
+
+.flyingon-Popup {
     
     border: 1px solid black;
     box-shadow: 2px 2px 2px silver;
 }
 
+/*******************************************************/
+
+
+
+/*************************表格样式***********************/
 
 .flyingon-Grid {
     border: 1px solid #ccc;
@@ -33,7 +41,7 @@
     white-space: normal;
 }
 
-.flyingon-Grid-header-back {
+.flyingon-Grid-back {
     -webkit-box-sizing: border-box;
     -o-box-sizing: border-box;
     -ms-box-sizing: border-box;
@@ -59,11 +67,11 @@
 }
 
 .flyingon-Grid-asc {
-    background-position: -5px -299px;
+    background-position: -2px -80px;
 }
 
 .flyingon-Grid-desc {
-background-position: -5px -321px;
+    background-position: -42px -80px;
 }
 
 .flyingon-Grid-resize {
@@ -101,6 +109,7 @@ background-position: -5px -321px;
     border-color: #ccc;
     border-width: 0 1px 1px 0;
     padding: 0 1px;
+    background-color: white;
     vertical-align: middle;
     white-space:nowrap;
     text-overflow:ellipsis;
@@ -254,3 +263,5 @@ vertical-align: middle;
 .flyingon-Grid-groupno-expand {
     border-left-width: 1px;
 }
+
+/*******************************************************/

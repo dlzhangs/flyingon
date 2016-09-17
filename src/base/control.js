@@ -1,4 +1,77 @@
 
+//class相关操作支持接口
+flyingon.__class_extend = function (target, default_class) {
+   
+    
+
+    //指定class名 与html一样
+    target.defineProperty('className', '', {
+
+        query: true,
+        set: 'this.dom.className = ' + default_class + ' + (value ? value + " " : "");'
+    });
+
+
+
+    //是否包含指定class
+    target.hasClass = function (name) {
+
+        return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
+    };
+
+
+    //添加class
+    target.addClass = function (name) {
+
+        var dom;
+        
+        if (name && (dom = this.dom).className.indexOf(name += ' ') < 0)
+        {
+            dom.className += name;
+        }
+
+        return this;
+    };
+
+
+    //移除class
+    target.removeClass = function (name) {
+
+        if (name)
+        {
+            var dom = this.dom;
+            dom.className = dom.className.replace(name + ' ', '');
+        }
+
+        return this;
+    };
+
+
+    //切换class 有则移除无则添加
+    target.toggleClass = function (name) {
+
+        if (name)
+        {
+            var dom = this.dom,
+                className = dom.className;
+
+            if (className.indexOf(name += name + ' ') >= 0)
+            {
+                dom.className = className.replace(name, '');
+            }
+            else
+            {
+                dom.className += name;
+            }
+        }
+
+        return this;
+    };
+
+    
+};
+
+
 
 //控件类
 $class('Control', flyingon.Visual, function (base, self) {
@@ -85,7 +158,7 @@ $class('Control', flyingon.Visual, function (base, self) {
 
         if (this !== self && (cache = Class.xtype))
         {
-            name += cache + ' ';
+            name += cache.replace(/\./g, '-') + ' ';
         }
         
         if (cache = dom.className)
@@ -93,7 +166,7 @@ $class('Control', flyingon.Visual, function (base, self) {
             name += cache + ' ';
         }
       
-        this.__default_className = name;
+        this.__default_className = dom.className = name;
     };
 
 
@@ -168,69 +241,11 @@ $class('Control', flyingon.Visual, function (base, self) {
     });
 
 
-
-    //指定class名 与html一样
-    this.defineProperty('className', '', {
-
-        attributes: 'query',
-        set: 'this.dom.className = this.__default_className + (value ? value + " " : "");'
-    });
-
-
-
-    //是否包含指定class
-    this.hasClass = function (name) {
-
-        return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
-    };
-
-
-    //添加class
-    this.addClass = function (name) {
-
-        if (name)
-        {
-            this.dom.className += name + ' ';
-        }
-
-        return this;
-    };
-
-
-    //移除class
-    this.removeClass = function (name) {
-
-        if (name)
-        {
-            var dom = this.dom;
-            dom.className = dom.className.replace(name + ' ', '');
-        }
-
-        return this;
-    };
-
-
-    //切换class 有则移除无则添加
-    this.toggleClass = function (name) {
-
-        if (name)
-        {
-            var dom = this.dom,
-                className = dom.className;
-
-            if (className.indexOf(name = name + ' ') >= 0)
-            {
-                dom.className = className.replace(name, '');
-            }
-            else
-            {
-                dom.className += name;
-            }
-        }
-
-        return this;
-    };
-
+    
+    //扩展class相关操作
+    flyingon.__class_extend(this, 'this.__default_className');
+    
+    
 
     /*
     //IE7点击滚动条时修改className会造成滚动条无法拖动,需在改变className后设置focus获取焦点解决此问题

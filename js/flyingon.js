@@ -16,7 +16,7 @@
 //根名字空间
 var flyingon = window.flyingon = function (selector, context) {
     
-    return new flyingon.Query(selector, context);
+    return new flyingon.Query().find(selector, context);
 };
 
 
@@ -172,6 +172,11 @@ flyingon.absoluteUrl = (function () {
     };
 
 })();
+
+
+//待扩展的选择器
+flyingon.Query = function () { };
+
 
 
 
@@ -1188,7 +1193,11 @@ flyingon.absoluteUrl = (function () {
     
 
 
-    var regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
+    var has = {}.hasOwnProperty,
+    
+        regex_interface = /^I[A-Z][A-Za-z0-9]*$/,   //接口名正则表式验证
+        
+        regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
 
         class_list = flyingon.__class_list = flyingon.create(null), //已注册类型集合
 
@@ -1203,7 +1212,7 @@ flyingon.absoluteUrl = (function () {
     //定义接口方法
     function $interface(name, fn) {
         
-        if (!regex_class.test(name))
+        if (!regex_interface.test(name))
         {
             throw $errortext('flyingon', 'interface name error');
         }
@@ -1213,17 +1222,23 @@ flyingon.absoluteUrl = (function () {
             xtype = namespace.namespace_name + '.' + name;
         
         prototype[xtype] = true;
+        prototype.defineProperty = defaults.defineProperty;
 
         fn.call(prototype);
         
         fn = function (target) {
           
-            var cache = prototype;
-            
-            for (var name in cache)
+            if (this instanceof fn)
             {
-                target[name] = cache[name];
+                throw $errortext('flyingon', 'interface can not new');
             }
+            
+            if (!target)
+            {
+                throw $errortext('flyingon', 'interface target error');
+            }
+            
+            extend(target, prototype);
         };
         
         fn.xtype = xtype;
@@ -1479,30 +1494,36 @@ flyingon.absoluteUrl = (function () {
     //处理类接口
     function class_superclass(prototype, list) {
         
-        var extend = flyingon.extend,
-            target, 
-            cache;
+        var target;
         
         for (var i = 1, _ = list.length; i < _; i++)
         {
             if (target = list[i])
             {
-                target = target.prototype || target;
-    
-                for (cache in target)
-                {
-                    prototype[cache] = target[cache];
-                }
-                
-                if (cache = target.__defaults)
-                {
-                    extend(prototype.__defaults, cache);
-                    extend(prototype.__properties, target.__properties);
-                }
+                extend(prototype, target.prototype || target);
             }
         }
     };
+                        
+           
+    //扩展原型
+    function extend(prototype, target) {
+        
+        for (var name in target)
+        {
+            switch (name)
+            {
+                case '__defaults': //默认值
+                case '__properties': //属性集
+                    flyingon.extend(prototype[name] || (prototype[name] = flyingon.create(null)), target[name]);
+                    break;
 
+                default:
+                    prototype[name] = target[name];
+                    break;
+            }
+        }
+    };
     
     
     //处理类静态成员
@@ -1613,26 +1634,20 @@ flyingon.absoluteUrl = (function () {
         var cache = attributes;
 
         //初始化attributes并生成属性元数据
-        this.__properties[name] = attributes = { name: name, dataType: 'object' };
+        attributes = { name: name };
      
         //处理默认值
         if (typeof defaultValue === 'function')
         {
             attributes.fn = defaultValue;
-            defaultValue = cache && cache.defaultValue;
         }
         else
         {
             attributes.defaultValue = defaultValue;
         }
         
-        this.__defaults[name] = defaultValue;
-
         //根据默认值生成数据类型
-        if (!attributes.dataType)
-        {
-            attributes.dataType = typeof defaultValue;
-        }
+        attributes.dataType = typeof attributes.defaultValue;
         
         if (cache && typeof cache === 'object')
         {
@@ -1641,27 +1656,21 @@ flyingon.absoluteUrl = (function () {
                 attributes[key] = cache[key];
             }
         }
-   
-        //直接设置函数
-        if (cache = attributes.fn)
-        {
-            this[name] = cache;
-        }
-        else //动态生成方法
-        {
-            //创建按需加载属性以提升初始化性能
-            this[name] = function (value, trigger) {
+        
+        (this.__defaults || (this.__defaults = flyingon.create(null)))[name] = attributes.defaultValue;
+        (this.__properties|| (this.__properties = flyingon.create(null)))[name] = attributes;
 
-                var target = this.constructor,
-                    fn = attributes.fn || defineProperty(name, attributes);
-                
-                target = target && target.prototype || this;
-                return (target[name] = fn).call(this, value, trigger);
-            };
-        }
+        //如未直接设置函数则创建按需加载属性以提升初始化性能
+        this[name] = attributes.fn || function (value, trigger) {
+
+            var target = property_target(this, name),
+                fn = attributes.fn || property_fn(attributes);
+
+            return (target[name] = fn).call(this, value, trigger);
+        };
 
         //扩展至选择器
-        if (attributes.query && flyingon.Query)
+        if (attributes.query)
         {
             flyingon.Query.prototype[name] = function (value) {
                 
@@ -1669,11 +1678,32 @@ flyingon.absoluteUrl = (function () {
             };
         }
     };
-
+    
+    
+    //获取属性绑定的目标对象
+    function property_target(target, name) {
+      
+        var Class = target.Class;
         
-    function defineProperty(name, attributes) {
+        while (Class)
+        {
+            if (has.call(target = Class.prototype, name))
+            {
+                return target;
+            }
+            
+            Class = Class.superclass;
+        }
         
-        var dataType = attributes.dataType,
+        return target;
+    };
+    
+        
+    //动态创建属性函数
+    function property_fn(attributes) {
+        
+        var name = attributes.name,
+            dataType = attributes.dataType,
             storage, 
             data,
             cache;
@@ -1852,6 +1882,28 @@ flyingon.absoluteUrl = (function () {
 
         return this;
     };
+    
+    
+    //批量赋属性值
+    defaults.assign = function (values, type) {
+        
+        var storage = this.__storage || (this.__storage = flyingon.create(this.__defaults));
+        
+        if (values)
+        {
+            type = type || 'xtype';
+            
+            for (var name in values)
+            {
+                if (name !== type)
+                {
+                    storage[name] = values[name];
+                }
+            }
+        }
+        
+        return this;
+    };
 
 
     //获取或设置属性默认值
@@ -1870,7 +1922,7 @@ flyingon.absoluteUrl = (function () {
 
 
     //获取属性值集合
-    defaults.getProperties = function (filter) {
+    defaults.properties = function (filter) {
 
         var target = this.__properties,
             data = [],
@@ -2124,32 +2176,47 @@ $class('Event', function () {
 
 
     //阻止事件冒泡
-    this.stopPropagation = function () {
+    this.stopPropagation = function (dom_event) {
 
         this.cancelBubble = true;
+        
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.stopPropagation();
+        }
     };
 
 
     //禁止默认事件
-    this.preventDefault = function () {
+    this.preventDefault = function (dom_event) {
 
         this.defaultPrevented = true;
+           
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.preventDefault();
+        }
     };
 
 
     //阻止事件冒泡及禁止默认事件
-    this.stopImmediatePropagation = function () {
+    this.stopImmediatePropagation = function (dom_event) {
 
         this.cancelBubble = this.defaultPrevented = true;
+                   
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.stopImmediatePropagation();
+        }
     };
 
     
     this.__class_init = function (Class) {
       
-        Class.load = function (type) {
+        Class.init = function (type) {
          
             var event = new Class(type),
-                i = 0,
+                i = 1,
                 length = arguments.length;
             
             while (i < length)
@@ -2741,7 +2808,7 @@ $class('SerializeWriter', function () {
 
 
     var Array = window.Array,
-        has = Object.prototype.hasOwnProperty;
+        has = {}.hasOwnProperty;
 
     
     $static('serialize', function (target) {
@@ -2935,8 +3002,8 @@ $class('SerializeWriter', function () {
 
 
 
-//组件基类
-$class('Component', flyingon.ISerialize, function () {
+//组件接口
+$interface('IComponent', function () {
   
     
 
@@ -2946,6 +3013,10 @@ $class('Component', flyingon.ISerialize, function () {
     
     //定义id属性
     this.defineProperty('id', '');
+    
+    
+    //扩展序列化接口
+    flyingon.ISerialize(this);
     
 
     //序列化方法
@@ -3586,7 +3657,8 @@ flyingon.style = function (cssText) {
         on = 'addEventListener',
         off = 'removeEventListener',
         prefix = '',
-        fixed;
+        fn1,
+        fn2;
 
 
     //以下为通用事件扩展(IE8以下浏览器不支持addEventListener)
@@ -3596,37 +3668,34 @@ flyingon.style = function (cssText) {
         on = 'attachEvent',
         off = 'detachEvent',
         prefix = 'on';
-
-        fixed = (function () {
-
-            function preventDefault() {
-
-                this.returnValue = false;
-            };
-
-            function stopPropagation() {
-
-                this.cancelBubble = true;
-            };
-
-            function stopImmediatePropagation() {
-
-                this.cancelBubble = true;
-                this.returnValue = false;
-            };
-
-            return function (e) {
-
-                e.target = e.srcElement;
-                e.preventDefault = preventDefault;
-                e.stopPropagation = stopPropagation;
-                e.stopImmediatePropagation = stopImmediatePropagation;
-
-                return e;
-            };
-
-        })();
     }
+    
+    
+    function preventDefault() {
+
+        this.returnValue = false;
+    };
+
+    function stopPropagation() {
+
+        this.cancelBubble = true;
+        
+        if (this.__stopPropagation)
+        {
+            this.__stopPropagation();
+        }
+    };
+
+    function stopImmediatePropagation() {
+
+        this.cancelBubble = true;
+        this.returnValue = false;
+        
+        if (this.__stopImmediatePropagation)
+        {
+            this.__stopImmediatePropagation();
+        }
+    };
 
 
     function trigger(dom, key, e) {
@@ -3637,10 +3706,19 @@ flyingon.style = function (cssText) {
 
         if (list && (items = list[e.type]))
         {
-            if (!e || !e.target)
+            if (!(e = e || window.event).target)
             {
-                e = fixed(e || window.event);
+                e.target = e.srcElement;
+                e.preventDefault = preventDefault;
             }
+            else if (e.stopPropagation !== stopPropagation)
+            {
+                e.__stopPropagation = e.stopPropagation;
+                e.__stopImmediatePropagation = e.stopImmediatePropagation;
+            }
+            
+            e.stopPropagation = stopPropagation;
+            e.stopImmediatePropagation = stopImmediatePropagation;
 
             for (var i = 0, _ = items.length; i < _; i++)
             {
@@ -3734,7 +3812,6 @@ flyingon.style = function (cssText) {
     function suspend_fn(e) {
       
         e.stopPropagation(); //有些浏览器不会设置cancelBubble
-        e.cancelBubble = true;
     };
     
 
@@ -4006,18 +4083,17 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
 //对齐到指定的dom
 //target: 要对齐的dom对象
-//source: 参考停靠的dom对象
-//position: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
+//rect: 停靠范围
+//location: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
 //align: 对齐 left|center|right|top|middle|bottom
 //reverse: 空间不足时是否反转方向
 //offset1: 当前方向偏移
 //offset2: 相反方向偏移
-flyingon.dom_align = function (target, source, position, align, reverse, offset1, offset2) {
+flyingon.dom_align = function (target, rect, location, align, reverse, offset1, offset2) {
 
     var width = target.offsetWidth,
         height = target.offsetHeight,
         style = target.style,
-        rect = source.getBoundingClientRect(),
         x1 = rect.left,
         y1 = rect.top,
         x2 = rect.right,
@@ -4037,13 +4113,13 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
         reverse = false;
         offset2 = +offset2 || 0;
 
-        switch (position)
+        switch (location)
         {
             case 'left':
                 if (x1 - offset1 < height && clientWidth - x2 - offset2 >= width)
                 {
                     offset1 = offset2;
-                    position = 'right';
+                    location = 'right';
                     reverse = true;
                 }
                 break;
@@ -4052,7 +4128,7 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 if (y1 - offset1 < height && clientHeight - y2 - offset2 >= height)
                 {
                     offset1 = offset2;
-                    position = 'bottom';
+                    location = 'bottom';
                     reverse = true;
                 }
                 break;
@@ -4061,7 +4137,7 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 if (x1 - offset2 >= width && clientWidth < x2 + offset1 + width)
                 {
                     offset1 = offset2;
-                    position = 'left';
+                    location = 'left';
                     reverse = true;
                 }
                 break;
@@ -4070,16 +4146,16 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 if (y1 - offset2 >= height && clientHeight < y2 + offset1 + height)
                 {
                     offset1 = offset2;
-                    position = 'top';
+                    location = 'top';
                     reverse = true;
                 }
                 break;
         }
     }
 
-    if (position === 'left' || position === 'right')
+    if (location === 'left' || location === 'right')
     {
-        x = position === 'left' ? x1 - width - offset1 : x2 + offset1;
+        x = location === 'left' ? x1 - width - offset1 : x2 + offset1;
 
         switch (align)
         {
@@ -4113,7 +4189,7 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 break;
         }
 
-        y = position === 'top' ? y1 - height - offset1 : y2 + offset1;
+        y = location === 'top' ? y1 - height - offset1 : y2 + offset1;
     }
     
     style.left = x + 'px';
@@ -4350,7 +4426,7 @@ $class('NodeList', Array, function () {
 
 
 //可视组件基类
-$class('Visual', [Object, flyingon.Component], function () {
+$class('Visual', [Object, flyingon.IComponent], function () {
    
     
         
@@ -4582,7 +4658,7 @@ $class('Sublayout', flyingon.Visual, function (base) {
 
 
 //布局基类
-$class('Layout', flyingon.Component, function (base, self) {
+$class('Layout', [Object, flyingon.IComponent], function (base, self) {
 
     
 
@@ -6112,6 +6188,23 @@ $class(flyingon.Layout, function (base) {
 
 
 
+//Dom事件类型
+$class('DomEvent', flyingon.Event, function () {
+    
+    
+    $constructor(function (type, dom_event) {
+    
+        this.type = type;
+        this.dom_event = dom_event;
+        
+    }, true);
+    
+    
+});
+
+
+
+
 //鼠标事件类型
 $class('MouseEvent', flyingon.Event, function () {
 
@@ -6211,6 +6304,79 @@ $class('KeyEvent', flyingon.Event, function () {
 
 
 
+//class相关操作支持接口
+flyingon.__class_extend = function (target, default_class) {
+   
+    
+
+    //指定class名 与html一样
+    target.defineProperty('className', '', {
+
+        query: true,
+        set: 'this.dom.className = ' + default_class + ' + (value ? value + " " : "");'
+    });
+
+
+
+    //是否包含指定class
+    target.hasClass = function (name) {
+
+        return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
+    };
+
+
+    //添加class
+    target.addClass = function (name) {
+
+        var dom;
+        
+        if (name && (dom = this.dom).className.indexOf(name += ' ') < 0)
+        {
+            dom.className += name;
+        }
+
+        return this;
+    };
+
+
+    //移除class
+    target.removeClass = function (name) {
+
+        if (name)
+        {
+            var dom = this.dom;
+            dom.className = dom.className.replace(name + ' ', '');
+        }
+
+        return this;
+    };
+
+
+    //切换class 有则移除无则添加
+    target.toggleClass = function (name) {
+
+        if (name)
+        {
+            var dom = this.dom,
+                className = dom.className;
+
+            if (className.indexOf(name += name + ' ') >= 0)
+            {
+                dom.className = className.replace(name, '');
+            }
+            else
+            {
+                dom.className += name;
+            }
+        }
+
+        return this;
+    };
+
+    
+};
+
+
 
 //控件类
 $class('Control', flyingon.Visual, function (base, self) {
@@ -6297,7 +6463,7 @@ $class('Control', flyingon.Visual, function (base, self) {
 
         if (this !== self && (cache = Class.xtype))
         {
-            name += cache + ' ';
+            name += cache.replace(/\./g, '-') + ' ';
         }
         
         if (cache = dom.className)
@@ -6305,7 +6471,7 @@ $class('Control', flyingon.Visual, function (base, self) {
             name += cache + ' ';
         }
       
-        this.__default_className = name;
+        this.__default_className = dom.className = name;
     };
 
 
@@ -6380,69 +6546,11 @@ $class('Control', flyingon.Visual, function (base, self) {
     });
 
 
-
-    //指定class名 与html一样
-    this.defineProperty('className', '', {
-
-        attributes: 'query',
-        set: 'this.dom.className = this.__default_className + (value ? value + " " : "");'
-    });
-
-
-
-    //是否包含指定class
-    this.hasClass = function (name) {
-
-        return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
-    };
-
-
-    //添加class
-    this.addClass = function (name) {
-
-        if (name)
-        {
-            this.dom.className += name + ' ';
-        }
-
-        return this;
-    };
-
-
-    //移除class
-    this.removeClass = function (name) {
-
-        if (name)
-        {
-            var dom = this.dom;
-            dom.className = dom.className.replace(name + ' ', '');
-        }
-
-        return this;
-    };
-
-
-    //切换class 有则移除无则添加
-    this.toggleClass = function (name) {
-
-        if (name)
-        {
-            var dom = this.dom,
-                className = dom.className;
-
-            if (className.indexOf(name = name + ' ') >= 0)
-            {
-                dom.className = className.replace(name, '');
-            }
-            else
-            {
-                dom.className += name;
-            }
-        }
-
-        return this;
-    };
-
+    
+    //扩展class相关操作
+    flyingon.__class_extend(this, 'this.__default_className');
+    
+    
 
     /*
     //IE7点击滚动条时修改className会造成滚动条无法拖动,需在改变className后设置focus获取焦点解决此问题
@@ -7537,3 +7645,384 @@ $class('Page', [flyingon.Panel, flyingon.ITopControl], function (base) {
     
     
 });
+
+
+/**
+* 弹出层组件
+* 
+* 事件:
+* open: 打开事件
+* autoclosing: 自动关闭前事件(可取消)
+* closing: 关闭前事件(可取消)
+* closed: 关闭后事件
+*/
+$class('Popup', [Object, flyingon.IComponent], function () {
+
+
+
+    var layers = [], //弹出层管理器
+
+        Event = flyingon.DomEvent; //Dom事件类
+
+
+
+    $constructor(function (dispose) {
+
+        var dom = this.dom = document.createElement('div');
+
+        dom.className = 'flyingon-Popup ';
+        dom.style.cssText = 'position:absolute;visibility:hidden;';
+        
+        this.__dispose = dispose;
+    });
+
+
+
+    //扩展class相关操作
+    flyingon.__class_extend(this, 'flyingon-Popup ');
+    
+    
+    
+    //弹出层宽度
+    this.defineProperty('width', '', {
+
+        set: 'this.dom.style.width = value > 0 ? value + "px" : value;'
+    });
+
+
+    //弹出层高度
+    this.defineProperty('height', '', {
+
+        set: 'this.dom.style.height = value > 0 ? value + "px" : value;'
+    });
+
+
+    //是否支持多级弹出层
+    this.defineProperty('multi', false);
+
+
+    //鼠标移出弹出层时是否自动关闭
+    this.defineProperty('closeLeave', false);
+
+
+    //鼠标离弹出层越来越远时是否自动关闭
+    this.defineProperty('closeAway', false);
+    
+    
+    //停靠位置 bottom:下面 top:上面 right:右边 left:左边
+    this.defineProperty('location', 'bottom');
+    
+    
+    //对齐 left|center|right|top|middle|bottom
+    this.defineProperty('align', 'left');
+    
+    
+    //空间不足时是否反转方向
+    this.defineProperty('reverse', true);
+    
+    
+    //当前方向偏移
+    this.defineProperty('offset1', 0);
+    
+    
+    //相反方向偏移
+    this.defineProperty('offset2', 2);
+
+
+
+    //打开弹出层
+    //dom: 参考停靠的dom对象
+    this.open = function (dom, offsetX, offsetY) {
+
+        if (check_open(this) !== false)
+        {
+            var target = this.__storage || this.__defaults,
+                rect = dom.getBoundingClientRect();
+            
+            rect = {
+                
+                left: rect.left + (offsetX | 0),
+                top: rect.top + (offsetY | 0),
+                right: rect.right,
+                bottom: rect.bottom
+            };
+            
+            flyingon.dom_align(this.dom, rect, target.location, target.align, target.reverse, target.offset1, target.offset2);
+            open(this);
+            
+            return true;
+        }
+
+        return false;
+    };
+
+
+    //在指定的位置打开弹出层
+    this.openAt = function (left, top) {
+
+        if (check_open(this) !== false)
+        {
+            var style = this.dom.style;
+
+            if (left > 0 || left < 0)
+            {
+                left += 'px';
+            }
+            
+            if (top > 0 || top < 0)
+            {
+                top += 'px';
+            }
+            
+            style.left = left;
+            style.top = top;
+            
+            open(this);
+            return true;
+        }
+
+        return false; 
+    };
+
+
+    function check_open(self) {
+
+        var items = layers,
+            length = items.length,
+            dom;
+
+        if (length > 0)
+        {
+            for (var i = 0; i < length; i++)
+            {
+                if (items[i] === self)
+                {
+                    return false;
+                }
+            }
+            
+            if (!self.multi() || !items[0].multi())
+            {
+                for (var i = length - 1; i >= 0; i--)
+                {
+                    if (self.close('auto', null, false) === false)
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        else //绑定全局事件
+        {
+            flyingon.dom_on(document, 'mousedown', document_mousedown);
+            flyingon.dom_on(document, 'keydown', document_keydown);
+        }
+
+        dom = self.dom;
+        dom.style.visibility = 'visible';
+        document.body.appendChild(dom);
+
+        return true;
+    };
+
+
+    function open(self) {
+
+        if (self.closeAway())
+        {
+            closeAway(self);
+        }
+
+        if (self.closeLeave())
+        {
+            closeLeave(self);
+        }
+
+        //添加弹出层
+        layers.push(self);
+        
+        //触发打开事件
+        self.trigger('open');
+    };
+
+
+    //处理全局点击事件,点击当前弹出层以外的区域则关闭当前弹出层
+    function document_mousedown(e) { 
+
+        var layer = layers[layers.length - 1];
+
+        if (layer) {
+
+            var dom = layer.dom,
+                target = e.target;
+
+            while (target) 
+            {
+                if (target === dom) 
+                {
+                    return;
+                }
+
+                target = target.parentNode;
+            }
+
+            //调用关闭弹出层方法, 关闭类型为'auto'
+            if (layer.trigger(new Event('autoclosing', e.target)) !== false) 
+            {
+                layer.close('auto', e);
+            }
+        }
+    };
+
+
+    //处理全局键盘事件,点击Esc则退出当前窗口
+    function document_keydown(e) { 
+
+        var layer;
+
+        if (e.which === 27 && (layer = layers[layers.length - 1]))
+        {
+            layer.close('cancel', e);
+        }
+    };
+
+
+    function closeLeave(self) {
+
+        var dom = self.dom;
+
+        flyingon.dom_on(dom, 'mouseout', self.__dom_mouseout = function (e) {
+
+            if (self === layers[layers.length - 1])
+            {
+                var rect = dom.getBoundingClientRect(),
+                    x = e.clientX,
+                    y = e.clientY;
+
+                if (x >= rect.right || y >= rect.bottom || x <= rect.left || y <= rect.top)
+                {
+                    self.close('auto', e);
+                }
+            }
+        });
+    };
+
+
+    function closeAway(self) {
+
+        var rect = self.dom.getBoundingClientRect(), 
+            source;
+
+        flyingon.dom_on(document, 'mousemove', self.__document_mousemove = function (e) {
+
+            if ((!source || self === layers[layers.length - 1]) && 
+                (source = check_closeAway(e, rect, source)) === true)
+            {
+                self.close('auto', e);
+            }
+        });
+    };
+
+
+    function check_closeAway(e, rect, source) {
+
+        var x = e.clientX,
+            y = e.clientY;
+
+        if (source)
+        {
+            if (rect.left - x > source.x1 + 4 || 
+                x - rect.right > source.x2 + 4 || 
+                rect.top - y > source.y1 + 4 || 
+                y - rect.bottom > source.y2 + 4)
+            {
+                return true;
+            }
+        }
+        else
+        {
+            source = Math.max;
+            source = {
+
+                x1: source(rect.left - x, 0),
+                x2: source(x - rect.right, 0),
+                y1: source(rect.top - y, 0),
+                y2: source(y - rect.bottom, 0)
+            };
+        }
+
+        return source;
+    };
+
+
+    //关闭弹出层(弹出多级窗口时只有最后一个可以成功关闭)
+    //closeType: 关闭类型 ok, cancel, auto
+    this.close = function (closeType, event, off) {
+
+        if (this === layers[layers.length - 1])
+        {
+            var dom = this.dom,
+                e = new Event('closing', event),
+                fn;
+
+            e.closeType = closeType || 'ok';
+
+            if (this.trigger(e) === false) 
+            {
+                return false;
+            }
+
+            //注销事件
+            if (fn = this.__document_mousemove)
+            {
+                flyingon.dom_off(document, 'mousemove', fn);
+                this.__document_mousemove = null;
+            }
+
+            if (fn = this.__dom_mouseout)
+            {
+                flyingon.dom_off(this.dom, 'mouseout', fn);
+                this.__dom_mouseout = null;
+            }
+
+            layers.pop();
+
+            dom.parentNode.removeChild(dom);
+
+            //注销全局事件
+            if (off !== false && !layers.length)
+            { 
+                flyingon.dom_off(document, 'mousedown', document_mousedown);
+                flyingon.dom_off(document, 'keydown', document_keydown);
+            }
+
+            e = new Event('closed', event);
+            e.closeType = closeType || 'ok';
+
+            this.trigger(e);
+            
+            if (this.__dispose)
+            {
+                this.dispose();
+            }
+            
+            return true;
+        }
+
+        return false;
+    };
+    
+    
+    this.dispose = function () {
+        
+        this.dom = null;
+        
+        if (this.__events)
+        {
+            this.off();
+        } 
+    };
+
+
+});
+

@@ -11,7 +11,7 @@
 
         setTimeout(function () {
 
-            console.profileEnd('test');
+            //console.profileEnd('test');
 
         }, 3000);
     }
@@ -31,7 +31,7 @@
 
 
         var page = new flyingon.Page(),
-            grid = new flyingon.Grid(),
+            grid = demo.grid = new flyingon.Grid(),
             columns = create_columns(),
             data = create_data();
 
@@ -58,20 +58,21 @@
         function create_columns() {
             
             var columns = [
-                { columnType: 'rowno' }, 
-                { columnType: 'checked' }
+                
+                { type: 'rowno' }, 
+                { type: 'checked' }
             ];
             
             for (var i = 0; i < 20; i++)
             {
                 columns.push({
 
-                    multiTitle: [
+                    fieldName: 'column' + i,
+                    title: [
                         String.fromCharCode(i + 65), 
-                        i & 1 ? null : { text: (i / 2 | 0) + 1, columnSpan: 2 }
-                    ],
-                    title: 'column' + i,
-                    fieldName: 'column' + i
+                        i & 1 ? null : { text: (i / 2 | 0) + 1, columnSpan: 2 },
+                        'column' + i
+                    ]
                 });
             }
             
@@ -85,7 +86,7 @@
             columns: columns,
             dataSource: data,
             headerHeight: 60,
-            lockedBefore: 4,
+            lockedBefore: 4
         });
         
         page.append(grid);

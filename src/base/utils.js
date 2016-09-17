@@ -361,7 +361,8 @@ flyingon.style = function (cssText) {
         on = 'addEventListener',
         off = 'removeEventListener',
         prefix = '',
-        fixed;
+        fn1,
+        fn2;
 
 
     //以下为通用事件扩展(IE8以下浏览器不支持addEventListener)
@@ -371,37 +372,34 @@ flyingon.style = function (cssText) {
         on = 'attachEvent',
         off = 'detachEvent',
         prefix = 'on';
-
-        fixed = (function () {
-
-            function preventDefault() {
-
-                this.returnValue = false;
-            };
-
-            function stopPropagation() {
-
-                this.cancelBubble = true;
-            };
-
-            function stopImmediatePropagation() {
-
-                this.cancelBubble = true;
-                this.returnValue = false;
-            };
-
-            return function (e) {
-
-                e.target = e.srcElement;
-                e.preventDefault = preventDefault;
-                e.stopPropagation = stopPropagation;
-                e.stopImmediatePropagation = stopImmediatePropagation;
-
-                return e;
-            };
-
-        })();
     }
+    
+    
+    function preventDefault() {
+
+        this.returnValue = false;
+    };
+
+    function stopPropagation() {
+
+        this.cancelBubble = true;
+        
+        if (this.__stopPropagation)
+        {
+            this.__stopPropagation();
+        }
+    };
+
+    function stopImmediatePropagation() {
+
+        this.cancelBubble = true;
+        this.returnValue = false;
+        
+        if (this.__stopImmediatePropagation)
+        {
+            this.__stopImmediatePropagation();
+        }
+    };
 
 
     function trigger(dom, key, e) {
@@ -412,10 +410,19 @@ flyingon.style = function (cssText) {
 
         if (list && (items = list[e.type]))
         {
-            if (!e || !e.target)
+            if (!(e = e || window.event).target)
             {
-                e = fixed(e || window.event);
+                e.target = e.srcElement;
+                e.preventDefault = preventDefault;
             }
+            else if (e.stopPropagation !== stopPropagation)
+            {
+                e.__stopPropagation = e.stopPropagation;
+                e.__stopImmediatePropagation = e.stopImmediatePropagation;
+            }
+            
+            e.stopPropagation = stopPropagation;
+            e.stopImmediatePropagation = stopImmediatePropagation;
 
             for (var i = 0, _ = items.length; i < _; i++)
             {
@@ -509,7 +516,6 @@ flyingon.style = function (cssText) {
     function suspend_fn(e) {
       
         e.stopPropagation(); //有些浏览器不会设置cancelBubble
-        e.cancelBubble = true;
     };
     
 
@@ -781,18 +787,17 @@ flyingon.dom_drag = function (context, event, begin, move, end, locked, delay) {
 
 //对齐到指定的dom
 //target: 要对齐的dom对象
-//source: 参考停靠的dom对象
-//position: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
+//rect: 停靠范围
+//location: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
 //align: 对齐 left|center|right|top|middle|bottom
 //reverse: 空间不足时是否反转方向
 //offset1: 当前方向偏移
 //offset2: 相反方向偏移
-flyingon.dom_align = function (target, source, position, align, reverse, offset1, offset2) {
+flyingon.dom_align = function (target, rect, location, align, reverse, offset1, offset2) {
 
     var width = target.offsetWidth,
         height = target.offsetHeight,
         style = target.style,
-        rect = source.getBoundingClientRect(),
         x1 = rect.left,
         y1 = rect.top,
         x2 = rect.right,
@@ -812,13 +817,13 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
         reverse = false;
         offset2 = +offset2 || 0;
 
-        switch (position)
+        switch (location)
         {
             case 'left':
                 if (x1 - offset1 < height && clientWidth - x2 - offset2 >= width)
                 {
                     offset1 = offset2;
-                    position = 'right';
+                    location = 'right';
                     reverse = true;
                 }
                 break;
@@ -827,7 +832,7 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 if (y1 - offset1 < height && clientHeight - y2 - offset2 >= height)
                 {
                     offset1 = offset2;
-                    position = 'bottom';
+                    location = 'bottom';
                     reverse = true;
                 }
                 break;
@@ -836,7 +841,7 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 if (x1 - offset2 >= width && clientWidth < x2 + offset1 + width)
                 {
                     offset1 = offset2;
-                    position = 'left';
+                    location = 'left';
                     reverse = true;
                 }
                 break;
@@ -845,16 +850,16 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 if (y1 - offset2 >= height && clientHeight < y2 + offset1 + height)
                 {
                     offset1 = offset2;
-                    position = 'top';
+                    location = 'top';
                     reverse = true;
                 }
                 break;
         }
     }
 
-    if (position === 'left' || position === 'right')
+    if (location === 'left' || location === 'right')
     {
-        x = position === 'left' ? x1 - width - offset1 : x2 + offset1;
+        x = location === 'left' ? x1 - width - offset1 : x2 + offset1;
 
         switch (align)
         {
@@ -888,7 +893,7 @@ flyingon.dom_align = function (target, source, position, align, reverse, offset1
                 break;
         }
 
-        y = position === 'top' ? y1 - height - offset1 : y2 + offset1;
+        y = location === 'top' ? y1 - height - offset1 : y2 + offset1;
     }
     
     style.left = x + 'px';

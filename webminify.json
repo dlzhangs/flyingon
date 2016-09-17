@@ -63,7 +63,8 @@
 			'src/base/htmlcontrol.js',
 			'src/base/container.js',
 			'src/base/panel.js',
-			'src/base/page.js'
+			'src/base/page.js',
+            'src/base/popup.js',
 		],
         output: 'js/flyingon.js',
         minify: false
@@ -84,7 +85,6 @@
     {
         base: '',
         files: [
-			'src/controls/popuplayer.js',
 			'src/controls/dialog.js'
 		],
         output: 'js/flyingon-controls.js',

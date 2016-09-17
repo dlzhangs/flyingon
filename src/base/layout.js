@@ -108,7 +108,7 @@ $class('Sublayout', flyingon.Visual, function (base) {
 
 
 //布局基类
-$class('Layout', flyingon.Component, function (base, self) {
+$class('Layout', [Object, flyingon.IComponent], function (base, self) {
 
     
 

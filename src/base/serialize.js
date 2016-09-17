@@ -209,7 +209,7 @@ $class('SerializeWriter', function () {
 
 
     var Array = window.Array,
-        has = Object.prototype.hasOwnProperty;
+        has = {}.hasOwnProperty;
 
     
     $static('serialize', function (target) {

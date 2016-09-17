@@ -1,3 +1,6 @@
+//自动引入样式
+$include('flyingon/css/{skin}/flyingon-controls.css', true);
+
 
 
 $class('Dialog', [flyingon.Panel, flyingon.ITopControl], function (base) {

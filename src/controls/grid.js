@@ -1,125 +1,117 @@
 
-//表格列
-$class('GridColumn', function (base, self) {
+//表格列基类
+$class('GridColumn', function () {
 
     
     
-    var registry_columns = flyingon.create(null);
+    //更新表格头
+    var update_header = { set: 'this.grid.update();' };
+    
+    //更新数据
+    var update_body = { set: 'this.grid.update(true);' };
     
     
-    $static('all', registry_columns);
-        
     
-
-    $constructor(function (grid, option) {
-
-        this.grid = grid;
-
-        if (option)
-        {
-            for (var name in option)
-            {
-                if (name !== 'columnType')
-                {
-                    this[name] = option[name];
-                }
-            }
-        }
-    });
-
-
     //列类型
-    this.columnType = null;
+    this.type = '';
 
+    
     //绑定的字段名
-    this.fieldName = '';
+    this.defineProperty('fieldName', '', update_body);
 
     //数据类型
-    this.dataType = 'string';
+    this.defineProperty('dataType', 'string', update_body);
 
-    //多行标题
-    this.multiTitle = null;
-
-    //标题
-    this.title = '';
+    //标题 值为数组则为多行标题
+    this.defineProperty('title', '', update_header); 
 
     //对齐方式
-    this.align = '';
-
-    //left
-    this.left = 0;
+    this.defineProperty('align', '', update_header);
 
     //列宽
-    this.width = 100;
+    this.defineProperty('width', 100, {
+     
+        minValue: 0,
+        set: 'this.grid.update();'
+    });
 
     //列头class
-    this.headerClass = '';
+    this.defineProperty('headerClass', '', update_header);
 
     //单元格class
-    this.cellClass = '';
+    this.defineProperty('cellClass', '', update_header);
 
     //是否可见
-    this.visible = true;
-
-    //是否选择
-    this.selected = false;
+    this.defineProperty('visible', true, update_header);
 
     //是否只读
-    this.readonly = false;
+    this.defineProperty('readonly', false, update_body);
 
     //编辑器
-    this.editor = null;
+    this.defineProperty('editor', '', update_body);
 
     //是否可调整列宽
-    this.resizable = true;
+    this.defineProperty('resizable', true, update_header);
 
     //是否可排序
-    this.sortable = true;
+    this.defineProperty('sortable', true, update_header);
 
     //是否降序排列
-    this.desc = false;
+    this.defineProperty('desc', false, update_header);
 
     //是否可操作列
-    this.showOperate = true;
+    this.defineProperty('showOperate', true, update_header);
 
     //格式化
-    this.formatter = null;
+    this.defineProperty('formatter', null, update_header);
+
+    
+    //left
+    this.left = 0;
 
     //列渲染索引
     this.renderIndex = -1;
 
+    //是否选择
+    this.selected = false;
 
 
-    this.__render_header = function (writer, columns, index, left, headerHeight) {
 
-        var top = 0,
-            width = this.width,
+    //渲染列头
+    this.renderHeader = function (writer, columns, index, left, headerHeight) {
+
+        var storage = this.__storage,
+            title = storage.title || '',
+            top = 0,
+            width = storage.width,
             height = headerHeight;
 
         this.left = left;
         this.renderIndex = index;
 
         //渲染多行列
-        if (this.multiTitle && this.multiTitle.length > 0)
+        if (typeof title !== 'string' && title.length > 1)
         {
-            top = this.__render_multiTitle(writer, columns, headerHeight);
+            top = render_multi(this, title, writer, columns, headerHeight);
             height -= top;
+            title = title[title.length - 1];
         }
 
-        if (this.visible)
+        if (storage.visible)
         {
             if (width > 0 && height > 0)
             {
-                this.__render_hcell(writer, this.title, top, width, height);
+                title = this.titleText = this.headerText(title && title.text || title);
+                render_header(this, writer, title, top, width, height);
             }
 
-            if (this.resizable)
+            if (storage.resizable)
             {
-                writer.push('<div class="flyingon-Grid-resize-column" style="position:absolute;overflow:hidden;z-index:1;background-color:transparent;width:5px;cursor:col-resize;left:'
-                    + (this.left + width - 3)
-                    + 'px;height:' + headerHeight
-                    + 'px;" column-index="' + index
-                    + '"></div>');
+                writer.push('<div class="flyingon-Grid-resize-column" style="position:absolute;overflow:hidden;z-index:1;background-color:transparent;width:5px;cursor:col-resize;left:',
+                    this.left + width - 3,
+                    'px;height:' + headerHeight,
+                    'px;" column-index="' + index,
+                    '"></div>');
             }
 
             return width;
@@ -128,40 +120,58 @@ $class('GridColumn', function (base, self) {
         return 0;
     };
 
+    
+    //渲染多行列
+    function render_multi(target, list, writer, columns, headerHeight) {
 
-    this.__render_multiTitle = function (writer, columns, headerHeight) {
-
-        var items = this.multiTitle,
-            length = items.length,
-            default_height = headerHeight / (length + (this.title != null ? 1 : 0)) >>> 0,
-            top = 0;
-
+        var top = 0,
+            length = list.length,
+            size = headerHeight / (length--) | 0,
+            storage,
+            item,
+            column,
+            text,
+            width,
+            height,
+            columnSpan;
+        
         for (var i = 0; i < length; i++)
         {
-            var item = items[i],
-                height = item && item.height > 0 ? item.height : default_height,
-                text;
-
-            if (item != null && height > 0 && (text = this.render_multiTitle_text(item)) != null)
+            if ((item = list[i]) != null)
             {
-                var width = this.visible ? this.width : 0;
-
-                if (item.columnSpan > 1)
+                if (typeof item === 'string')
                 {
-                    for (var j = 1, _ = item.columnSpan; j < _; j++)
-                    {
-                        var column = columns[this.renderIndex + j];
+                    text = item;
+                    height = size;
+                }
+                else
+                {
+                    text = item.text;
+                    height = item.height || size;
+                }
+                
+                if (text != null)
+                {
+                    storage = target.__storage;
+                    width = storage.visible ? storage.width : 0;
 
-                        if (column && column.visible)
+                    if ((columnSpan = item.columnSpan) > 1)
+                    {
+                        for (var j = 1; j < columnSpan; j++)
                         {
-                            width += column.width;
+                            if ((column = columns[target.renderIndex + j]) && 
+                                (storage = column.__storage) && storage.visible)
+                            {
+                                width += storage.width;
+                            }
                         }
                     }
-                }
 
-                if (width > 0)
-                {
-                    this.__render_hcell(writer, text, top, width, height, item);
+                    if (width > 0 && height > 0)
+                    {
+                        text = target.headerText(text, item);
+                        render_header(target, writer, text, top, width, height, columnSpan);
+                    }
                 }
             }
 
@@ -172,62 +182,71 @@ $class('GridColumn', function (base, self) {
     };
 
 
-    this.render_multiTitle_text = function (title) {
+    function render_header(target, writer, text, top, width, height, columnSpan) {
 
-        return typeof title === 'string' ? title : title.text;
+        var storage = target.__storage,
+            index = target.renderIndex;
+
+        writer.push('<div class="flyingon-Grid-hcell ',
+            storage.selected ? 'flyingon-Grid-column-selected ' : '',
+            storage.headerClass || '',
+            '" style="position:absolute;overflow:hidden;margin:0;border-left:0;border-top:0;left:',
+            target.left, 'px;top:',
+            top, 'px;width:',
+            width, 'px;height:',
+            height, 'px;line-height:',
+            height, 'px;',
+            '" column-index="', index + '"',
+            columnSpan > 1 ? ' column-end="' + (index + columnSpan - 1) + '"' : '',
+            '>',
+            text,
+            '</div>');
     };
 
 
-    this.__render_hcell = function (writer, text, top, width, height, multiTitle) {
-
-        var index = this.renderIndex,
-            columnSpan = multiTitle && multiTitle.columnSpan || 0;
-
-        writer.push('<div class="flyingon-Grid-hcell '
-            + (this.selected ? 'flyingon-Grid-column-selected ' : '')
-            + (this.headerClass || '')
-            + '" style="position:absolute;overflow:hidden;margin:0;border-left:0;border-top:0;left:'
-            + this.left + 'px;top:'
-            + top + 'px;width:'
-            + width + 'px;height:'
-            + height + 'px;line-height:'
-            + height + 'px;'
-            + (columnSpan > 1 ? 'z-index:1;' : '')
-            + '" column-index="' + index + '"'
-            + (columnSpan > 1 ? ' column-end="' + (index + columnSpan - 1) + '"' : '')
-            + '>');
-
-        writer.push(this.render_hcell(text, multiTitle));
-
-        writer.push('</div>');
-    };
-
-
-    this.render_hcell = function (text, multiTitle) {
+    //获取列头内容
+    this.headerText = function (text, multi) {
 
         return text || '';
     };
 
 
+    //渲染列内容
+    this.renderBody = function (writer, columns, row, fn, end) {
 
-    this.__render_data = function (writer, row) {
-
-        writer.push(this.__render_cell(writer, row) + '</div>');
+        var cell = this.renderCell(row),
+            text = typeof cell === 'string' ? cell : cell && cell.text;
+        
+        renderBody(this, writer, columns, cell, row);
+        
+        if (fn)
+        {
+            fn(writer, column, row, text);
+        }
+        else if (text)
+        {
+            writer.push(text);
+        }
+        
+        if (end !== false)
+        {
+            writer.push('</div>');
+        }
     };
 
 
-    this.__render_cell = function (writer, row) {
+    function renderBody(target, writer, columns, cell, row) {
 
-        var cell = this.render_cell(row),
+        var storage = target.__storage,
             className = 'flyingon-Grid-cell',
-            width = this.width,
+            width = storage.width,
             height = row.height,
-            attribute = ' column-index="' + this.renderIndex + '" row-index="' + row.renderIndex + '"',
+            attribute = ' column-index="' + target.renderIndex + '" row-index="' + row.renderIndex + '"',
             zIndex,
             style,
             cache;
 
-        if (cache = this.cellClass)
+        if (cache = storage.cellClass)
         {
             className += ' ' + cache;
         }
@@ -242,7 +261,7 @@ $class('GridColumn', function (base, self) {
             className += ' flyingon-Grid-row-selected';
         }
 
-        if (this.selected)
+        if (storage.selected)
         {
             className += ' flyingon-Grid-column-selected';
         }
@@ -258,7 +277,7 @@ $class('GridColumn', function (base, self) {
 
                 if ((cache = cell.rowSpan) > 1)
                 {
-                    attribute += ' column-end="' + (this.renderIndex + cache - 1) + '"';
+                    attribute += ' column-end="' + (target.renderIndex + cache - 1) + '"';
 
                     height *= cache;
                     zIndex = 1;
@@ -268,7 +287,7 @@ $class('GridColumn', function (base, self) {
                 {
                     attribute += ' row-end="' + (row.renderIndex + cache - 1) + '"';
 
-                    width = this.__after_width(cache);
+                    width = target.columnWidth(columns, cache);
                     zIndex = 1;
                 }
 
@@ -278,7 +297,6 @@ $class('GridColumn', function (base, self) {
                 }
 
                 style = cell.style;
-                cell = cell.text;
             }
         }
         else
@@ -286,28 +304,29 @@ $class('GridColumn', function (base, self) {
             style = 'visibility:hidden;';
         }
 
-        writer.push('<div class="' + className
-            + '" style="left:' + this.left
-            + 'px;top:' + row.top
-            + 'px;width:' + width
-            + 'px;height:' + height
-            + 'px;line-height:' + height
-            + 'px;'
-            + (this.align ? 'text-align:' + this.align + ';' : '')
-            + (zIndex ? 'z-index:1;' : '')
-            + (style || '')
-            + '"'
-            + attribute + '>');
-
-        return cell || '';
+        writer.push('<div class="', className,
+            '" style="left:', target.left,
+            'px;top:', row.top,
+            'px;width:', width,
+            'px;height:', height,
+            'px;line-height:', height,
+            'px;',
+            (cache = storage.align) ? 'text-align:' + cache + ';' : '',
+            zIndex ? 'z-index:1;' : '',
+            style || '',
+            '"',
+            attribute, 
+            '>');
     };
 
 
-    this.render_cell = function (row) {
+    //渲染单元格
+    this.renderCell = function (row) {
 
-        var formatter = this.formatter,
+        var storage = this.__storage,
+            formatter = storage.formatter,
             data = row.data,
-            value = data && data[this.fieldName] || '';
+            value = data && data[storage.fieldName] || '';
 
         if (typeof formatter === 'function')
         {
@@ -321,7 +340,8 @@ $class('GridColumn', function (base, self) {
     //获取排序函数
     this.sort = function (desc) {
 
-        var name = this.fieldName,
+        var storage = this.__storage,
+            name = storage.fieldName,
             value1 = desc ? 'row2' : 'row1',
             value2 = desc ? 'row1' : 'row2',
             data;
@@ -331,7 +351,7 @@ $class('GridColumn', function (base, self) {
             value1 += '.data.' + name;
             value2 += '.data.' + name;
 
-            if (this.dataType === 'number')
+            if (storage.dataType === 'number')
             {
                 data = 'return ' + value1 + ' - ' + value2 + ';';
             }
@@ -347,82 +367,94 @@ $class('GridColumn', function (base, self) {
     };
 
 
-    //获取后面指定列数的总宽度
-    this.__after_width = function (length) {
+    //获取指定列后指定行数的总宽度
+    this.columnWidth = function (columns, length) {
 
-        var columns = this.grid.__columns,
-            start = this.renderIndex,
+        var start = this.renderIndex,
             end = start + length,
             width = 0,
-            column;
+            column,
+            storage;
 
         for (var i = start; i < end; i++)
         {
-            if ((column = columns[i]) && column.visible)
+            if ((column = columns[i]) && (storage = column.__storage) && storage.visible)
             {
-                width += column.width;
+                width += storage.width;
             }
         }
 
         return width;
     };
 
+    
 
+    var columns;
+    
     this.__class_init = function (Class) {
 
-        if (this !== self)
+        if (columns)
         {
-            if (this.columnType)
+            if (this.type)
             {
-                registry_columns[this.columnType] = Class;
+                columns[this.type] = Class;
             }
             else
             {
-                alert((Class.typeName || 'GridColumn') + ' must define "columnType"!');
+                throw $errortext('flyingon', 'column type error');
             }
+        }
+        else
+        {
+            Class.all = columns = flyingon.create(null);
         }
     };
 
+    
 
 });
 
 
 
 //行编号列
-$class('RowNoGridColumn', flyingon.GridColumn, function (base) {
+$class(flyingon.GridColumn, function (base) {
 
 
     //列类型
-    this.columnType = 'rowno';
+    this.type = 'rowno';
 
+    
     //默认宽度
-    this.width = 25;
+    this.defaultValue('width', 25);
 
     //指定单元格class
-    this.cellClass = 'flyingon-Grid-rowno';
+    this.defaultValue('cellClass', 'flyingon-Grid-rowno');
 
     //禁止编辑
-    this.readonly = true;
+    this.defaultValue('readonly', true);
 
     //禁止可调整列宽
-    this.resizable = false;
+    this.defaultValue('resizable', false);
 
     //禁止列头排序
-    this.sortable = false;
+    this.defaultValue('sortable', false);
 
     //禁止可操作列
-    this.showOperate = false;
+    this.defaultValue('showOperate', false);
 
+                      
     //是否显示行号
-    this.rowno = true;
+    this.defineProperty('rowno', true);
 
 
 
-    this.render_cell = function (row) {
+    this.renderCell = function (row) {
 
-        if (this.rowno)
+        var storage = this.__storage;
+        
+        if (storage.rowno)
         {
-            var formatter = this.formatter,
+            var formatter = storage.formatter,
                 value = row.renderIndex + 1;
 
             if (formatter)
@@ -439,10 +471,8 @@ $class('RowNoGridColumn', flyingon.GridColumn, function (base) {
 
             return value != null ? value : '';
         }
-        else
-        {
-            return '';
-        }
+
+        return '';
     };
 
 
@@ -451,41 +481,43 @@ $class('RowNoGridColumn', flyingon.GridColumn, function (base) {
 
 
 //选择列
-$class('CheckedGridColumn', flyingon.GridColumn, function (base) {
+$class(flyingon.GridColumn, function (base) {
 
 
     //列类型
-    this.columnType = 'checked';
+    this.type = 'checked';
 
+    
     //默认宽度
-    this.width = 25;
-
-    //指定单元格class
-    this.cellClass = 'flyingon-Grid-checked';
-
-    //是否显示选中所有
-    this.all = false;
+    this.defaultValue('width', 25);
 
     //禁止编辑
-    this.readonly = true;
+    this.defaultValue('readonly', true);
 
     //禁止可调整列宽
-    this.resizable = false;
+    this.defaultValue('resizable', false);
 
     //禁止列头排序
-    this.sortable = false;
+    this.defaultValue('sortable', false);
 
     //禁止可操作列
-    this.showOperate = false;
+    this.defaultValue('showOperate', false);
+
+    //指定单元格class
+    this.defaultValue('cellClass', 'flyingon-Grid-checked');
+
+    
+    //是否显示选中所有
+    this.defineProperty('all', false);
 
 
-    this.render_hcell = function (title, multiTitle) {
+    this.headerText = function (title, multi) {
 
-        return !multiTitle && this.all ? '<input type="checkbox" class="flyingon-gird-checked-all"></input>' : '';
+        return !multi && this.__storage.all ? '<input type="checkbox" class="flyingon-gird-checked-all"></input>' : '';
     };
 
 
-    this.render_cell = function (row) {
+    this.renderCell = function (row) {
 
         return '<input type="checkbox"' + (row.checked ? ' checked="checked"' : '') + '></input>';
     };
@@ -497,10 +529,10 @@ $class('CheckedGridColumn', flyingon.GridColumn, function (base) {
             view = grid.__view,
             row;
 
-        if (view && e.target.type === 'checkbox' && (row = view[cell.getAttribute('row-index') >>> 0]))
+        if (view && e.target.type === 'checkbox' && (row = view[cell.getAttribute('row-index') | 0]))
         {
             var items = view.checkedRows,
-                list = view.find_row_cells(row),
+                list = view.findRowCells(row),
                 className = 'flyingon-Grid-row-checked';
 
             if (row.checked = !row.checked)
@@ -524,113 +556,132 @@ $class('CheckedGridColumn', flyingon.GridColumn, function (base) {
 
 
 //仿excel的分组树列
-$class('GroupGridColumn', flyingon.GridColumn, function (base) {
+$class(flyingon.GridColumn, function (base) {
 
 
     //列类型
-    this.columnType = 'group';
+    this.type = 'group';
 
+    
     //默认宽度(收拢时的宽度)
-    this.width = 40;
+    this.defaultValue('width', 40);
 
     //指定单元格class
-    this.cellClass = 'flyingon-Grid-grouptree';
+    this.defaultValue('cellClass', 'flyingon-Grid-grouptree');
 
     //禁止编辑
-    this.readonly = true;
+    this.defaultValue('readonly', true);
 
     //禁止可调整列宽
-    this.resizable = false;
+    this.defaultValue('resizable', false);
 
     //禁止列头排序
-    this.sortable = false;
+    this.defaultValue('sortable', false);
 
     //禁止可操作列
-    this.showOperate = false;
+    this.defaultValue('showOperate', false);
 
+                      
     //最大级别
-    this.maxLevel = 0;
+    this.defineProperty('maxLevel', 0);
 
     //默认展示级别
-    this.expandLevel = 0;
+    this.defineProperty('expandLevel', 0);
 
     //是否展开
-    this.expanded = false;
+    this.defineProperty('expanded', false);
 
     //栏位宽度
-    this.itemWidth = 16;
+    this.defineProperty('itemWidth', 16);
 
     //栏位高度
-    this.itemHeight = 16;
+    this.defineProperty('itemHeight', 16);
 
     //是否显示行号
-    this.rowno = true;
+    this.defineProperty('rowno', true);
 
     //行号宽度
-    this.rownoWidth = 40;
+    this.defineProperty('rownoWidth', 40);
 
 
-    this.render_hcell = function (text, multiTitle) {
+    this.headerText = function (text, multi) {
 
-        if (multiTitle || !this.expanded)
+        var storage = this.__storage;
+        
+        if (multi || !storage.expanded)
         {
             return text || '';
         }
 
         var data = [],
             left = 0,
-            width = this.itemWidth,
+            width = storage.itemWidth,
             html = '<span class="flyingon-Grid-grouptree-level" style="display:inline-block;width:' + width + 'px;left:';
 
-        for (var i = 1, _ = this.maxLevel; i <= _; i++)
+        for (var i = 1, _ = storage.maxLevel; i <= _; i++)
         {
-            data.push(html + left + 'px;">' + i + '</span>');
+            data.push(html, left, 'px;">', i, '</span>');
             left += width;
         }
 
-        data.push('<span class="flyingon-Grid-groupno-title" style="display:inline-block;width:' + this.rownoWidth + 'px;">' + (text || '') + '</span>');
+        data.push('<span class="flyingon-Grid-groupno-title" style="display:inline-block;width:', 
+            storage.rownoWidth, 
+            'px;">', 
+            text || '', 
+            '</span>');
+        
         return data.join('');
     };
 
 
-    this.__render_data = function (writer, row) {
+    this.renderBody = function (writer, columns, row, fn, end) {
 
-        writer.push(this.__render_cell(writer, row));
+        base.renderBody.call(this, writer, columns, row, fn, false);
 
         if (this.rowno)
         {
+            writer.length--;
             render_rowno.call(this, writer, row);
         }
-
-        writer.push('</div>');
+                    
+        if (end !== false)
+        {
+            writer.push('</div>');
+        }
     };
 
 
-    this.render_cell = function (row) {
+    this.renderCell = function (row) {
 
         var data = [],
             text1 = '<span class="flyingon-Grid-grouptree-',
-            text2 = '" style="display:inline-block;width:' + this.itemWidth + 'px;height:100%;" no-current="true"',
+            text2 = '" style="display:inline-block;width:' + this.__storage.itemWidth + 'px;height:100%;" no-current="true"',
             target = row,
             cache;
 
         while (cache = target.parent)
         {
-            data.unshift(text1 + 'line' + (target.next ? '' : ' flyingon-Grid-grouptree-line-last') + text2 + '></span>');
+            data.unshift(text1, 
+                'line', 
+                target.next ? '' : ' flyingon-Grid-grouptree-line-last',
+                text2,
+                '></span>');
+            
             target = cache;
         }
 
         if (row.children)
         {
             cache = row.expanded ? 'expand' : 'collapse';
-            data.push(text1 + cache + text2 + ' tree-' + cache + '="true"></span>');
+            data.push(text1, cache, text2, ' tree-', cache, '="true"></span>');
         }
         else
         {
-            data.push(text1 + 'leaf' + text2 + '></span>');
+            data.push(text1, 'leaf', text2, '></span>');
         }
 
         return {
+            
             text: data.join(''),
             attribute: 'no-current="true"'
         };
@@ -639,7 +690,8 @@ $class('GroupGridColumn', flyingon.GridColumn, function (base) {
 
     function render_rowno(writer, row) {
 
-        var formatter = this.formatter,
+        var storage = this.__storage,
+            formatter = storage.formatter,
             value;
 
         if (formatter)
@@ -661,10 +713,10 @@ $class('GroupGridColumn', flyingon.GridColumn, function (base) {
         if (value !== null)
         {
             var className = 'flyingon-Grid-groupno',
-                style = 'display:inline-block;width:' + this.rownoWidth + 'px;',
+                style = 'display:inline-block;width:' + storage.rownoWidth + 'px;',
                 attribute = '';
 
-            if (this.expanded)
+            if (storage.expanded)
             {
                 className += ' flyingon-Grid-groupno-expand'
             }
@@ -687,9 +739,11 @@ $class('GroupGridColumn', flyingon.GridColumn, function (base) {
                 }
             }
 
-            writer.push('<span class="' + className + '" style="' + style + ';"' + attribute + '>');
-            writer.push(value);
-            writer.push('</span>')
+            writer.push('<span class="', className,
+                '" style="', style, ';"',
+                attribute, '>',
+                value,
+                '</span>');
         }
     };
 
@@ -747,7 +801,7 @@ $class('GridRow', function () {
 
 
 //树形表格行
-$class('TreeGridRow', flyingon.GridRow, function (base) {
+$class(flyingon.GridRow, function (base) {
 
 
 
@@ -898,7 +952,7 @@ $class('TreeGridRow', flyingon.GridRow, function (base) {
             rows,
             items;
 
-        if ((expandLevel = expandLevel >>> 0) < 0)
+        if ((expandLevel = expandLevel | 0) < 0)
         {
             expandLevel = 100;
         }
@@ -937,7 +991,7 @@ $class('TreeGridRow', flyingon.GridRow, function (base) {
 
         if (render !== false)
         {
-            grid.render_data(true);
+            grid.renderBody(true);
         }
 
         grid.trigger('expand');
@@ -956,7 +1010,7 @@ $class('TreeGridRow', flyingon.GridRow, function (base) {
             if (render !== false)
             {
                 this.view.fix_vscroll();
-                grid.render_data(true);
+                grid.renderBody(true);
             }
 
             grid.trigger('collapse');
@@ -992,52 +1046,40 @@ $class('TreeGridRow', flyingon.GridRow, function (base) {
 
 
 //表格视图
-$class('GridView', function (base, self) {
+$class('GridView', function () {
 
 
-    var registry_view = flyingon.create(null),
-        push = Array.prototype.push,
-        splice = Array.prototype.splice,
-        sort = Array.prototype.sort;
+    var push = [].push;
+    var splice = [].splice;
+    var sort = [].sort;
 
     
-    $static('all', registry_view);
-
-    $constructor(function (grid, options) {
-
-        this.grid = grid;
-
-        if (options)
-        {
-            for (var name in options)
-            {
-                this[name] = options[name];
-            }
-        }
-    });
-
-
     //视图类型
-    this.viewType = null;
+    this.type = null;
 
+    
     //行高
-    this.rowHeight = 28;
+    this.defineProperty('rowHeight', 28);
 
+    //是否启用延迟加载行
+    this.defineProperty('delayLoad', false);
+    
     //延迟加载最大行数
-    this.delayMaxRows = 0;
+    this.defineProperty('maxDelayRows', 0);
 
+                        
     //表格行数量
     this.length = 0;
+
+    //行类型
+    this.rowType = flyingon.GridRow;
 
     //视图宽度
     this.width = 0;
 
     //视图高度
     this.height = 0;
-
-    //行类型
-    this.rowType = flyingon.GridRow;
-
+    
 
     //当前表格行
     this.currentRow = null;
@@ -1047,10 +1089,6 @@ $class('GridView', function (base, self) {
 
     //选中表格行
     this.checkedRows = null;
-
-
-    //是否启用延迟加载行
-    this.delayLoadRows = false;
 
 
 
@@ -1075,7 +1113,7 @@ $class('GridView', function (base, self) {
 
 
     //延迟加载行
-    this.loadRowsDelay = function (start, end) {
+    this.loadDelay = function (start, end) {
 
         var data = this.data,
             type = this.rowType;
@@ -1115,7 +1153,7 @@ $class('GridView', function (base, self) {
     //查找指定位置的表格行
     this.findRowIndex = function (top) {
 
-        return (top / this.rowHeight) >>> 0;
+        return top / this.rowHeight() | 0;
     };
 
 
@@ -1131,27 +1169,27 @@ $class('GridView', function (base, self) {
     };
 
 
-    //渲染视图 //modify by yaozy 2016.01.20
+    //渲染
     this.render = function (start, resize) {
 
         var date = new Date();
 
         var writer = [],
             grid = this.grid,
+            head = grid.dom_header,
             body = grid.dom_body,
+            storage = this.__storage,
             columns = grid.__columns,
-            rowHeight = this.rowHeight,
-            lockedWidth = columns.lockedWidth,
-            lockedBefore = columns.lockedBefore,
-            width = columns.totalWidth - lockedWidth,
-            height = Math.max(this.delayMaxRows, this.length) * rowHeight,
+            rowHeight = storage.rowHeight,
+            lockedWidth = head.lockedWidth,
+            lockedBefore = head.lockedBefore,
+            width = head.totalWidth - lockedWidth,
+            height = Math.max(storage.maxDelayRows, this.length) * rowHeight,
             scrollTop = grid.dom_vscroll.scrollTop,
-            style = 'overflow:hidden;margin:0;border:0;padding:0;',
-            style1 = 'position:absolute;' + style + 'height:100%;',
-            style2 = 'position:relative;' + style + 'top:' + (-scrollTop) + 'px;height:' + height + 'px;width:';
+            style = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;top:' + -scrollTop + 'px;height:' + height + 'px;width:';
 
         //记录视图大小
-        this.width = columns.totalWidth;
+        this.width = head.totalWidth;
         this.height = height;
 
         //如果是全局渲染
@@ -1170,16 +1208,16 @@ $class('GridView', function (base, self) {
                 }
             }
 
-            this.end = this.__render_end(start, scrollTop, grid.clientHeight - columns.headerHeight, rowHeight);
+            this.end = this.__render_end(start, scrollTop, grid.clientHeight - head.headerHeight, rowHeight);
         }
 
         //记录渲染的开始及结束行号
         this.start = start;
 
         //如果启用了延迟加载行
-        if (this.delayLoadRows)
+        if (this.delayLoad())
         {
-            this.loadRowsDelay(start, this.end);
+            this.loadDelay(start, this.end);
         }
 
         //触发渲染前事件
@@ -1187,24 +1225,19 @@ $class('GridView', function (base, self) {
 
         writer.view = this;
         writer.columns = columns;
+        
+        writer.push('<div class="flyingon-Grid-scroll" style="', style, width, 'px;left:', lockedWidth - grid.dom_hscroll.scrollLeft, 'px;">');
 
-        writer.push('<div class="flyingon-Grid-locked" style="' + style1 + '">');
-        writer.push('<div style="' + style2 + lockedWidth + 'px;">');
+        this.__render_columns(writer, columns, lockedBefore, columns.length, rowHeight);
+        
+        writer.push('</div>',
+                    '<div class="flyingon-Grid-locked" style="', style, lockedWidth, 'px;z-index:1;">');
 
         if (lockedBefore > 0)
         {
             this.__render_columns(writer, columns, 0, lockedBefore, rowHeight);
         }
 
-        writer.push('</div>');
-        writer.push('</div>');
-
-        writer.push('<div class="flyingon-Grid-scroll" style="' + style1 + 'left:' + lockedWidth + 'px;">');
-        writer.push('<div style="' + style2 + width + 'px;left:' + (-grid.dom_hscroll.scrollLeft) + 'px;">');
-
-        this.__render_columns(writer, columns, lockedBefore, columns.length, rowHeight);
-
-        writer.push('</div>');
         writer.push('</div>');
 
         writer.view = writer.columns = null;
@@ -1215,7 +1248,7 @@ $class('GridView', function (base, self) {
         if (resize)
         {
             body.style.height = height + 'px';
-            grid.render_scroll();
+            grid.renderScroll();
         }
 
         body.style.display = 'block';
@@ -1227,7 +1260,6 @@ $class('GridView', function (base, self) {
     };
 
 
-    //获取渲染结束行 //add by yaozy 2016.01.20
     this.__render_end = function (start, top, height, rowHeight) {
 
         height += (top % rowHeight); //处理开始的行偏移避免有时渲染不出最后一行的问题
@@ -1235,7 +1267,6 @@ $class('GridView', function (base, self) {
     };
 
 
-    //渲染视图列
     this.__render_columns = function (writer, columns, start, end, rowHeight) {
 
         var top = this.start * rowHeight;
@@ -1248,30 +1279,33 @@ $class('GridView', function (base, self) {
             row.height = rowHeight;
             row.renderIndex = i;
 
-            this.render_row(writer, row, columns, start, end);
+            this.renderRow(writer, row, columns, start, end);
 
             top += rowHeight;
         }
     };
 
 
-    //渲染视图行
-    this.render_row = function (writer, row, columns, start, end) {
+    //渲染行
+    this.renderRow = function (writer, row, columns, start, end) {
 
-        var column;
+        var column, storage;
 
         for (var i = start; i < end; i++)
         {
-            if ((column = columns[i]) && column.visible && column.width > 0)
+            if ((column = columns[i]) && 
+                (storage = column.__storage) && 
+                storage.visible && 
+                storage.width > 0)
             {
-                column.__render_data(writer, row);
+                column.renderBody(writer, columns, row);
             }
         }
     };
 
 
     //从指定的dom往上查找拥有指定className的dom
-    this.find_dom = function (dom, className) {
+    this.findDom = function (dom, className) {
 
         var name;
 
@@ -1288,21 +1322,21 @@ $class('GridView', function (base, self) {
 
 
     //查找事件触发的列头单元格
-    this.event_hcell = function (e) {
+    this.eventHeaderCell = function (event) {
 
-        return this.find_dom(e.target, 'flyingon-Grid-hcell');
+        return this.findDom(event.target, 'flyingon-Grid-hcell');
     };
 
 
     //查找事件触发的单元格
-    this.event_cell = function (e) {
+    this.eventBodyCell = function (event) {
 
-        return this.find_dom(e.target, 'flyingon-Grid-cell');
+        return this.findDom(event.target, 'flyingon-Grid-cell');
     };
 
 
     //查找单元格
-    this.find_cell = function (row, column) {
+    this.findCell = function (row, column) {
 
         var list = this.find_row.cells(row),
             index = '' + (column >= 0 ? column : column.renderIndex);
@@ -1318,7 +1352,7 @@ $class('GridView', function (base, self) {
 
 
     //查找指定行索引的单元格
-    this.find_row_cells = function (row, list) {
+    this.findRowCells = function (row, list) {
 
         var grid = this.grid,
             start = this.start,
@@ -1332,9 +1366,10 @@ $class('GridView', function (base, self) {
             return list;
         }
 
-        var body = grid.dom_body,
-            children = body.children[0].children[0].children,
-            step = grid.__columns.locked_visible,
+        var head = grid.dom_header,
+            body = grid.dom_body,
+            children = body.children[1].children,
+            step = head.locked_visible,
             offset = (index - start) * step;
 
         for (var i = 0; i < step; i++)
@@ -1342,8 +1377,8 @@ $class('GridView', function (base, self) {
             list.push(children[offset + i]);
         }
 
-        children = body.children[1].children[0].children;
-        step = grid.__columns.scroll_visible;
+        children = body.children[0].children;
+        step = head.scroll_visible;
         offset = (index - start) * step;
 
         for (var i = 0; i < step; i++)
@@ -1356,12 +1391,13 @@ $class('GridView', function (base, self) {
 
 
     //查找指定列索引的单元格
-    this.find_column_cells = function (column, list, header, body) {
+    this.findColumnCells = function (column, list, header, body) {
 
         var grid = this.grid,
+            head = grid.dom_header,
             columns = grid.__columns,
             index = column >= 0 ? column : column.renderIndex,
-            lockedBefore = columns.lockedBefore,
+            lockedBefore = head.lockedBefore,
             children,
             item,
             cache;
@@ -1375,7 +1411,7 @@ $class('GridView', function (base, self) {
 
         if (header !== false)
         {
-            children = grid.dom_head.children[index >= lockedBefore ? 1 : 0].children[0].children;
+            children = grid.dom_header.children[index >= lockedBefore ? 0 : 1].children;
             cache = '' + index;
 
             for (var i = 0, _ = children.length; i < _; i++)
@@ -1395,7 +1431,7 @@ $class('GridView', function (base, self) {
             var start = index,
                 step;
 
-            children = grid.dom_body.children[index >= lockedBefore ? 1 : 0].children[0].children;
+            children = grid.dom_body.children[index >= lockedBefore ? 0 : 1].children;
 
             for (var i = index - 1; i >= 0; i--)
             {
@@ -1408,11 +1444,11 @@ $class('GridView', function (base, self) {
             if (index >= lockedBefore)
             {
                 start -= lockedBefore;
-                step = columns.scroll_visible;
+                step = head.scroll_visible;
             }
             else
             {
-                step = columns.locked_visible;
+                step = head.locked_visible;
             }
 
             cache = children.length;
@@ -1467,14 +1503,14 @@ $class('GridView', function (base, self) {
 
 
     //切换当前单元格
-    this.__change_current = function (cell) {
+    this.changeCurrent = function (cell) {
 
         var grid = this.grid,
             //style = grid.dom_body.style,
             row1 = this.currentRow,
-            row2 = this[cell.getAttribute('row-index') >>> 0],
+            row2 = this[cell.getAttribute('row-index') | 0],
             column1 = this.currentColumn,
-            column2 = grid.__columns[cell.getAttribute('column-index') >>> 0],
+            column2 = grid.__columns[cell.getAttribute('column-index') | 0],
             cache;
 
         //style.visibility = 'hidden';
@@ -1486,13 +1522,13 @@ $class('GridView', function (base, self) {
             if (column1)
             {
                 column1.selected = false;
-                this.find_column_cells(column1).removeClass(cache);
+                this.findColumnCells(column1).removeClass(cache);
             }
 
             column2.selected = true;
 
             this.currentColumn = column2;
-            this.find_column_cells(column2).addClass(cache);
+            this.findColumnCells(column2).addClass(cache);
         }
 
         if (row1 !== row2 && grid.autoCurrentRow())
@@ -1502,19 +1538,20 @@ $class('GridView', function (base, self) {
             if (row1)
             {
                 row1.selected = false;
-                this.find_row_cells(row1).removeClass(cache);
+                this.findRowCells(row1).removeClass(cache);
             }
 
             row2.selected = true;
 
             this.currentRow = row2;
-            this.find_row_cells(row2).addClass(cache);
+            this.findRowCells(row2).addClass(cache);
         }
 
         //style.visibility = '';
     };
 
 
+    //清除数据行
     this.clear = function () {
 
         var length = this.length,
@@ -1545,18 +1582,25 @@ $class('GridView', function (base, self) {
     };
 
 
+    
+    var views;
+    
     this.__class_init = function (Class) {
 
-        if (this !== self)
+        if (views)
         {
-            if (this.viewType)
+            if (this.type)
             {
-                registry_view[this.viewType] = Class;
+                views[this.type] = Class;
             }
             else
             {
-                alert((Class.typeName || 'GridView') + '" must define "viewType"!');
+                throw $errortext('flyingon', 'view type error');
             }
+        }
+        else
+        {
+            Class.all = views = flyingon.create(null);
         }
     };
 
@@ -1566,32 +1610,34 @@ $class('GridView', function (base, self) {
 
 
 //树形表格视图
-$class('TreeGridView', flyingon.GridView, function (base) {
+$class(flyingon.GridView, function (base) {
 
 
 
-    var splice = Array.prototype.splice,
-        sort = Array.prototype.sort;
+    var splice = [].splice;
+    var sort = [].sort;
+
+    
+    //注册的视图类型
+    this.type = 'tree';
 
 
     //渲染成树的字段名
-    this.treeFieldName = null;
+    this.defineProperty('treeFieldName', '');
 
     //子节点名称
-    this.childrenName = 'children';
+    this.defineProperty('childrenName', 'children');
 
     //默认展开级别
-    this.expandLevel = 0;
-
-    //表格行类型
-    this.rowType = flyingon.TreeGridRow;
-
-    //注册的视图类型
-    this.viewType = 'TreeGridView';
+    this.defineProperty('expandLevel', 0);
 
     //数据转换器
-    this.converter = null;
+    this.defineProperty('converter', null);
 
+    
+    //表格行类型
+    this.rowType = flyingon.TreeGridRow;
+    
 
 
     function convert_table(self, data, converter, childrenName) {
@@ -1608,7 +1654,7 @@ $class('TreeGridView', flyingon.GridView, function (base) {
         for (var i = 0; i < length; i++)
         {
             keys[(item = data[i])[id]] = item;
-            item[childrenName] = null; //清除原有关系防止重复转换 add by yaozy 2016.01.28
+            item[childrenName] = null; //清除原有关系防止重复转换
         }
 
         for (var i = 0; i < length; i++)
@@ -1658,7 +1704,7 @@ $class('TreeGridView', flyingon.GridView, function (base) {
     this.init = function (data) {
 
         var converter = this.converter,
-            expandLevel = this.expandLevel >>> 0,
+            expandLevel = this.expandLevel | 0,
             type = this.rowType,
             name = this.childrenName,
             rows,
@@ -1709,14 +1755,13 @@ $class('TreeGridView', flyingon.GridView, function (base) {
 
 
     //计算树编号
-    this.compute_treeIndex = function () {
+    this.computeTreeIndex = function () {
 
         var start = this.start,
             end = this.end,
             index = 1,
             row;
 
-        //modified by yaozy 2016.01.28
         for (var i = 0; i < start; i++)
         {
             if (row = this[i])
@@ -1731,7 +1776,6 @@ $class('TreeGridView', flyingon.GridView, function (base) {
                 }
             }
         }
-        //end modify
 
         while (start < end)
         {
@@ -1758,7 +1802,7 @@ $class('TreeGridView', flyingon.GridView, function (base) {
         {
             if (columns[i].formatter === 'tree')
             {
-                this.compute_treeIndex();
+                this.computeTreeIndex();
                 break;
             }
         }
@@ -1767,34 +1811,30 @@ $class('TreeGridView', flyingon.GridView, function (base) {
     };
 
 
-    this.render_row = function (writer, row, columns, start, end) {
+    this.renderRow = function (writer, row, columns, start, end) {
 
         var treeFieldName = this.treeFieldName,
-            column;
+            column,
+            storage;
 
         for (var i = start; i < end; i++)
         {
-            if ((column = columns[i]) && column.visible && column.width > 0)
+            if ((column = columns[i]) && 
+                (storage = column.__storage) && 
+                storage.visible && 
+                storage.width > 0)
             {
-                if (treeFieldName === column.fieldName)
-                {
-                    render_tree_column(writer, row, column);
-                }
-                else
-                {
-                    column.__render_data(writer, row);
-                }
+                column.renderBody(writer, columns, row, treeFieldName === storage.fieldName ? render_tree : null);
             }
         }
     };
 
 
-    function render_tree_column(writer, row, column) {
+    function render_tree(writer, column, row, text) {
 
-        var text = column.__render_cell(writer, row),
-            children = row.children,
+        var children = row.children,
             cache = row.level;
-
+        
         cache = (children ? 0 : 1) + (cache > 0 ? cache : 0);
 
         if (cache > 0)
@@ -1821,7 +1861,7 @@ $class('TreeGridView', flyingon.GridView, function (base) {
             }
         }
 
-        writer.push('<span class="flyingon-Grid-tree-cell">' + text + '</span></div>');
+        writer.push('<span class="flyingon-Grid-tree-cell">' + (text || '') + '</span></div>');
     };
 
 
@@ -1831,7 +1871,8 @@ $class('TreeGridView', flyingon.GridView, function (base) {
         if (this.start > 0)
         {
             var grid = this.grid,
-                height = Math.max(this.delayMaxRows, this.length) * this.rowHeight;
+                storage = this.__storage,
+                height = Math.max(storage.maxDelayRows, this.length) * storage.rowHeight;
 
             if (!grid.__check_scroll(this.width, height)[1])
             {
@@ -1844,14 +1885,14 @@ $class('TreeGridView', flyingon.GridView, function (base) {
 
     this.__on_expand = function (e) {
 
-        var index = e.target.parentNode.getAttribute('row-index') >>> 0;
+        var index = e.target.parentNode.getAttribute('row-index') | 0;
         this[index].expand();
     };
 
 
     this.__on_collapse = function (e) {
 
-        var index = e.target.parentNode.getAttribute('row-index') >>> 0;
+        var index = e.target.parentNode.getAttribute('row-index') | 0;
         this[index].collapse();
     };
 
@@ -1976,50 +2017,95 @@ $class('TreeGridView', flyingon.GridView, function (base) {
 $class('Grid', flyingon.Control, function (base) {
 
 
-
-    var contextmenu, //弹出菜单
-        tip; //弹出提醒
+    
+    //弹出菜单
+    var contextmenu;
+    
+    //弹出提醒
+    var tip; 
 
 
 
     $constructor(function () {
 
         var self = this,
-            on = flyingon.dom_on,
             dom = this.dom,
             children = dom.children,
             head,
             body,
             hscroll,
-            vscroll;
+            vscroll,
+            on = flyingon.dom_on;
 
-        if (!tip)
-        {
-            contextmenu = new flyingon.PopupLayer(false).multi(true).closeAway(true);
-            contextmenu.dom.className += ' flyingon-Grid-contextmenu';
-
-            tip = new flyingon.PopupLayer(false).multi(true);
-            tip.dom.className += ' flyingon-Grid-tip';
-        }
-
-        this.dom_head_back = children[0];
-        this.dom_head = head = children[1];
+        this.dom_back = children[0];
+        this.dom_header = head = children[1];
         this.dom_body = body = children[2];
         this.dom_resize = children[3];
         this.dom_end = children[4];
         this.dom_hscroll = hscroll = children[5];
         this.dom_vscroll = vscroll = children[6];
         this.dom_sort = children[7];
-        this.dom_pager = children[8];
+
+        on(head, 'mouseover', function (e) {
+
+            head_mouseover(self, e);
+        });
+
+        on(head, 'mousedown', function (e) {
+
+            head_mousedown(self, e);
+        });
+
+        on(head, 'click', function (e) {
+
+            head_click(self, e);
+        });
+
+        on(head, 'mouseout', function (e) {
+
+            dom_mouseout(self, e, this);
+        });
+
+        on(body, 'mouseover', function (e) {
+
+            body_mouseover(self, e);
+        });
+
+        on(body, 'mousedown', function (e) {
+
+            body_mousedown(self, e);
+        });
+
+        on(body, 'click', function (e) {
+
+            body_click(self, e);
+        });
+
+        on(body, 'mouseout', function (e) {
+
+            dom_mouseout(self, e, this);
+        });
+
+        on(body, 'keydown', function (e) {
+
+            body_keyup(self, e);
+        });
+
+        on(dom, 'mousewheel', function (e) {
+
+            vscroll.scrollTop -= event.wheelDelta || (-event.detail * 40);//鼠标滚轮数据
+        });
+
+        on(dom, 'mouseout', function (e) {
+
+            dom_mouseout(self, e, this);
+        });
 
         on(hscroll, 'scroll', function (e) {
 
-            var style1 = head.children[1].children[0].style,
-            style2 = body.children[1],
-            dom = self.dom_sort;
+            var dom = self.dom_sort;
 
-            style2 = style2 ? style2.children[0].style : style1;
-            style1.left = style2.left = -this.scrollLeft + 'px';
+            head.children[0].style.left = body.children[0].style.left = head.lockedWidth - this.scrollLeft + 'px';
 
             if (dom.scroll_left >= 0)
             {
@@ -2036,99 +2122,58 @@ $class('Grid', flyingon.Control, function (base) {
 
             if (self.fullRender()) //全局渲染
             {
-                var style1 = body.children[0].children[0].style,
-                style2 = body.children[1].children[0].style;
-
-                style1.top = style2.top = -this.scrollTop + 'px';
+                body.children[0].style.top = body.children[1].style.top = -this.scrollTop + 'px';
             }
             else
             {
-                render_data(self);
+                render_body(self);
             }
         });
 
-        on(head, 'mouseover', function (e) {
-
-            on_head_mouseover(self, e);
-        });
-
-        on(head, 'mousedown', function (e) {
-
-            on_head_mousedown(self, e);
-        });
-
-        on(head, 'click', function (e) {
-
-            on_head_click(self, e);
-        });
-
-        on(head, 'mouseout', function (e) {
-
-            on_mouseout(self, e, this);
-        });
-
-        on(body, 'mouseover', function (e) {
-
-            on_body_mouseover(self, e);
-        });
-
-        on(body, 'mousedown', function (e) {
-
-            on_body_mousedown(self, e);
-        });
-
-        on(body, 'click', function (e) {
-
-            on_body_click(self, e);
-        });
-
-        on(body, 'mouseout', function (e) {
-
-            on_mouseout(self, e, this);
-        });
-
-        on(body, 'keydown', function (e) {
-
-            on_body_keyup(self, e);
-        });
-
-        on(dom, 'mousewheel', function (e) {
-
-            vscroll.scrollTop -= event.wheelDelta || (-event.detail * 40);//鼠标滚轮数据
-        });
-
-        on(dom, 'mouseout', function (e) {
-
-            on_mouseout(self, e, this);
-        });
-
+        if (!tip)
+        {
+            contextmenu = new flyingon.Popup(false).multi(true).closeAway(true).addClass('flyingon-Grid-contextmenu');
+            tip = new flyingon.Popup(false).multi(true).addClass('flyingon-Grid-tip');
+        }
     });
 
 
 
-
-    this.createDomTemplate(('<div class="flyingon-Grid" style="position:relative;overflow:hidden;border-width:1px;">'
-            + '<div class="flyingon-Grid-header-back" style="position:absolute;left:0;top:0;right:0;width:auto;border-left:0;border-top:0;border-right:0;"></div>'
-            + '<div class="flyingon-Grid-header" style="style-1;"></div>'
-            + '<div class="flyingon-Grid-body" style="style-1;outline:none;" tabindex="0"></div>'
-            + '<div class="flyingon-Grid-resize" style="style-2;z-index:1;display:none;height:100%;"></div>'
-            + '<div class="flyingon-Grid-end" style="style-2;z-index:1;width:vscroll_width;height:hscroll_height;left:auto;top:auto;overflow:scroll;"></div>'
-            + '<div class="flyingon-Grid-hscroll" style="style-2;overflow-x:scroll;overflow-y:hidden;z-index:1;left:0;top:auto;width:auto;height:hscroll_height;">scroll_length</div>'
-            + '<div class="flyingon-Grid-vscroll" style="style-2;overflow-x:hidden;overflow-y:scroll;z-index:1;left:auto;top:0;width:vscroll_width;height:auto;">scroll_length</div>'
-            + '<div class="flyingon-Grid-sort" style="position:absolute;display:none;z-index:1;"></div>'
-            + '<div class="flyingon-Grid-pager" style="style-2;overflow:hidden;display:none;width:100%;"></div>'
-        + '</div>')
-        .replace(/style-1/g, 'position:relative;overflow:hidden;margin:0;border:0;padding:0')
-        .replace(/style-2/g, 'position:absolute;display:none;margin:0;right:0;bottom:0')
-        .replace(/scroll_length/g, '<div style="overflow:hidden;margin:0;border:0;padding:0;width:1px;height:1px;"></div>')
-        .replace(/hscroll_height/g, flyingon.hscroll_height + 'px')
-        .replace(/vscroll_width/g, flyingon.vscroll_width + 'px'));
+    this.createDomTemplate(function () {
+        
+        var start = '<div class="flyingon-Grid',
+            end = '</div>',
+            relative = '" style="position:relative;',
+            absolute = '" style="position:absolute;',
+            style1 = 'overflow:hidden;margin:0;border:0;padding:0;',
+            style2 = 'display:none;margin:0;right:0;bottom:0;z-index:1;',
+            scroll = '<div style="' + style1 + 'width:1px;height:1px;"></div>',
+            width = 'width:' + flyingon.vscroll_width + 'px;',
+            height = 'height:' + flyingon.hscroll_height + 'px;';
+        
+        return new Array(
+            
+            start, relative, 'overflow:hidden;border-width:1px;">',
+                start, '-back"', absolute, 'left:0;top:0;right:0;width:auto;border:0">', end,
+                start, '-header"', relative, style1, '">', end,
+                start, '-body"', relative, style1, 'outline:none;" tabindex="0">', end,
+                start, '-resize"', absolute, style2, 'display:none;height:100%;">', end,
+                start, '-end"', absolute, style2, width, height, 'left:auto;top:auto;overflow:scroll;">', end,
+                start, '-hscroll', absolute, style2, height, 'width:auto;overflow-x:scroll;overflow-y:hidden;left:0;top:auto;">', scroll, end,
+                start, '-vscroll', absolute, style2, width, 'height:auto;overflow-x:hidden;overflow-y:scroll;left:auto;top:0;">', scroll, end,
+                start, '-sort"', absolute, style2, '">', end,
+            end
+            
+        ).join('');
+        
+    }());
 
 
 
     this.defaultValue('border', 1);
 
 
+    
     //表格列
     this.defineProperty('columns', null, {
 
@@ -2151,7 +2196,7 @@ $class('Grid', flyingon.Control, function (base) {
     });
 
     //是否只读
-    this.defineProperty('readonly', true); //modified by yaozy 2016.01.20
+    this.defineProperty('readonly', true);
 
     //前部锁定列数
     this.defineProperty('lockedBefore', 0);
@@ -2168,28 +2213,29 @@ $class('Grid', flyingon.Control, function (base) {
     //是否完整渲染(完全渲染时会一次性渲染所有数据)
     this.defineProperty('fullRender', false);
 
-    //分页参数
-    //this.defineProperty('pager', null);
 
 
     //检测列操作
     function check_operate(self, e) {
 
-        var dom = self.dom_head.children[2],
+        var dom = self.dom_header.children[2],
             style = dom.style,
             view = self.__view,
             cell;
 
-        if (view && e && (cell = view.event_hcell(e)))
+        if (view && e && (cell = view.eventHeaderCell(e)))
         {
-            var index = cell.getAttribute('column-index') >>> 0,
+            var index = cell.getAttribute('column-index') | 0,
                 column = self.__columns[index],
-                parent = cell.parentNode;
+                storage,
+                parent;
 
-            if (column && column.showOperate)
+            if (column && (storage = column.__storage) && storage.showOperate)
             {
                 dom.setAttribute('column-index', index);
 
+                parent = cell.parentNode;
+                
                 style.display = 'block';
                 style.top = (cell.offsetTop + 1) + 'px';
                 style.left = (parent.parentNode.offsetLeft + parent.offsetLeft + column.left + 2) + 'px';
@@ -2205,25 +2251,32 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //显示操作指引
-    function showOperate(self, e) {
+    function show_operate(self, e) {
 
         var columns = self.__columns,
             dom = e.target,
-            index = dom.getAttribute('column-index') >>> 0;
+            index = dom.getAttribute('column-index') | 0;
 
         if (columns && index >= 0)
         {
             var writer = [],
-            menu = contextmenu,
-            column;
+                menu = contextmenu,
+                column,
+                storage;
 
             menu.close('auto');
 
             for (var i = 0, _ = columns.length; i < _; i++)
             {
-                if ((column = columns[i]).showOperate)
+                if ((column = columns[i]) && (storage = column.__storage) && storage.showOperate)
                 {
-                    writer.push('<div class="flyingon-Grid-contextmenuitem"><input type="checkbox"' + (column.visible ? ' checked="true"' : '') + ' column-index="' + i + '"></input>' + column.title + '</div>')
+                    writer.push('<div class="flyingon-Grid-contextmenuitem">',
+                        '<input type="checkbox"', 
+                        storage.visible ? ' checked="true"' : '',
+                        ' column-index="', i, 
+                        '"></input>',
+                        column.titleText,
+                        '</div>');
                 }
             }
 
@@ -2255,7 +2308,7 @@ $class('Grid', flyingon.Control, function (base) {
             cache,
             visible;
 
-        if (index != null && (column = columns[index >>> 0]))
+        if (index != null && (column = columns[index | 0]) && (column = column.__storage))
         {
             if (column.visible = e.target.checked)
             {
@@ -2266,7 +2319,11 @@ $class('Grid', flyingon.Control, function (base) {
                 //检测不可隐藏所有列
                 for (var i = 0, _ = columns.length; i < _; i++)
                 {
-                    if ((cache = columns[i]) && cache.visible && cache.width > 0 && cache.showOperate)
+                    if ((cache = columns[i]) && 
+                        (cache = cache.__storage) && 
+                        cache.visible && 
+                        cache.width > 0 && 
+                        cache.showOperate)
                     {
                         visible = true;
                         break;
@@ -2276,9 +2333,9 @@ $class('Grid', flyingon.Control, function (base) {
 
             if (visible)
             {
-                self.render_header();
-                self.render_data();
-                self.render_scroll();
+                self.renderHeader();
+                self.renderBody();
+                self.renderScroll();
             }
             else
             {
@@ -2290,7 +2347,7 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //处理列头鼠标移入事件
-    function on_head_mouseover(self, e) {
+    function head_mouseover(self, e) {
 
         var name = e.target.className;
 
@@ -2302,7 +2359,7 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //处理列头鼠标按下事件
-    function on_head_mousedown(self, e) {
+    function head_mousedown(self, e) {
 
         var name = e.target.className;
 
@@ -2312,7 +2369,7 @@ $class('Grid', flyingon.Control, function (base) {
                 style = dom.style,
                 target = e.target,
                 parent = target.parentNode,
-                column = self.__columns[target.getAttribute('column-index') >>> 0],
+                column = self.__columns[target.getAttribute('column-index') | 0],
                 context = {
 
                     style: style,
@@ -2320,7 +2377,7 @@ $class('Grid', flyingon.Control, function (base) {
                     column: column
                 };
 
-            style.left = (parent.parentNode.offsetLeft + parent.offsetLeft + column.left + column.width - 2) + 'px';
+            style.left = (parent.parentNode.offsetLeft + parent.offsetLeft + column.left + column.__storage.width - 2) + 'px';
             style.display = 'block';
 
             flyingon.dom_drag(context, e, null, null, resize_end, 'y', false);
@@ -2333,6 +2390,7 @@ $class('Grid', flyingon.Control, function (base) {
 
         var self = this.grid,
             column = this.column,
+            storage = column.__storage,
             style = this.style,
             distanceX = e.distanceX;
 
@@ -2341,27 +2399,25 @@ $class('Grid', flyingon.Control, function (base) {
 
         if (distanceX)
         {
-            if (distanceX < -column.width)
+            if (distanceX < -storage.width)
             {
-                distanceX = -column.width;
+                distanceX = -storage.width;
             }
 
-            column.width += distanceX;
+            storage.width += distanceX;
 
-            self.render_header();
-            self.render_data();
-            self.render_scroll();
+            self.renderHeader();
+            self.renderBody();
+            self.renderScroll();
 
             //调整滚动条位置
             if (distanceX < 0 && (style = self.dom_hscroll.style).display === 'none')
             {
                 //设置滚动位置
                 style.display = 'block';
+                
                 self.dom_hscroll.scrollLeft = 0;
-                style.display = 'none';
-
-                grid.dom_head.children[1].children[0].style.left = '0';
-                grid.dom_body.children[1].children[0].style.left = '0';
+                self.dom_header.children[0].style.left = self.dom_body.children[0].style.left = self.dom_header.lockedWidth + 'px';
             }
 
             if (self.dom_sort.column_index >= column.renderIndex)
@@ -2375,7 +2431,7 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //处理列头点击事件
-    function on_head_click(self, e) {
+    function head_click(self, e) {
 
         var name = e.target.className,
             view,
@@ -2384,21 +2440,22 @@ $class('Grid', flyingon.Control, function (base) {
 
         if (name && name.indexOf('flyingon-Grid-operate') >= 0)
         {
-            showOperate(self, e);
+            show_operate(self, e);
         }
         else if ((view = self.__view) &&
-            (cell = view.event_hcell(e)) &&
+            (cell = view.eventHeaderCell(e)) &&
             (cell.getAttribute('column-end') == null) &&
-            (column = self.__columns[cell.getAttribute('column-index') >>> 0]))
+            (column = self.__columns[cell.getAttribute('column-index') | 0]))
         {
-            var dom = self.dom_sort,
+            var storage = column.__storage,
+                dom = self.dom_sort,
                 parent = cell.parentNode,
                 style = dom.style,
                 cache;
 
-            if (column.sortable && (cache = parent.parentNode))
+            if (storage.sortable && (cache = parent.parentNode))
             {
-                view.sort(column, column.desc = !column.desc);
+                view.sort(column, storage.desc = !storage.desc);
 
                 style.display = 'block';
 
@@ -2408,7 +2465,7 @@ $class('Grid', flyingon.Control, function (base) {
                 style.top = (cell.offsetTop + ((cell.offsetHeight - dom.offsetHeight) >> 1)) + 'px';
                 style.left = dom.offset_left + 'px';
 
-                dom.className = 'flyingon-Grid-sort flyingon-Grid-' + (column.desc ? 'desc' : 'asc');
+                dom.className = 'flyingon-Grid-sort flyingon-Grid-' + (storage.desc ? 'desc' : 'asc');
 
                 //如果是滚动列则记下滚动条位置以便拖动时调整偏移
                 if (cache && (cache = cache.className) && cache.indexOf('flyingon-Grid-scroll') >= 0)
@@ -2420,7 +2477,7 @@ $class('Grid', flyingon.Control, function (base) {
                     dom.scroll_left = -1;
                 }
 
-                render_data(self);
+                render_body(self);
             }
             else
             {
@@ -2431,7 +2488,7 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //处理表格体鼠标移入事件
-    function on_body_mouseover(self, e) {
+    function body_mouseover(self, e) {
 
         var view = self.__view,
             cell,
@@ -2445,13 +2502,13 @@ $class('Grid', flyingon.Control, function (base) {
         try
         {
             //IE8在滚动鼠标分屏加载时会触发系统异常, 可能IE8的渲染与js执行不是同步的
-            if (tip && view && (cell = view.event_cell(e)) &&
+            if (tip && view && (cell = view.eventBodyCell(e)) &&
                 self.trigger('cellmouseover', e, cell) !== false &&
                 cell.scrollWidth > cell.clientWidth &&
                 (text = cell.textContent || cell.innerText))
             {
                 tip.dom['textContent' in cell ? 'textContent' : 'innerText'] = text;
-                tip.open(cell);
+                tip.open(cell, 4);
             }
         }
         catch (e)
@@ -2461,24 +2518,24 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //处理表格体鼠标按下事件
-    function on_body_mousedown(self, e) {
+    function body_mousedown(self, e) {
 
         var view, cell, column;
 
         if ((e.which === 1 || e.button === 1) &&
             (view = self.__view) &&
-            (cell = view.event_cell(e)) &&
-            (column = self.__columns[cell.getAttribute('column-index') >>> 0]))
+            (cell = view.eventBodyCell(e)) &&
+            (column = self.__columns[cell.getAttribute('column-index') | 0]))
         {
             if (!e.target.getAttribute('no-current') &&
                 (!column.__on_cell_mousedown || column.__on_cell_mousedown(e, cell) !== false))
             {
-                view.__change_current(cell);
+                view.changeCurrent(cell);
             }
 
             if (!column.readonly && !self.readonly())
             {
-                var row = view[cell.getAttribute('row-index') >>> 0],
+                var row = view[cell.getAttribute('row-index') | 0],
                     event = new flyingon.Event('beforeedit');
 
                 if (self.trigger(event, column, row) !== false)
@@ -2491,7 +2548,7 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //处理单元格点击事件
-    function on_body_click(self, e) {
+    function body_click(self, e) {
 
         var view = self.__view,
             cell;
@@ -2506,7 +2563,7 @@ $class('Grid', flyingon.Control, function (base) {
             {
                 view.__on_expand(e);
             }
-            else if (cell = view.event_cell(e))
+            else if (cell = view.eventBodyCell(e))
             {
                 self.trigger('cellclick', e, cell);
             }
@@ -2569,7 +2626,7 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //处理表格体keyup事件
-    function on_body_keyup(self, e) {
+    function body_keyup(self, e) {
 
         var view = self.__view;
 
@@ -2599,7 +2656,7 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //移出表格组件范围时的清理
-    function on_mouseout(self, e, dom) {
+    function dom_mouseout(self, e, dom) {
 
         if (self.trigger('cellmouseout', e) !== false)
         {
@@ -2609,7 +2666,7 @@ $class('Grid', flyingon.Control, function (base) {
 
             if (x <= rect.left || y <= rect.top || x >= rect.right || y >= rect.bottom)
             {
-                if (dom === self.dom_head)
+                if (dom === self.dom_header)
                 {
                     dom.children[2].style.display = 'none';
                 }
@@ -2619,47 +2676,37 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //获取事件触发相关的表格行
-    this.getEventRow = function (e) {
+    this.eventRow = function (e) {
 
         var view = this.__view,
             cell;
 
-        if (view && (cell = view.event_cell(e)))
+        if (view && (cell = view.eventBodyCell(e)))
         {
-            return view[cell.getAttribute('row-index') >>> 0];
+            return view[cell.getAttribute('row-index') | 0];
         }
     };
 
 
     //获取事件触发相关的表格列
-    this.getEventColumn = function (e) {
+    this.eventColumn = function (e) {
 
         var columns = this.__columns,
             view = this.__view,
             cell;
 
-        if (columns && view && (cell = view.event_cell(e) || view.event_hcell(e)))
+        if (columns && view && (cell = view.eventBodyCell(e) || view.eventHeaderCell(e)))
         {
-            return columns[cell.getAttribute('column-index') >>> 0];
+            return columns[cell.getAttribute('column-index') | 0];
         }
     };
 
 
-    //关闭提醒信息
-    this.closeTip = function () {
-
-        tip && tip.close();
-        return this;
-    };
-
-
-    //初始化列集合
     this.__init_columns = function (options) {
 
         var Class = flyingon.GridColumn,
             list = Class.all,
             columns = [],
-            columnType,
             cache;
 
         if (this.__columns)
@@ -2671,80 +2718,275 @@ $class('Grid', flyingon.Control, function (base) {
         {
             if (cache = options[i])
             {
-                columns.push(new ((columnType = cache.columnType) && list[columnType] || Class)(this, cache));
+                var column = new (list[cache.type] || Class)();
+                
+                column.grid = this;
+                column.assign(cache, 'type');
+                
+                columns.push(column);
             }
         }
 
-        columns.__init = true;
-
-        this.__columns = columns;
+        (this.__columns = columns).__init = true;
     };
+    
+    
+    //查找列
+    this.findColumn = function (filter) {
+        
+        var columns = this.__columns;
+        
+        if (columns)
+        {
+            if (!filter)
+            {
+                return null;
+            }
+            
+            switch (typeof filter)
+            {
+                case 'number':
+                    return columns[filter | 0] || null;
 
+                case 'string':
+                    for (var i = columns.length - 1; i >= 0; i--)
+                    {
+                        if (columns[i].fieldName === filter)
+                        {
+                            return columns[i];
+                        }
+                    }
+                    break;
 
-    this.update = function () {
-
+                case 'function':
+                    for (var i = columns.length - 1; i >= 0; i--)
+                    {
+                        if (filter(columns[i]))
+                        {
+                            return columns[i];
+                        }
+                    }
+                    break;
+            }
+        }
+        
+        return null;
+    };
+    
+    
+    //添加列
+    this.addColumn = function (type, options) {
+        
+        return this.insertColumn(-1, type, options);
+    };
+    
+    
+    //插入列
+    this.insertColumn = function (index, type, options) {
+        
+        var columns = this.__columns || (this.__columns = []),
+            Class = flyingon.GridColumn,
+            column;
+        
+        if (type instanceof Class)
+        {
+            column = type;
+        }
+        else if (type)
+        {
+            if (typeof type === 'object')
+            {
+                options = type;
+                type = type.type;
+            }
+                
+            column = new (Class.all[type] || Class)();
+            column.assign(options);
+        }
+        else
+        {
+            column = new Class();
+            column.assign('');
+        }
+        
+        if (index < 0 || index >= columns.length)
+        {
+            columns.push(column);
+        }
+        else
+        {
+            columns.splice(index, 0, column);
+        }
+        
+        return this.update();
+    };
+    
+    
+    //移除列
+    this.removeColumn = function (index) {
+      
+        var columns = this.__columns;
+        
+        if (columns)
+        {
+            columns.splice(index.renderIndex || (index | 0), 1);
+            this.update();
+        }
+        
+        return this;
+    };
+    
+    
+    
+    var update_time = 0;
+    
+    
+    //刷新表格
+    this.refresh = function (body) {
+    
         var date = new Date();
 
         this.render();
+        
+        //先记录下窗口的大小
+        this.clientWidth = this.dom.clientWidth;
+        this.clientHeight = this.dom.clientHeight;
 
         if (this.__columns)
         {
-            this.render_header();
-
+            if (body !== true)
+            {
+                this.renderHeader();
+            }
+            
             if (this.__dataSource)
             {
-                this.render_data(true);
+                this.renderBody(true);
             }
             else
             {
-                //先记录下窗口的大小
-                this.clientWidth = this.dom.clientWidth;
-                this.clientHeight = this.dom.clientHeight;
-
-                this.render_scroll();
+                this.renderScroll();
             }
         }
-
+            
         console.log('update:' + (new Date() - date));
+        
+        return this;
+    };
+    
 
+    //更新表格
+    this.update = function (body) {
+
+        var self = this;
+        
+        if (update_time)
+        {
+            clearTimeout(update_time);
+        }
+        
+        update_time = setTimeout(function () {
+            
+            self.refresh(body);
+            
+        }, 20);
+        
         return this;
     };
 
 
+    
+    //渲染表头
+    this.renderHeader = function () {
 
-    //渲染头
+        var columns = this.__columns;
+
+        if (columns && columns.length > 0)
+        {
+            var date = new Date();
+
+            var head = this.dom_header,
+                style = head.style,
+                lockedBefore = this.lockedBefore(), //锁定列
+                totalWidth = 0,
+                lockedWidth = 0,
+                visible1 = 0,
+                visible2 = 0,
+                column,
+                storage,
+                width;
+
+            //计算锁定列宽
+            for (var i = 0, _ = columns.length; i < _; i++)
+            {
+                if ((column = columns[i]) && 
+                    (storage = column.__storage) && 
+                    (storage.visible && (width = storage.width) > 0))
+                {
+                    if (i < lockedBefore)
+                    {
+                        visible1++;
+                        lockedWidth += width;
+                    }
+                    else
+                    {
+                        visible2++;
+                    }
+
+                    totalWidth += width;
+                }
+            }
+
+            head.locked_visible = visible1; //锁定列可见列数
+            head.scroll_visible = visible2; //非锁定列的可见列数
+
+            head.lockedBefore = lockedBefore; //锁定列数
+            head.lockedWidth = lockedWidth; //锁定列宽
+            head.totalWidth = totalWidth; //滚动列宽
+
+            head.headerHeight = this.headerHeight(); //列头高度
+
+            style.display = 'none';
+
+            //设置总宽高
+            style.width = head.totalWidth + 'px';
+            style.height = this.dom_back.style.height = head.headerHeight + 'px';
+
+            //渲染列头
+            head.innerHTML = head.headerHeight > 0 ? render_header(this, columns) : '';
+
+            style.display = 'block';
+
+            console.log('render columns: ' + columns.length + ' columns, time:' + (new Date() - date) + 'ms');
+        }
+
+        return this;
+    };
+
+    
     function render_header(self, columns) {
 
         var writer = [],
-            lockedBefore = columns.lockedBefore,
-            lockedWidth = columns.lockedWidth,
-            totalWidth = columns.totalWidth,
-            headerHeight = columns.headerHeight,
-            style1 = 'overflow:hidden;margin:0;padding:0;height:' + headerHeight + 'px;width:',
-            style2 = 'position:absolute;border:0;' + style1;
+            head = self.dom_header,
+            lockedBefore = head.lockedBefore,
+            lockedWidth = head.lockedWidth,
+            headerHeight = head.headerHeight,
+            style = 'position:absolute;overflow:hidden;margin:0;border:0;padding:0;height:' + headerHeight + 'px;width:';
 
-        writer.push('<div class="flyingon-Grid-locked" style="' + style2 + lockedWidth + 'px;left:0;">');
-        writer.push('<div style="position:relative;border:0;' + style1 + lockedWidth + 'px;">');
+        writer.push('<div class="flyingon-Grid-scroll" style="', style, head.totalWidth - lockedWidth, 'px;left:', lockedWidth, 'px;">');
+
+        render_columns_header(writer, columns, lockedBefore, columns.length, headerHeight);
+
+        writer.push('</div>',
+                    '<div class="flyingon-Grid-locked" style="', style, lockedWidth, 'px;left:0;z-index:1;">');
 
         if (lockedBefore > 0)
         {
             render_columns_header(writer, columns, 0, lockedBefore, headerHeight);
         }
 
-        writer.push('</div>');
-        writer.push('</div>');
-
-        totalWidth -= lockedWidth;
-
-        writer.push('<div class="flyingon-Grid-scroll" style="' + style2 + totalWidth + 'px;left:' + lockedWidth + 'px;">');
-        writer.push('<div style="position:relative;border:0;' + style1 + totalWidth + 'px;left:' + (-self.dom_hscroll.scrollLeft) + 'px;">');
-
-        render_columns_header(writer, columns, lockedBefore, columns.length, headerHeight);
-
-        writer.push('</div>');
-        writer.push('</div>');
-
-        writer.push('<div class="flyingon-Grid-operate" style="position:absolute;display:none;z-index:1;"></div>');
+        writer.push('</div>',
+                    '<div class="flyingon-Grid-operate" style="position:absolute;display:none;z-index:1;"></div>');
 
         return writer.join('');
     };
@@ -2756,102 +2998,34 @@ $class('Grid', flyingon.Control, function (base) {
 
         for (var i = start; i < end; i++)
         {
-            left += columns[i].__render_header(writer, columns, i, left, headerHeight);
+            left += columns[i].renderHeader(writer, columns, i, left, headerHeight);
         }
     };
 
 
-    //渲染表头
-    this.render_header = function () {
 
-        var columns = this.__columns;
-
-        if (columns && columns.length > 0)
-        {
-            var date = new Date();
-
-            var head = this.dom_head,
-                style = head.style,
-                lockedBefore = this.lockedBefore(), //锁定列
-                totalWidth = 0,
-                lockedWidth = 0,
-                visible1 = 0,
-                visible2 = 0,
-                column,
-                width;
-
-            //计算锁定列宽
-            for (var i = 0, _ = columns.length; i < _; i++)
-            {
-                if ((column = columns[i]) && column.visible && column.width > 0)
-                {
-                    if (i < lockedBefore)
-                    {
-                        visible1++;
-                        lockedWidth += column.width;
-                    }
-                    else
-                    {
-                        visible2++;
-                    }
-
-                    totalWidth += column.width;
-                }
-            }
-
-            columns.locked_visible = visible1; //锁定列可见列数
-            columns.scroll_visible = visible2; //非锁定列的可见列数
-
-            columns.lockedBefore = lockedBefore;
-            columns.lockedWidth = lockedWidth; //锁定列宽
-            columns.totalWidth = totalWidth; //滚动列宽
-
-            columns.headerHeight = this.headerHeight(); //列头高度
-
-            style.display = 'none';
-
-            //设置总宽高
-            style.width = columns.totalWidth + 'px'; //modified by yaozy 2016.01.20
-            style.height = this.dom_head_back.style.height = columns.headerHeight + 'px';
-
-            //渲染列头
-            head.innerHTML = columns.headerHeight > 0 ? render_header(this, columns) : '';
-
-            style.display = 'block';
-
-            console.log('render columns: ' + columns.length + ' columns, time:' + (new Date() - date) + 'ms');
-        }
-
-        return this;
-    };
-
-
-    //初始化数据源
     this.__init_dataSource = function (data) {
 
-        var view = this.__view,
-            columns = this.__columns;
+        var view = this.__view;
 
         if (view && view.data && view instanceof flyingon.GridView)
         {
             view.clear();
         }
 
-        if (columns && columns.headerHeight >= 0 && this.dom.parentNode)
+        if (this.dom_header.headerHeight >= 0 && this.dom.parentNode)
         {
-            //重置滚动条 add by yaozy 2016.01.28
+            //重置滚动条
             if (this.dom_vscroll.scrollTop)
             {
                 this.dom_vscroll.scrollTop = 0;
             }
-            //end add
 
-            this.render_data(true);
+            this.renderBody(true);
         }
     };
 
 
-    //初始化视图
     this.__init_view = function (value) {
 
         var GridView = flyingon.GridView,
@@ -2865,33 +3039,32 @@ $class('Grid', flyingon.Control, function (base) {
 
         if (value != null)
         {
-            if (typeof value === 'string')
-            {
-                this.__view = new (GridView.all[value] || GridView)(this);
-            }
-            else
-            {
-                this.__view = new (GridView.all[value.viewType] || GridView)(this, value);
-            }
+            view = this.__view = new (GridView.all[value.viewType || value] || GridView)();
+            view.grid = this;
+            view.assign(value, 'type');
         }
 
-        return this;
+        return view;
     };
 
 
-    function render_data(self, resize) {
+    //渲染数据
+    this.renderBody = function (resize) {
 
-        var view = self.__view || (self.__view = new flyingon.GridView(self)),
+        render_body(this, resize);
+        return this;
+    };
+
+    
+    function render_body(self, resize) {
+
+        var view = self.__view || self.__init_view(''),
             columns = self.__columns,
             data = self.__dataSource || [],
             scrollTop = self.dom_vscroll.scrollTop,
             start = view.findRowIndex(scrollTop);
 
-        //先记录下窗口的大小
-        self.clientWidth = self.dom.clientWidth;
-        self.clientHeight = self.dom.clientHeight;
-
-        self.dom_body.style.height = (self.clientHeight - (columns && columns.headerHeight || 0)) + 'px'; //add by yaozy 2016.01.20
+        self.dom_body.style.height = (self.clientHeight - self.dom_header.headerHeight) + 'px';
 
         if (view.data !== data)
         {
@@ -2900,7 +3073,7 @@ $class('Grid', flyingon.Control, function (base) {
         }
 
         //启用了延迟分包加载
-        if (view.delayMaxRows > data.length && start > data.length)
+        if (view.maxDelayRows() > data.length && start > data.length)
         {
             self.trigger('delayload', function (rows) {
 
@@ -2911,8 +3084,7 @@ $class('Grid', flyingon.Control, function (base) {
 
                     if (resize)
                     {
-                        //delete by yaozy 2016.01.20
-                        self.render_scroll();
+                        self.renderScroll();
                     }
                 }
                 else if (!view.length)
@@ -2927,8 +3099,7 @@ $class('Grid', flyingon.Control, function (base) {
 
             if (resize)
             {
-                //delete by yaozy 2016.01.20
-                self.render_scroll();
+                self.renderScroll();
             }
         }
         else
@@ -2946,25 +3117,16 @@ $class('Grid', flyingon.Control, function (base) {
         }
 
         self.dom_body.style.height = '0';
-        self.render_scroll();
+        self.renderScroll();
 
         self.trigger('emptydata');
     };
 
 
-    //渲染数据
-    this.render_data = function (resize) {
-
-        render_data(this, resize);
-        return this;
-    };
-
-
-
-    //检测滚动条
     this.__check_scroll = function (width, height) {
 
-        var style1 = this.dom_head.style,
+        var head= this.dom_header,
+            style1 = head.style,
             style2 = this.dom_body.style,
             clientWidth = this.clientWidth,
             clientHeight = this.clientHeight,
@@ -2976,7 +3138,7 @@ $class('Grid', flyingon.Control, function (base) {
             hscroll = flyingon.hscroll_height;
         }
 
-        if (height > clientHeight - this.__columns.headerHeight - hscroll)
+        if (height > clientHeight - head.headerHeight - hscroll)
         {
             vscroll = flyingon.vscroll_width;
 
@@ -2991,17 +3153,17 @@ $class('Grid', flyingon.Control, function (base) {
 
 
     //渲染滚动条
-    this.render_scroll = function () {
+    this.renderScroll = function () {
 
         var date = new Date();
 
-        var columns = this.__columns,
+        var head = this.dom_header,
             view = this.__view,
             hscroll_style = this.dom_hscroll.style,
             vscroll_style = this.dom_vscroll.style,
             end_style = this.dom_end.style;
 
-            var width = view && view.width || columns.totalWidth,
+            var width = view && view.width || head.totalWidth,
             height = view && view.height || 0,
             scroll = this.__check_scroll(width, height),
             hscroll = scroll[0],
@@ -3010,7 +3172,7 @@ $class('Grid', flyingon.Control, function (base) {
         if (hscroll > 0)
         {
             hscroll_style.display = 'block';
-            this.dom_hscroll.children[0].style.width = (width + (vscroll > 0 ? 1 : 0)) + 'px';
+            this.dom_hscroll.children[0].style.width = width + (vscroll > 0 ? 1 : 0) + 'px';
         }
         else
         {
@@ -3020,10 +3182,10 @@ $class('Grid', flyingon.Control, function (base) {
         if (vscroll > 0)
         {
             vscroll_style.display = 'block';
-            vscroll_style.top = (columns && columns.headerHeight || 0) + 'px';
+            vscroll_style.top = head.headerHeight + 'px';
             vscroll_style.bottom = (hscroll > 0 ? hscroll - 2 : 0) + 'px';
 
-            this.dom_vscroll.children[0].style.height = (height + (hscroll > 0 ? 1 : 0)) + 'px';
+            this.dom_vscroll.children[0].style.height = height + (hscroll > 0 ? 1 : 0) + 'px';
         }
         else
         {
@@ -3091,7 +3253,7 @@ $class('Grid', flyingon.Control, function (base) {
                 if (row = cache[i])
                 {
                     row.checked = false;
-                    view.find_row_cells(row, list);
+                    view.findRowCells(row, list);
                 }
             }
 
@@ -3125,7 +3287,7 @@ $class('Grid', flyingon.Control, function (base) {
                     row.checked = true;
                     
                     (cache || (view.checkedRows = new Set())).add(row);
-                    view.find_row_cells(row, list);
+                    view.findRowCells(row, list);
                 }
             }
 
@@ -3174,7 +3336,7 @@ $class('Grid', flyingon.Control, function (base) {
                 cache.selected = false;
 
                 view.currentRow = null;
-                view.find_row_cells(cache).removeClass(className);
+                view.findRowCells(cache).removeClass(className);
             }
 
             if (row)
@@ -3182,7 +3344,7 @@ $class('Grid', flyingon.Control, function (base) {
                 row.selected = true;
 
                 view.currentRow = row;
-                view.find_row_cells(row).addClass(className);
+                view.findRowCells(row).addClass(className);
             }
         }
 
@@ -3224,7 +3386,7 @@ $class('Grid', flyingon.Control, function (base) {
                 cache.selected = false;
 
                 view.currentColumn = null;
-                view.find_column_cells(cache).removeClass(className);
+                view.findColumnCells(cache).removeClass(className);
             }
 
             if (column)
@@ -3232,7 +3394,7 @@ $class('Grid', flyingon.Control, function (base) {
                 column.selected = true;
 
                 view.currentColumn = column;
-                view.find_column_cells(column).addClass(className);
+                view.findColumnCells(column).addClass(className);
             }
         }
 
@@ -3259,7 +3421,7 @@ $class('Grid', flyingon.Control, function (base) {
                 index = length - 1;
             }
 
-            this.dom_vscroll.scrollTop = view.rowHeight * index;
+            this.dom_vscroll.scrollTop = view.rowHeight() * index;
         }
 
         return this;
@@ -3274,7 +3436,7 @@ $class('Grid', flyingon.Control, function (base) {
         if (view)
         {
             view.expand();
-            render_data(this, true);
+            render_body(this, true);
         }
 
         return this;
@@ -3291,14 +3453,49 @@ $class('Grid', flyingon.Control, function (base) {
             view.collapse(true);
             view.fix_vscroll();
 
-            render_data(this, true);
+            render_body(this, true);
         }
 
         return this;
     };
 
 
-    //销毁列集合
+    //关闭提醒信息
+    this.closeTip = function () {
+
+        tip && tip.close();
+        return this;
+    };
+
+
+    this.dispose = function () {
+
+        var view = this.__view,
+            off = flyingon.dom_off;
+
+            off(this.dom_hscroll);
+            off(this.dom_vscroll);
+            off(this.dom_header);
+            off(this.dom_body);
+            off(this.dom);
+
+        if (view)
+        {
+            if (view.grid)
+            {
+                view.clear();
+                view.grid = null;
+            }
+
+            this.__view = null;
+        }
+
+        this.__dispose_columns();
+
+        return base.dispose.call(this);
+    };
+
+
     this.__dispose_columns = function () {
 
         var columns = this.__columns,
@@ -3312,38 +3509,8 @@ $class('Grid', flyingon.Control, function (base) {
             }
 
             columns.length = 0;
-
             this.__columns = null;
         }
-    };
-
-
-    //销毁
-    this.dispose = function () {
-
-        var view = this.__view,
-            off = flyingon.dom_off;
-
-            off(this.dom_hscroll);
-            off(this.dom_vscroll);
-            off(this.dom_head);
-            off(this.dom_body);
-            off(this.dom);
-
-        if (view)
-        {
-            if (view instanceof flyingon.GridView)
-            {
-                view.clear();
-                view.grid = null;
-            }
-
-            this.__view = null;
-        }
-
-        this.__dispose_columns();
-
-        return base.dispose.call(this);
     };
 
 

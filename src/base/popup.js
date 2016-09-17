@@ -1,7 +1,4 @@
 
-//自动引入样式
-$include('flyingon/css/{skin}/flyingon-controls.css', true);
-
 
 /**
 * 弹出层组件
@@ -12,13 +9,13 @@ $include('flyingon/css/{skin}/flyingon-controls.css', true);
 * closing: 关闭前事件(可取消)
 * closed: 关闭后事件
 */
-$class('PopupLayer', flyingon.Component, function (base) {
+$class('Popup', [Object, flyingon.IComponent], function () {
 
 
 
     var layers = [], //弹出层管理器
 
-        Event = flyingon.UIEvent; //UI事件类
+        Event = flyingon.DomEvent; //Dom事件类
 
 
 
@@ -26,7 +23,7 @@ $class('PopupLayer', flyingon.Component, function (base) {
 
         var dom = this.dom = document.createElement('div');
 
-        dom.className = 'flyingon-PopupLayer';
+        dom.className = 'flyingon-Popup ';
         dom.style.cssText = 'position:absolute;visibility:hidden;';
         
         this.__dispose = dispose;
@@ -34,6 +31,11 @@ $class('PopupLayer', flyingon.Component, function (base) {
 
 
 
+    //扩展class相关操作
+    flyingon.__class_extend(this, 'flyingon-Popup ');
+    
+    
+    
     //弹出层宽度
     this.defineProperty('width', '', {
 
@@ -60,25 +62,45 @@ $class('PopupLayer', flyingon.Component, function (base) {
     this.defineProperty('closeAway', false);
     
     
-    //弹出定位方式 值:对象
-    //position: 停靠位置 bottom:下面 top:上面 right:右边 left:左边
-    //align: 对齐 left|center|right|top|middle|bottom
-    //reverse: 空间不足时是否反转方向
-    //offset1: 当前方向偏移
-    //offset2: 相反方向偏移
-    this.defineProperty('location', null);
+    //停靠位置 bottom:下面 top:上面 right:右边 left:左边
+    this.defineProperty('location', 'bottom');
+    
+    
+    //对齐 left|center|right|top|middle|bottom
+    this.defineProperty('align', 'left');
+    
+    
+    //空间不足时是否反转方向
+    this.defineProperty('reverse', true);
+    
+    
+    //当前方向偏移
+    this.defineProperty('offset1', 0);
+    
+    
+    //相反方向偏移
+    this.defineProperty('offset2', 2);
 
 
 
     //打开弹出层
     //dom: 参考停靠的dom对象
-    this.open = function (dom) {
+    this.open = function (dom, offsetX, offsetY) {
 
         if (check_open(this) !== false)
         {
-            var location = this.location() || {};
+            var target = this.__storage || this.__defaults,
+                rect = dom.getBoundingClientRect();
             
-            flyingon.dom_align(this.dom, dom, location.position, location.align, location.reverse, location.offset1 || 2, location.offset2 || 2);
+            rect = {
+                
+                left: rect.left + (offsetX | 0),
+                top: rect.top + (offsetY | 0),
+                right: rect.right,
+                bottom: rect.bottom
+            };
+            
+            flyingon.dom_align(this.dom, rect, target.location, target.align, target.reverse, target.offset1, target.offset2);
             open(this);
             
             return true;
@@ -347,7 +369,11 @@ $class('PopupLayer', flyingon.Component, function (base) {
     this.dispose = function () {
         
         this.dom = null;
-        base.dispose.call(this);  
+        
+        if (this.__events)
+        {
+            this.off();
+        } 
     };
 
 

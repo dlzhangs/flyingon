@@ -195,7 +195,7 @@
 
 
 //可视组件基类
-$class('Visual', [Object, flyingon.Component], function () {
+$class('Visual', [Object, flyingon.IComponent], function () {
    
     
         

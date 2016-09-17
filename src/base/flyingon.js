@@ -16,7 +16,7 @@
 //根名字空间
 var flyingon = window.flyingon = function (selector, context) {
     
-    return new flyingon.Query(selector, context);
+    return new flyingon.Query().find(selector, context);
 };
 
 
@@ -172,6 +172,11 @@ flyingon.absoluteUrl = (function () {
     };
 
 })();
+
+
+//待扩展的选择器
+flyingon.Query = function () { };
+
 
 
 
@@ -1188,7 +1193,11 @@ flyingon.absoluteUrl = (function () {
     
 
 
-    var regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
+    var has = {}.hasOwnProperty,
+    
+        regex_interface = /^I[A-Z][A-Za-z0-9]*$/,   //接口名正则表式验证
+        
+        regex_class = /^[A-Z][A-Za-z0-9]*$/, //类名正则表式验证
 
         class_list = flyingon.__class_list = flyingon.create(null), //已注册类型集合
 
@@ -1203,7 +1212,7 @@ flyingon.absoluteUrl = (function () {
     //定义接口方法
     function $interface(name, fn) {
         
-        if (!regex_class.test(name))
+        if (!regex_interface.test(name))
         {
             throw $errortext('flyingon', 'interface name error');
         }
@@ -1213,17 +1222,23 @@ flyingon.absoluteUrl = (function () {
             xtype = namespace.namespace_name + '.' + name;
         
         prototype[xtype] = true;
+        prototype.defineProperty = defaults.defineProperty;
 
         fn.call(prototype);
         
         fn = function (target) {
           
-            var cache = prototype;
-            
-            for (var name in cache)
+            if (this instanceof fn)
             {
-                target[name] = cache[name];
+                throw $errortext('flyingon', 'interface can not new');
             }
+            
+            if (!target)
+            {
+                throw $errortext('flyingon', 'interface target error');
+            }
+            
+            extend(target, prototype);
         };
         
         fn.xtype = xtype;
@@ -1479,30 +1494,36 @@ flyingon.absoluteUrl = (function () {
     //处理类接口
     function class_superclass(prototype, list) {
         
-        var extend = flyingon.extend,
-            target, 
-            cache;
+        var target;
         
         for (var i = 1, _ = list.length; i < _; i++)
         {
             if (target = list[i])
             {
-                target = target.prototype || target;
-    
-                for (cache in target)
-                {
-                    prototype[cache] = target[cache];
-                }
-                
-                if (cache = target.__defaults)
-                {
-                    extend(prototype.__defaults, cache);
-                    extend(prototype.__properties, target.__properties);
-                }
+                extend(prototype, target.prototype || target);
             }
         }
     };
+                        
+           
+    //扩展原型
+    function extend(prototype, target) {
+        
+        for (var name in target)
+        {
+            switch (name)
+            {
+                case '__defaults': //默认值
+                case '__properties': //属性集
+                    flyingon.extend(prototype[name] || (prototype[name] = flyingon.create(null)), target[name]);
+                    break;
 
+                default:
+                    prototype[name] = target[name];
+                    break;
+            }
+        }
+    };
     
     
     //处理类静态成员
@@ -1613,26 +1634,20 @@ flyingon.absoluteUrl = (function () {
         var cache = attributes;
 
         //初始化attributes并生成属性元数据
-        this.__properties[name] = attributes = { name: name, dataType: 'object' };
+        attributes = { name: name };
      
         //处理默认值
         if (typeof defaultValue === 'function')
         {
             attributes.fn = defaultValue;
-            defaultValue = cache && cache.defaultValue;
         }
         else
         {
             attributes.defaultValue = defaultValue;
         }
         
-        this.__defaults[name] = defaultValue;
-
         //根据默认值生成数据类型
-        if (!attributes.dataType)
-        {
-            attributes.dataType = typeof defaultValue;
-        }
+        attributes.dataType = typeof attributes.defaultValue;
         
         if (cache && typeof cache === 'object')
         {
@@ -1641,27 +1656,21 @@ flyingon.absoluteUrl = (function () {
                 attributes[key] = cache[key];
             }
         }
-   
-        //直接设置函数
-        if (cache = attributes.fn)
-        {
-            this[name] = cache;
-        }
-        else //动态生成方法
-        {
-            //创建按需加载属性以提升初始化性能
-            this[name] = function (value, trigger) {
+        
+        (this.__defaults || (this.__defaults = flyingon.create(null)))[name] = attributes.defaultValue;
+        (this.__properties|| (this.__properties = flyingon.create(null)))[name] = attributes;
 
-                var target = this.constructor,
-                    fn = attributes.fn || defineProperty(name, attributes);
-                
-                target = target && target.prototype || this;
-                return (target[name] = fn).call(this, value, trigger);
-            };
-        }
+        //如未直接设置函数则创建按需加载属性以提升初始化性能
+        this[name] = attributes.fn || function (value, trigger) {
+
+            var target = property_target(this, name),
+                fn = attributes.fn || property_fn(attributes);
+
+            return (target[name] = fn).call(this, value, trigger);
+        };
 
         //扩展至选择器
-        if (attributes.query && flyingon.Query)
+        if (attributes.query)
         {
             flyingon.Query.prototype[name] = function (value) {
                 
@@ -1669,11 +1678,32 @@ flyingon.absoluteUrl = (function () {
             };
         }
     };
-
+    
+    
+    //获取属性绑定的目标对象
+    function property_target(target, name) {
+      
+        var Class = target.Class;
         
-    function defineProperty(name, attributes) {
+        while (Class)
+        {
+            if (has.call(target = Class.prototype, name))
+            {
+                return target;
+            }
+            
+            Class = Class.superclass;
+        }
         
-        var dataType = attributes.dataType,
+        return target;
+    };
+    
+        
+    //动态创建属性函数
+    function property_fn(attributes) {
+        
+        var name = attributes.name,
+            dataType = attributes.dataType,
             storage, 
             data,
             cache;
@@ -1852,6 +1882,28 @@ flyingon.absoluteUrl = (function () {
 
         return this;
     };
+    
+    
+    //批量赋属性值
+    defaults.assign = function (values, type) {
+        
+        var storage = this.__storage || (this.__storage = flyingon.create(this.__defaults));
+        
+        if (values)
+        {
+            type = type || 'xtype';
+            
+            for (var name in values)
+            {
+                if (name !== type)
+                {
+                    storage[name] = values[name];
+                }
+            }
+        }
+        
+        return this;
+    };
 
 
     //获取或设置属性默认值
@@ -1870,7 +1922,7 @@ flyingon.absoluteUrl = (function () {
 
 
     //获取属性值集合
-    defaults.getProperties = function (filter) {
+    defaults.properties = function (filter) {
 
         var target = this.__properties,
             data = [],
@@ -2124,32 +2176,47 @@ $class('Event', function () {
 
 
     //阻止事件冒泡
-    this.stopPropagation = function () {
+    this.stopPropagation = function (dom_event) {
 
         this.cancelBubble = true;
+        
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.stopPropagation();
+        }
     };
 
 
     //禁止默认事件
-    this.preventDefault = function () {
+    this.preventDefault = function (dom_event) {
 
         this.defaultPrevented = true;
+           
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.preventDefault();
+        }
     };
 
 
     //阻止事件冒泡及禁止默认事件
-    this.stopImmediatePropagation = function () {
+    this.stopImmediatePropagation = function (dom_event) {
 
         this.cancelBubble = this.defaultPrevented = true;
+                   
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.stopImmediatePropagation();
+        }
     };
 
     
     this.__class_init = function (Class) {
       
-        Class.load = function (type) {
+        Class.init = function (type) {
          
             var event = new Class(type),
-                i = 0,
+                i = 1,
                 length = arguments.length;
             
             while (i < length)

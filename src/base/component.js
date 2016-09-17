@@ -1,6 +1,6 @@
 
-//组件基类
-$class('Component', flyingon.ISerialize, function () {
+//组件接口
+$interface('IComponent', function () {
   
     
 
@@ -10,6 +10,10 @@ $class('Component', flyingon.ISerialize, function () {
     
     //定义id属性
     this.defineProperty('id', '');
+    
+    
+    //扩展序列化接口
+    flyingon.ISerialize(this);
     
 
     //序列化方法
