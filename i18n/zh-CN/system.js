@@ -1,4 +1,4 @@
-flyingon.i18n('system', {
+$i18nlist('system', {
 
     ok: '确定',
     cancel: '取消',

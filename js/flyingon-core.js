@@ -106,7 +106,7 @@ flyingon.parseJSON = window.JSON && JSON.parse || (function () {
         {
             if (regex1.test(text.replace(regex2, '')))
             {
-                throw $errortext('flyingon', 'json parse error');
+                throw $translate('flyingon', 'json parse error');
             }
 
             return new Function('return ' + text)();
@@ -189,7 +189,7 @@ flyingon.Query = function () { };
 
         dom = document.createElement('div'), //清除节点用
 
-        ie9 = !-[1,] || document.documentMode === 9, //ie9
+        ie9 = !-[1,] || document.documentMode === 9, //ie9及以下版本
         
         base_path = flyingon.absoluteUrl('/'), //网站主路径
 
@@ -217,22 +217,18 @@ flyingon.Query = function () { };
         
         include_ajax = ie9, //是否ajax加载js, IE6789不支持script异步加载, 因为js的执行与加载完毕事件不是一一对应
 
-        include_var = { //引入资源变量
+        include_keys = { //引入资源变量
             
             layout: 'default', //当前布局
             skin: 'default', //当前皮肤
             i18n: navigator.language || 'zh-CN'    //当前本地化名称
         },
         
-        var_files = {}, //已加载的变量文件集合
+        key_files = {}, //已加载的变量文件集合
 
         i18n_list = flyingon.create(null), //本地化信息集合
         
-        error_type,  //当前错误类型
-        
-        error_path = '{type}/i18n/{i18n}/error.js', //错误信息路径模板
-        
-        error_list = flyingon.create(null), //错误信息列表        
+        translate_list = flyingon.create(null), //翻译资源文件列表        
 
         regex_namespace = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/, //名字空间名称检测
 
@@ -245,7 +241,7 @@ flyingon.Query = function () { };
     flyingon_path = include_path = (function () {
         
         var list = document.scripts,
-            regex = /flyingon(?:-mini)?(?:\.min)?\.js/;
+            regex = /flyingon(?:-core)?(?:\.min)?\.js/;
         
         for (var i = list.length - 1; i >= 0; i--)
         {
@@ -263,15 +259,75 @@ flyingon.Query = function () { };
     })();
     
     
+    
+    //引入js或css资源
+    //url可为字符串路径或路径数组
+    //url规则: /xxx: 相对网站根目录
+    //url规则: xxx 相对flyingon.js目录
+    //url规则: ./xxx: 相对flyingon.js目录
+    //url规则: ../xxx: 相对flyingon.js的上级目录
+    //url规则: xxx://xxx 绝对路径
+    function $require(url, css, callback) {
+
+        if (url)
+        {
+            var include = include_list,
+                current = include_current,
+                items = typeof url === 'string' ? [url] : url,
+                list;
+            
+            if (typeof css === 'function')
+            {
+                callback = css;
+                css = null;
+            }
+
+            for (var i = 0, _ = items.length; i < _; i++)
+            {
+                url = items[i];
+                
+                //样式
+                if (css === true || (css !== false && url.indexOf(css || '.css') >= 0))
+                {
+                    if (!include[url = to_src(url)])
+                    {
+                        include[url] = true; //标记css文件已经加载
+                        create_link(url);
+                    }
+                }
+                else if (callback) //按需加载并执行回调
+                {
+                    (list || (list = [])).push(url);
+                }
+                else if (include[url = to_src(url)] !== true && !current[url]) //依赖加载
+                {
+                    current[url] = true;
+                    current.push(url);
+                }
+            }
+
+            if (list && (list = check_require(list, callback)))
+            {
+                load_include(list);
+            }
+            else if (callback)
+            {
+                callback(flyingon);
+            }
+        }
+    };
+
+    
+    
     //是否使用同步script模式加载资源
-    flyingon.include_sync = function (value) {
+    $require.sync = function (value) {
     
         include_sync = !!value;
     };
     
     
     //是否使用ajax模式加载资源
-    flyingon.include_ajax = function (value) {
+    $require.ajax = function (value) {
       
         if (value || !ie9) //IE9以下不能设置为不使用ajax加载模式
         {
@@ -281,7 +337,7 @@ flyingon.Query = function () { };
     
 
     //指定引入资源起始路径
-    flyingon.include_path = function (path) {
+    $require.path = function (path) {
 
         if (path === void 0)
         {
@@ -312,7 +368,7 @@ flyingon.Query = function () { };
 
 
     //指定引入资源版本号
-    flyingon.include_version = function (version, files) {
+    $require.version = flyingon.include_version = function (version, files) {
 
         if (typeof version === 'string')
         {
@@ -334,7 +390,7 @@ flyingon.Query = function () { };
 
 
     //指定引入资源合并关系
-    flyingon.include_merge = function (values) {
+    $require.merge = flyingon.include_merge = function (values) {
 
         if (values)
         {
@@ -358,99 +414,7 @@ flyingon.Query = function () { };
     };
     
     
-    //引入js或css资源
-    //url: /xxx: 相对网站根目录
-    //url: xxx 相对flyingon.js目录
-    //url: ./xxx: 相对flyingon.js目录
-    //url: ../xxx: 相对flyingon.js的上级目录
-    //url: xxx://xxx 绝对路径
-    function $include(url, css) {
-
-        if (url && typeof url === 'string' && !check_css(url, css))
-        {
-            var list;
-
-            //如果脚本已处理
-            if (include_list[url = to_src(url)] !== true && !(list = include_current)[url])
-            {
-                list[url] = true;
-                list.push(url);
-            }
-        }
-    };
-
-
-    //require函数
-    function $require(url, callback, css) {
-
-        if (typeof url === 'function')
-        {
-            url(flyingon);
-            return;
-        }
         
-        if (typeof callback !== 'function')
-        {
-            callback = null;
-        }
-        
-        var length;
-        
-        if (typeof url === 'string')
-        {
-            if (!check_css(url, css))
-            {
-                url = [url];
-                length = 1;
-            }
-        }
-        else if ((length = url.length) > 0)
-        {
-            for (var i = 0; i < length; i++)
-            {
-                if (check_css(url[i], css))
-                {
-                    url.splice(i, 1);
-                    i--;
-                    length--;
-                }
-            }
-        }
-        else
-        {
-            url = null;
-        }
-        
-        if (url && length && (url = check_require(url, callback)))
-        {
-            load_include(url);
-        }
-        else if (callback)
-        {
-            callback(flyingon);
-        }
-    };
-
-    
-    
-    //检测指定的url是否css文件
-    function check_css(url, css) {
-        
-        if (css === true || (css !== false && url.indexOf(css || '.css') >= 0))
-        {
-            var include = include_list;
-            
-            if (!include[url = to_src(url)])
-            {
-                include[url] = true; //标记css文件已经加载
-                create_link(url);
-            }
-            
-            return true;
-        }
-    };
-    
-
     //转换相对url为绝对src
     function to_src(url) {
 
@@ -469,7 +433,7 @@ flyingon.Query = function () { };
         if ((index = url.indexOf('{')) >= 0 && 
             (cache = url.indexOf('}')) > index &&
             (name = url.substring(index + 1, cache)) &&
-            ((cache = include_var[name]) || (name = null)))
+            ((cache = include_keys[name]) || (name = null)))
         {
             src = url.replace('{' + name + '}', cache);
         }
@@ -501,7 +465,7 @@ flyingon.Query = function () { };
         //记录多语言及皮肤
         if (name)
         {
-            (var_files[name] || (var_files[name] = {}))[cache] = url;
+            (key_files[name] || (key_files[name] = {}))[cache] = url;
         }
 
         return include_url[src] = cache;
@@ -835,7 +799,7 @@ flyingon.Query = function () { };
 
             if (cycle > 10)
             {
-                throw $errortext('flyingon', 'include cycle');
+                throw $translate('flyingon', 'include cycle');
             }
 
             var cache = include[url];
@@ -915,43 +879,32 @@ flyingon.Query = function () { };
 
     
     //获取或设置引入变量值
-    flyingon.include_var = function (name, value, callback, init) {
+    $require.key = function (key, value, callback, set) {
         
-        var list = include_var;
+        var list = include_keys;
         
         if (!value)
         {
-            return list[name];
+            return list[key];
         }
         
-        if (value && list[name] !== value)
+        if (value && list[key] !== value)
         {
             //设置当前变量
-            list[name] = value;
+            list[key] = value;
 
-            //国际化时先清空缓存
-            if (name === 'i18n')
-            {
-                i18n_list = flyingon.create(null);
-                error_list = flyingon.create(null);
-            }
-            
-            init && init();
+            set && set();
          
-            if (list = var_files[name])
+            if (list = key_files[key])
             {
-                for (var _ in list) //有引入的变量资源则重新切换引入
-                {
-                    change_include(list, callback, callback === true);
-                    break;
-                }
+                change_include(list, key === 'skin', callback);
             }
         }
     };
     
     
     //变量皮肤或多语言资源
-    function change_include(data, callback, css) {
+    function change_include(data, css, callback) {
         
         var list = document.getElementsByTagName(css ? 'link' : 'script'),
             cache;
@@ -976,14 +929,14 @@ flyingon.Query = function () { };
             list.push(cache);
         }
         
-        $require(list, callback, css);
+        $require(list, css, callback || function () {});
     };
 
 
     //获取或设置当前皮肤
     flyingon.skin = function (name) {
 
-        return flyingon.include_var('skin', name, true);
+        return $require.key('skin', name);
     };
     
     
@@ -995,28 +948,33 @@ flyingon.Query = function () { };
 
 
     //获取或设置当前本地化名称
-    (flyingon.i18n = function (name, values) {
+    flyingon.i18n = function (name) {
 
-        if (name && typeof name === 'object')
+        return $require.key('i18n', name, null, function () {
+        
+            //国际化时先清空缓存
+            i18n_list = flyingon.create(null);
+            translate_list = flyingon.create(null);
+        });
+    };
+
+    
+    //定义国际化集合
+    function $i18nlist(name, values) {
+    
+        if (typeof name === 'object')
         {
             values = name;
             name = null;
         }
-        else if (!values || typeof values !== 'object')
-        {
-            return flyingon.include_var('i18n', name, values);
-        }
-
-        extend_i18n(i18n_list, name, values);
         
-    }).all = function () { //获取所有本地化信息值
-
-        return i18n_list;
-    };
-
-    
-    function extend_i18n(target, name, values) {
-    
+        if (!values)
+        {
+            return i18n_list;
+        }
+        
+        var target = i18n_list;
+        
         if (name)
         {
             name += '.';
@@ -1035,68 +993,41 @@ flyingon.Query = function () { };
         }
     };
     
-
-    //修改错误路径模板, 使用ajax同步加载, 不能跨域 支持变量: {type} {i18n}
-    flyingon.error_path = function (path) {
-        
-        if (path)
-        {
-            error_path = '' + path;
-        }
-        else
-        {
-            return error_path;
-        }
-    };
     
-    
-   //定义错误信息
-    flyingon.error = function (name, values) {
-        
-        if (name && typeof name === 'object')
-        {
-            values = name;
-            name = null;
-        }
-        else if (!values || typeof values !== 'object')
-        {
-            return;
-        }
-        
-        var type = error_type;
-        
-        if (type)
-        {
-            type = error_list[type] || (error_list[type] = flyingon.create(null));
-            extend_i18n(type, name, values);
-        }
-    };
-    
-    
-    //获取错误信息
-    function $errortext(type, key) {
+    //翻译国际化信息
+    function $translate(url, name) {
       
-        if (type && key)
+        if (url && name)
         {
-            var cache = error_list[type];
+            var target = translate_list[url];
             
-            if (cache)
+            if (target)
             {
-                return cache[key] || key;
+                return target[name] || name;
             }
             
-            cache = to_src(error_path.replace('{type}', error_type = type));
+            flyingon.ajax(to_src($translate[url] || url), { 
                 
-            flyingon.ajax(cache, { dataType: 'script', async: false });
-
-            return (cache = error_list[type]) && cache[key] || key;
+                dataType: 'json', 
+                async: false 
+                
+            }).done(function (data) {
+             
+                translate_list[url] = target = data;
+            });
+            
+            return target && target[name] || name;
         }
     };
+    
+    
+    //定义翻译flyingon资源路径
+    $translate.flyingon = 'flyingon/i18n/{i18n}/message.json';
     
     
     
     //默认名字空间名
-    flyingon.namespace_name = 'flyingon';
+    flyingon.namespaceName = 'flyingon';
 
 
     //定义或切换名字空间
@@ -1121,9 +1052,9 @@ flyingon.Query = function () { };
                         cache = target[name] = flyingon.create(null);
                     }
                     
-                    if (!cache.namespace_name)
+                    if (!cache.namespaceName)
                     {
-                        cache.namespace_name = target.namespace_name ? target.namespace_name + '.' + name : name;
+                        cache.namespaceName = target.namespaceName ? target.namespaceName + '.' + name : name;
                     }
                     
                     target = cache;
@@ -1131,7 +1062,7 @@ flyingon.Query = function () { };
             }
             else
             {
-                throw $errortext('flyingon', 'namespace name error');
+                throw $translate('flyingon', 'namespace name error');
             }
         }
         else
@@ -1176,11 +1107,11 @@ flyingon.Query = function () { };
     
     //输出外部接口
     //分开赋值解决chrome调试时类名过长的问题
-    flyingon.$include = window.$include = $include;
-    flyingon.$i18ntext = window.$i18ntext = $i18ntext;
-    flyingon.$errortext = window.$errortext = $errortext;
-    flyingon.$require = window.$require = $require;
-    flyingon.$namespace = window.$namespace = $namespace;
+    window.$require = window.$include = $require;
+    window.$i18nlist = $i18nlist;
+    window.$i18ntext = $i18ntext;
+    window.$translate = $translate;
+    window.$namespace = $namespace;
     
 
 })(window, document, flyingon);
@@ -1189,7 +1120,7 @@ flyingon.Query = function () { };
     
 
 //类,属性及事件
-(function (flyingon) {
+(function (window, flyingon) {
     
 
 
@@ -1214,12 +1145,12 @@ flyingon.Query = function () { };
         
         if (!regex_interface.test(name))
         {
-            throw $errortext('flyingon', 'interface name error');
+            throw $translate('flyingon', 'interface name error');
         }
         
         var prototype = flyingon.create(null),
             namespace = $namespace.current || flyingon,
-            xtype = namespace.namespace_name + '.' + name;
+            xtype = namespace.namespaceName + '.' + name;
         
         prototype[xtype] = true;
         prototype.defineProperty = defaults.defineProperty;
@@ -1230,12 +1161,12 @@ flyingon.Query = function () { };
           
             if (this instanceof fn)
             {
-                throw $errortext('flyingon', 'interface can not new');
+                throw $translate('flyingon', 'interface can not new');
             }
             
             if (!target)
             {
-                throw $errortext('flyingon', 'interface target error');
+                throw $translate('flyingon', 'interface target error');
             }
             
             extend(target, prototype);
@@ -1285,7 +1216,7 @@ flyingon.Query = function () { };
         }
         else
         {
-            throw $errortext('flyingon', '$constructor not in class');
+            throw $translate('flyingon', '$constructor not in class');
         }
     };
     
@@ -1301,7 +1232,7 @@ flyingon.Query = function () { };
         }
         else
         {
-            throw $errortext('flyingon', '$static not in class');
+            throw $translate('flyingon', '$static not in class');
         }
     };
     
@@ -1332,7 +1263,7 @@ flyingon.Query = function () { };
         }
         else if (!regex_class.test(name))
         {
-            throw $errortext('flyingon', 'class name error');
+            throw $translate('flyingon', 'class name error');
         }
 
         if (!fn && (fn = superclass))
@@ -1342,7 +1273,7 @@ flyingon.Query = function () { };
 
         if (typeof fn !== 'function')
         {
-            throw $errortext('flyingon', 'class fn error');
+            throw $translate('flyingon', 'class fn error');
         }
 
                 
@@ -1405,7 +1336,7 @@ flyingon.Query = function () { };
         //xtype
         if (name)
         {
-            prototype.xtype = namespace.namespace_name + '.' + name;
+            prototype.xtype = namespace.namespaceName + '.' + name;
         }
         
         
@@ -1628,7 +1559,7 @@ flyingon.Query = function () { };
 
         if (name.match(/\W/))
         {
-            throw $errortext('flyingon', 'property name error').replace('{0}', name);
+            throw $translate('flyingon', 'property name error').replace('{0}', name);
         }
 
         var cache = attributes;
@@ -1820,6 +1751,14 @@ flyingon.Query = function () { };
         {
             return false;
         }
+    };
+    
+    
+    //获取当前存储对象
+    defaults.storage = function (name) {
+        
+        var storage = this.__storage || (this.__storage = flyingon.create(this.__defaults));
+        return name ? storage[name] : storage;
     };
     
         
@@ -2137,14 +2076,14 @@ flyingon.Query = function () { };
     
     //输出外部接口
     //分开赋值解决chrome调试时类名过长的问题
-    flyingon.$interface = window.$interface = $interface;
-    flyingon.$class = window.$class = $class;
-    flyingon.$constructor = window.$constructor = $constructor;
-    flyingon.$static = window.$static = $static;
+    window.$interface = $interface;
+    window.$class = $class;
+    window.$constructor = $constructor;
+    window.$static = $static;
     
 
 
-})(flyingon);
+})(window, flyingon);
 
 
 
@@ -2343,17 +2282,14 @@ $class('Async', function () {
 $class('Ajax', [Object, flyingon.Async], function () {
 
 
-    var ajax_fn;
-
-    
     //发送请求
     $constructor(function (url, options) {
 
         var self = this,
-            ajax = this.ajax = new (ajax_fn || ajax_init())(),
+            ajax = this.ajax = new XMLHttpRequest(),
             data,
             cache;
-
+        
         if (options)
         {
             for (var name in options)
@@ -2372,7 +2308,7 @@ $class('Ajax', [Object, flyingon.Async], function () {
         {
             options = {};
         }
-
+        
         //执行发送前全局start事件
         if (cache = flyingon.Ajax.start)
         {
@@ -2392,19 +2328,7 @@ $class('Ajax', [Object, flyingon.Async], function () {
             }, cache);
         }
 
-        ajax.onreadystatechange = function () {
-
-            callback(self, this, url, options);
-        };
-
-        if (cache = this.method)
-        {
-            cache = cache.toUpperCase();
-        }
-        else
-        {
-            cache = 'GET';
-        }
+        cache = (cache = this.method) && cache.toUpperCase() || 'GET';
 
         if (data)
         {
@@ -2419,7 +2343,30 @@ $class('Ajax', [Object, flyingon.Async], function () {
             }
         }
 
-        ajax.open(this.method, url, this.async, this.user, this.password);
+        //CORS
+        if (this.crossDomain)
+        {
+            //withCredentials是XMLHTTPRequest2中独有的
+            if ('withCredentials' in ajax)
+            {
+                ajax.withCredentials = true;
+            }
+            else if (cache = window.XDomainRequest)
+            {
+                ajax = new cache();
+            }
+            else
+            {
+                throw $translate('flyingon', 'ajax no crossDomain');
+            }
+        }
+        
+        ajax.open(this.method, url, this.async);
+        
+        ajax.onreadystatechange = function () {
+
+            callback(self, this, url, options);
+        };
 
         if (cache = this.header)
         {
@@ -2443,8 +2390,8 @@ $class('Ajax', [Object, flyingon.Async], function () {
     //method
     this.method = 'GET';
 
-    //text/plain || json || script || xml
-    this.dataType = 'text/plain';
+    //text || json || script || xml
+    this.dataType = 'text';
 
     //内容类型
     this.contentType = 'application/x-www-form-urlencoded';
@@ -2454,57 +2401,14 @@ $class('Ajax', [Object, flyingon.Async], function () {
 
     //是否异步
     this.async = true;
-
-    //请求用户名
-    this.user = void 0;
-
-    //请求密码
-    this.password = void 0;
+    
+    //是否支持跨域(CORS)
+    this.crossDomain = false;
 
     //超时时间
     this.timeout = 0;
     
     
-
-    function ajax_init() {
-
-        var cache = window.XMLHttpRequest;
-
-        if (cache)
-        {
-            return ajax_fn = function () { 
-
-                return new cache(); 
-            };
-        }
-
-        if (cache = window.ActiveXObject)
-        {
-            var items = ['MSXML2.XMLHTTP.4.0', 'MSXML2.XMLHTTP', 'Microsoft.XMLHTTP'];
-
-            for (var i = 0, _ = items.length; i < _; i++)
-            {
-                try
-                {
-                    (ajax_fn = function () { 
-
-                        return new cache(items[i]); 
-                    })();
-
-                    return ajax_fn;
-                }
-                catch (e)
-                {
-                }
-            }
-        }
-
-        if (cache = window.createRequest)
-        {
-            return ajax_fn = cache;
-        }
-    };
-
 
     //处理响应结果
     function callback(self, ajax, url, options) {
@@ -2521,22 +2425,24 @@ $class('Ajax', [Object, flyingon.Async], function () {
 
             if (ajax.status < 300)
             {
-                if ((cache = self.dataType).indexOf('json') >= 0)
+                switch (self.dataType)
                 {
-                    self.resolve(flyingon.parseJSON(ajax.responseText));
-                }
-                else if (cache.indexOf('script') >= 0)
-                {
-                    flyingon.globalEval(ajax.responseText); //全局执行js避免变量冲突
-                    self.resolve(url);
-                }
-                else if (cache.indexOf('xml') >= 0)
-                {
-                    self.resolve(ajax.responseXML);
-                }
-                else
-                {
-                    self.resolve(ajax.responseText);
+                    case 'json':
+                        self.resolve(flyingon.parseJSON(ajax.responseText));
+                        break;
+                        
+                    case 'script':
+                        flyingon.globalEval(ajax.responseText); //全局执行js避免变量冲突
+                        self.resolve(ajax.responseText);
+                        break;
+                        
+                    case 'xml':
+                        self.resolve(ajax.responseXML);
+                        break;
+                        
+                    default:
+                        self.resolve(ajax.responseText);
+                        break;
                 }
             }
             else

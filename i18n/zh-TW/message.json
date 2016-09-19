@@ -1,5 +1,4 @@
-flyingon.error({
-    
+{
     "include cycle": "文件循環依賴不能超過10層!",
     "namespace name error": "名字空間名稱只能使用爾寫英文字毋和藪字且似爾寫英文字毋開頭, 哆級名字空間使用\".\"汾隔!",
     "interface name error": "類名只能使用英文字毋和藪字且似\"I\"加大寫英文字毋開頭!",
@@ -12,4 +11,4 @@ flyingon.error({
     "serialize no id": "序列化引用的對象必須設置id!",
     "$constructor not in class": "函數\"$constructor\"只能在定義類時調用!",
     "$static not in class": "函數\"$static\"只能在定義類時調用!"
-});
+}

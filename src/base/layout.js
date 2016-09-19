@@ -131,7 +131,7 @@ $class('Layout', [Object, flyingon.IComponent], function (base, self) {
         }
         else
         {
-            return flyingon.include_var('layout', name, values); //获取或设置当前布局
+            return $require.key('layout', name, values); //获取或设置当前布局
         }
     };
     

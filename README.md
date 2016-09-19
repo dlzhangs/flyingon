@@ -23,7 +23,7 @@ flyingon主要包含以下内容：
 
 
 浏览器支持：
-IE6+
+IE7+
 FF3+
 Safari4+
 chrome2+
@@ -40,8 +40,8 @@ Opera9+
 -----------------------------------
 
     //引入相关的js
-    $include('a.js');
-    $include('b.js');
+    $require('a.js');
+    $require('b.js');
 
 
     //$namespace: 定义或切换名字空间, 注：test参数为flyingon.test的别名

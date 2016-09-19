@@ -33,14 +33,14 @@
 	{
         base: '',
         files: ['src/base/flyingon.js'],
-        output: 'js/flyingon-mini.js',
+        output: 'js/flyingon-core.js',
         minify: false
 	},
 	
     {
         base: 'js',
-        files: ['flyingon-mini.js'],
-        output: 'flyingon-mini.min.js',
+        files: ['flyingon-core.js'],
+        output: 'flyingon-core.min.js',
         minify: true,
         //mangle: false,
         //mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]},

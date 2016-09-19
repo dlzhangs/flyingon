@@ -1,5 +1,5 @@
 //自动引入样式
-$include('flyingon/css/{skin}/flyingon-controls.css', true);
+$require('flyingon/css/{skin}/flyingon-controls.css', true);
 
 
 

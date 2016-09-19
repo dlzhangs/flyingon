@@ -1,11 +1,11 @@
-flyingon.i18n('test', {
+$i18nlist('test', {
 
     ok: 'ok',
     cancel: 'cancel'
 });
 
 
-flyingon.i18n({
+$i18nlist({
    
     'test.exit': 'exit',
     'test.close': 'close'
