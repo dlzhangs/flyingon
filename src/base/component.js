@@ -287,6 +287,6 @@ $interface('IComponent', function () {
     };
     
         
-});
+}, true);
 
 

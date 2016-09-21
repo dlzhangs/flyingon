@@ -1,7 +1,11 @@
+$require('flyingon/demo/src/class/class3.js');
+
 
 //$namespace: 定义或切换名字空间, 注：test参数为flyingon.test的别名
 $namespace('flyingon.test', function (test) {
 
+    
+    console.log('test1.js executed!');
     
     
     //定义基类: freeoasoft.test.BaseClass (注:仅在名字空间内才可定义类)

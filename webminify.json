@@ -64,6 +64,7 @@
 			'src/base/container.js',
 			'src/base/panel.js',
 			'src/base/page.js',
+            'src/base/datatable.js',
             'src/base/popup.js',
 		],
         output: 'js/flyingon.js',
@@ -101,6 +102,27 @@
         //compress: false,
         advanced: true,
         license: '/*\n* flyingon javascript library v0.0.1.0\n* https://github.com/freeoasoft/flyingon\n*\n* Copyright 2014, yaozhengyang\n* licensed under the LGPL Version 3 licenses\n*/'
-    }
+    },
+    
+    {
+        base: '',
+        files: [
+			'src/controls/grid.js'
+		],
+        output: 'js/flyingon-grid.js',
+        minify: false
+    },
+	
+	{
+        base: 'js',
+        files: ['flyingon-grid.js'],
+        output: 'flyingon-grid.min.js',
+        minify: true,
+        //mangle: false,
+        //mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]},
+        //compress: false,
+        advanced: true,
+        license: '/*\n* flyingon javascript library v0.0.1.0\n* https://github.com/freeoasoft/flyingon\n*\n* Copyright 2014, yaozhengyang\n* licensed under the LGPL Version 3 licenses\n*/'
+    },
 	
 ]

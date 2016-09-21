@@ -1,5 +1,6 @@
 $require('flyingon/demo/src/class/class1.js');
 $require('flyingon/demo/src/class/class2.js');
+$require('flyingon/demo/src/class/class3.js');
 
 
 $namespace('flyingon.test', function (test) {

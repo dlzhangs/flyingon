@@ -195,29 +195,29 @@ flyingon.Query = function () { };
 
         flyingon_path, //flyingon路径, flyingon所在目录或flyingon.js文件所在目录
 
-        include_path, //引入资源起始目录
+        require_path, //引入资源起始目录
 
-        include_version = '', //引入资源版本
+        require_version = '', //引入资源版本
 
-        include_files = flyingon.create(null), //特殊指定的引入资源版本
+        require_files = flyingon.create(null), //特殊指定的引入资源版本
 
-        include_map = flyingon.create(null), //引入资源映射
+        require_map = flyingon.create(null), //引入资源映射
 
-        include_list = flyingon.create(null), //加载资源队列
+        require_list = flyingon.create(null), //加载资源队列
 
-        include_back = flyingon.create(null), //回溯检测关系
+        require_back = flyingon.create(null), //回溯检测关系
 
-        include_url = flyingon.create(null), //相对url对应绝对url
+        require_url = flyingon.create(null), //相对url对应绝对url
 
-        include_current = [], //当前加载资源缓
+        require_current = [], //当前加载资源缓
 
-        include_sync, //是否使用同步script模式加载资源
+        require_sync, //是否使用同步script模式加载资源
         
         sync_list = [], //同步资源队列
         
-        include_ajax = ie9, //是否ajax加载js, IE6789不支持script异步加载, 因为js的执行与加载完毕事件不是一一对应
+        require_ajax = ie9, //是否ajax加载js, IE6789不支持script异步加载, 因为js的执行与加载完毕事件不是一一对应
 
-        include_keys = { //引入资源变量
+        require_keys = { //引入资源变量
             
             layout: 'default', //当前布局
             skin: 'default', //当前皮肤
@@ -238,7 +238,7 @@ flyingon.Query = function () { };
                     
     
     //实始化起始路径
-    flyingon_path = include_path = (function () {
+    flyingon_path = require_path = (function () {
         
         var list = document.scripts,
             regex = /flyingon(?:-core)?(?:\.min)?\.js/;
@@ -271,8 +271,8 @@ flyingon.Query = function () { };
 
         if (url)
         {
-            var include = include_list,
-                current = include_current,
+            var require = require_list,
+                current = require_current,
                 items = typeof url === 'string' ? [url] : url,
                 list;
             
@@ -289,9 +289,9 @@ flyingon.Query = function () { };
                 //样式
                 if (css === true || (css !== false && url.indexOf(css || '.css') >= 0))
                 {
-                    if (!include[url = to_src(url)])
+                    if (!require[url = to_src(url)])
                     {
-                        include[url] = true; //标记css文件已经加载
+                        require[url] = true; //标记css文件已经加载
                         create_link(url);
                     }
                 }
@@ -299,7 +299,7 @@ flyingon.Query = function () { };
                 {
                     (list || (list = [])).push(url);
                 }
-                else if (include[url = to_src(url)] !== true && !current[url]) //依赖加载
+                else if (require[url = to_src(url)] !== true && !current[url]) //依赖加载
                 {
                     current[url] = true;
                     current.push(url);
@@ -308,7 +308,7 @@ flyingon.Query = function () { };
 
             if (list && (list = check_require(list, callback)))
             {
-                load_include(list);
+                load_require(list);
             }
             else if (callback)
             {
@@ -322,7 +322,7 @@ flyingon.Query = function () { };
     //是否使用同步script模式加载资源
     $require.sync = function (value) {
     
-        include_sync = !!value;
+        require_sync = !!value;
     };
     
     
@@ -331,7 +331,7 @@ flyingon.Query = function () { };
       
         if (value || !ie9) //IE9以下不能设置为不使用ajax加载模式
         {
-            include_ajax = !!value;
+            require_ajax = !!value;
         }
     };
     
@@ -341,27 +341,27 @@ flyingon.Query = function () { };
 
         if (path === void 0)
         {
-            return include_path;
+            return require_path;
         }
 
         if (path && typeof path === 'string')
         {
             if (path.charAt(0) === '/')
             {
-                include_path = flyingon.absoluteUrl(path);
+                require_path = flyingon.absoluteUrl(path);
             }
             else if (path.indexOf(':/') >= 0)
             {
-                include_path = path;
+                require_path = path;
             }
             else
             {
-                include_path = flyingon.absoluteUrl(flyingon_path + path);
+                require_path = flyingon.absoluteUrl(flyingon_path + path);
             }
             
             if (path.charAt(path.length - 1) !== '/')
             {
-                include_path += '/';
+                require_path += '/';
             }
         }
     };
@@ -372,7 +372,7 @@ flyingon.Query = function () { };
 
         if (typeof version === 'string')
         {
-            include_version = version;
+            require_version = version;
         }
         else
         {
@@ -383,7 +383,7 @@ flyingon.Query = function () { };
         {
             for (var name in files)
             {
-                include_files[name] = files[name];
+                require_files[name] = files[name];
             }
         }
     };
@@ -400,13 +400,13 @@ flyingon.Query = function () { };
 
                 if (typeof value === 'string')
                 {
-                    include_map[value] = name;
+                    require_map[value] = name;
                 }
                 else
                 {
                     for (var i = 0, _ = value.length; i < _; i++)
                     {
-                        include_map[value[i]] = name;
+                        require_map[value[i]] = name;
                     }
                 }
             }
@@ -416,15 +416,15 @@ flyingon.Query = function () { };
     
         
     //转换相对url为绝对src
-    function to_src(url) {
+    function to_src(url, key) {
 
-        var src = url = include_map[url] || url,
+        var src = url = require_map[url] || url,
             name,
             index,
             cache;
 
         //如果已经缓存则直接返回
-        if (cache = include_url[src])
+        if (cache = require_url[src])
         {
             return cache;
         }
@@ -433,15 +433,19 @@ flyingon.Query = function () { };
         if ((index = url.indexOf('{')) >= 0 && 
             (cache = url.indexOf('}')) > index &&
             (name = url.substring(index + 1, cache)) &&
-            ((cache = include_keys[name]) || (name = null)))
+            (cache = require_keys[name]))
         {
             src = url.replace('{' + name + '}', cache);
         }
+        else
+        {
+            key = false;
+        }
 
         //添加版本号
-        if (cache = include_files[url] || include_version)
+        if (cache = require_files[url] || require_version)
         {
-            cache = src + (url.indexOf('?') >= 0 ? '&' : '?') + 'include-version=' + cache;
+            cache = src + (url.indexOf('?') >= 0 ? '&' : '?') + 'require-version=' + cache;
         }
         else
         {
@@ -459,16 +463,16 @@ flyingon.Query = function () { };
         }
         else if (url.indexOf(':/') < 0)
         {
-            cache = include_path + cache;
+            cache = require_path + cache;
         }
         
         //记录多语言及皮肤
-        if (name)
+        if (key !== false)
         {
             (key_files[name] || (key_files[name] = {}))[cache] = url;
         }
 
-        return include_url[src] = cache;
+        return require_url[src] = cache;
     };
 
 
@@ -490,21 +494,21 @@ flyingon.Query = function () { };
     //检测按需引入的资源
     function check_require(list, callback) {
         
-        var include = include_list,
+        var require = require_list,
             data = [],
             back,
             src;
         
         if (callback)
         {
-            back = include_back;
+            back = require_back;
         }
         
         for (var i = 0, length = list.length; i < length; i++)
         {
             src = to_src(list[i]);
             
-            if (include[src] !== true && !data[src])
+            if (require[src] !== true && !data[src])
             {
                 data[src] = true;
                 data.push(src);
@@ -529,18 +533,18 @@ flyingon.Query = function () { };
     
     
     //加载引入资源
-    function load_include(list) {
+    function load_require(list) {
 
         if (list && list.length > 0)
         {
-            list = list.include || list;
+            list = list.require || list;
             
             //调试模式使用同步script方式加载资源
-            if (include_sync)
+            if (require_sync)
             {
                 registry_sync(list.reverse()); //倒序加入队列
             }
-            else if (include_ajax) //使用ajax加载资源
+            else if (require_ajax) //使用ajax加载资源
             {
                 script_ajax(list);
             }
@@ -555,17 +559,17 @@ flyingon.Query = function () { };
     //使用ajax的方式加载资源
     function script_ajax(list) {
                         
-        var include = include_list,
+        var require = require_list,
             src;
         
         for (var i = 0, length = list.length; i < length; i++)
         {
-            if ((src = list[i]) && !include[src])
+            if ((src = list[i]) && !require[src])
             {
                 //不跨域
                 if (src.indexOf(base_path) === 0)
                 {
-                    include[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
+                    require[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
                     flyingon.ajax(src, { dataType: 'script' }).always(script_load);
                 }
                 else //跨域使用script同步加载
@@ -620,7 +624,7 @@ flyingon.Query = function () { };
                 src = list.pop();
             }
             
-            if (include_list[src])
+            if (require_list[src])
             {
                 callback();
             }
@@ -629,7 +633,7 @@ flyingon.Query = function () { };
                 //标记正在加载防止重复执行
                 fn.load = true;
             
-                include_list[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
+                require_list[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
 
                 create_script(src, function (src) {
 
@@ -646,14 +650,14 @@ flyingon.Query = function () { };
     //异步加载脚本
     function script_async(list) {
         
-        var include = include_list,
+        var require = require_list,
             src;
 
         for (var i = 0, _ = list.length; i < _; i++)
         {
-            if ((src = list[i]) && !include[src])
+            if ((src = list[i]) && !require[src])
             {
-                include[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
+                require[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
                 create_script(src, script_load);
             }
         }
@@ -700,45 +704,45 @@ flyingon.Query = function () { };
     //脚本执行完毕
     function script_load(src) {
 
-        var include = include_list,
-            list = include_current,
-            back = include_back;
+        var require = require_list,
+            current = require_current,
+            back = require_back;
         
         //如果资源中包含需引入的资源则继续加载
-        if (list && list.length > 0 && check_include(include, back, src, list))
+        if (current && current.length > 0 && check_load(require, back, src, current))
         {
             //标记js已加载但未执行
-            include[src] = list;
+            require[src] = current;
 
             //初始化当前引入对象
-            include_current = [];
+            require_current = [];
 
             //继续加载资源
-            load_include(list);
+            load_require(current);
         }
         else
         {
             //标记已完全执行
-            include[src] = true;
+            require[src] = true;
             
             //回溯检测
-            check_back(include, back, src);
+            check_back(require, back, src);
         }
     };
 
 
     //检测引入资源
-    function check_include(include, back, src, list) {
+    function check_load(require, back, src, list) {
         
-        var data, item, cache;
+        var items, item, cache;
         
         for (var i = 0, length = list.length; i < length; i++)
         {
             if ((item = list[i]) && item[0] !== true)
             {
                 if (item === src || //自身不能引用自身
-                    (cache = include[item]) === true ||
-                    (cache && (cache = cache.include) && check_cycle(include, src, cache, 0))) //不能组成循环引用
+                    (cache = require[item]) === true ||
+                    (cache && (cache = cache.require) && check_cycle(require, src, cache, 0))) //不能组成循环引用
                 {
                     //移除当前url及执行最开始的回调函数
                     if (i === 0)
@@ -769,14 +773,14 @@ flyingon.Query = function () { };
                     continue;
                 }
                 
-                (data || (data = [])).push(item);
+                (items || (items = [])).push(item);
                 (back[item] || (back[item] = [])).push(src); //设置回溯
             }
         }
         
-        if (data)
+        if (items)
         {
-            list.include = data;
+            list.require = items;
             return true;
         }
      };
@@ -784,7 +788,7 @@ flyingon.Query = function () { };
     
     //检测循环引用
     //注: 循环引用时最后被加载的文件优先执行
-    function check_cycle(include, src, list, cycle) {
+    function check_cycle(require, src, list, cycle) {
       
         cycle++;
 
@@ -799,12 +803,12 @@ flyingon.Query = function () { };
 
             if (cycle > 10)
             {
-                throw $translate('flyingon', 'include cycle');
+                throw $translate('flyingon', 'require cycle');
             }
 
-            var cache = include[url];
+            var cache = require[url];
 
-            if (cache && (cache = cache.include) && check_cycle(include, src, cache, cycle))
+            if (cache && (cache = cache.require) && check_cycle(require, src, cache, cycle))
             {
                 return true;
             }
@@ -813,7 +817,7 @@ flyingon.Query = function () { };
     
     
     //检测是否已加载完毕
-    function check_done(include, list) {
+    function check_done(require, list) {
         
         var item;
         
@@ -823,7 +827,7 @@ flyingon.Query = function () { };
             {
                 item[1].apply(item[2], item[3]);
             }
-            else if (include[item] !== true)
+            else if (require[item] !== true)
             {
                 if (i > 0)
                 {
@@ -836,16 +840,16 @@ flyingon.Query = function () { };
         
         //清空数组
         list.length = 0;
-        list.include = null;
+        list.require = null;
     };
 
 
     //回溯检测引入的资源是否已加载完成
-    function check_back(include, back, src) {
+    function check_back(require, back, src) {
       
         var list = back[src],
-            cache,
-            item;
+            item,
+            cache;
         
         if (list)
         {
@@ -861,16 +865,16 @@ flyingon.Query = function () { };
                         item(flyingon);
                     }
                 }
-                else if ((cache = include[item]) && 
+                else if ((cache = require[item]) && 
                          cache !== true && 
                          cache !== 1 && 
-                         check_done(include, cache) !== false)
+                         check_done(require, cache) !== false)
                 {
                     //标记已完成执行
-                    include[item] = true;
+                    require[item] = true;
                     
                     //回溯检测
-                    check_back(include, back, item);
+                    check_back(require, back, item);
                 }
             }
         }
@@ -881,7 +885,7 @@ flyingon.Query = function () { };
     //获取或设置引入变量值
     $require.key = function (key, value, callback, set) {
         
-        var list = include_keys;
+        var list = require_keys;
         
         if (!value)
         {
@@ -897,14 +901,14 @@ flyingon.Query = function () { };
          
             if (list = key_files[key])
             {
-                change_include(list, key === 'skin', callback);
+                change_require(list, key === 'skin', callback);
             }
         }
     };
     
     
     //变量皮肤或多语言资源
-    function change_include(data, css, callback) {
+    function change_require(data, css, callback) {
         
         var list = document.getElementsByTagName(css ? 'link' : 'script'),
             cache;
@@ -923,7 +927,7 @@ flyingon.Query = function () { };
         for (var src in data)
         {
             //移除缓存
-            include_list[src] = include_url[cache = data[src]] = false; 
+            require_list[src] = require_url[cache = data[src]] = false; 
 
             //重新加载资源
             list.push(cache);
@@ -1006,7 +1010,7 @@ flyingon.Query = function () { };
                 return target[name] || name;
             }
             
-            flyingon.ajax(to_src($translate[url] || url), { 
+            flyingon.ajax(to_src($translate[url] || url, false), { 
                 
                 dataType: 'json', 
                 async: false 
@@ -1075,7 +1079,7 @@ flyingon.Query = function () { };
         if (typeof callback === 'function')
         {
             //如果正在动态加载脚本或还有依赖的js没有加载完成则先注册
-            if ((cache = include_current) && cache.length > 0)
+            if ((cache = require_current) && cache.length > 0)
             {
                 cache.push([true, load_namespace, window, [target, callback]]);
             }
@@ -1090,16 +1094,18 @@ flyingon.Query = function () { };
     //执行名字空间函数
     function load_namespace(target, callback) {
 
+        var stack = namespace_stack;
+        
         try
         {
             //记录当前名字空间
-            namespace_stack.push($namespace.current = target);
-
+            stack.push($namespace.current = target);
             callback.call(target, target, flyingon);
         }
         finally
         {
-            $namespace.current = namespace_stack.pop() || flyingon;
+            stack.pop();
+            $namespace.current = stack[stack.length - 1] || flyingon;
         }
     };
 
@@ -1134,14 +1140,27 @@ flyingon.Query = function () { };
 
         class_stack = [],  //类栈(支持类的内部定义类)
         
-        class_data, //当前类定义信息(支持类的内部定义类)
+        class_data; //当前类定义信息(支持类的内部定义类)
         
-        defaults = flyingon.create(null); //默认方法集合
-        
+                
+    
+    //注册或获取注册的类型
+    flyingon.registry_class = function (xtype, Class) {
+
+        if (Class)
+        {
+            class_list[xtype || Class.xtype] = Class;
+        }
+        else
+        {
+            return class_list[xtype];
+        }
+    };
+    
     
     
     //定义接口方法
-    function $interface(name, fn) {
+    function $interface(name, fn, property) {
         
         if (!regex_interface.test(name))
         {
@@ -1153,8 +1172,12 @@ flyingon.Query = function () { };
             xtype = namespace.namespaceName + '.' + name;
         
         prototype[xtype] = true;
-        prototype.defineProperty = defaults.defineProperty;
-
+        
+        if (property)
+        {
+            prototype.defineProperty = defineProperty;
+        }
+        
         fn.call(prototype);
         
         fn = function (target) {
@@ -1176,21 +1199,6 @@ flyingon.Query = function () { };
         fn.prototype = prototype;
  
         return namespace[name] = fn;
-    };
-    
-    
-    
-    //注册或获取注册的类型
-    flyingon.registry_class = function (xtype, Class) {
-
-        if (Class)
-        {
-            class_list[xtype || Class.xtype] = Class;
-        }
-        else
-        {
-            return class_list[xtype];
-        }
     };
     
     
@@ -1242,7 +1250,8 @@ flyingon.Query = function () { };
     //name:             类名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
     //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口, 接口只会复制其原型上的方法
     //fn:               类代码, 函数, 参数(base:父类原型, self:当前类原型)
-    function $class(name, superclass, fn) {
+    //property:         是否支持属性, false不支持, 可以从非属性类继承生成非属性类, 不能从非属性类继承生成属性类
+    function $class(name, superclass, fn, property) {
 
 
         var data = class_data = [null, null], 
@@ -1257,6 +1266,7 @@ flyingon.Query = function () { };
         //处理参数
         if (typeof name !== 'string') //不传name则创建匿名类
         {
+            property = fn;
             fn = superclass;
             superclass = name;
             name = null;
@@ -1266,14 +1276,18 @@ flyingon.Query = function () { };
             throw $translate('flyingon', 'class name error');
         }
 
-        if (!fn && (fn = superclass))
-        {
-            superclass = null;
-        }
-
         if (typeof fn !== 'function')
         {
-            throw $translate('flyingon', 'class fn error');
+            if (typeof superclass === 'function')
+            {
+                property = fn;
+                fn = superclass;
+                superclass = null;
+            }
+            else
+            {
+                throw $translate('flyingon', 'class fn error');
+            }
         }
 
                 
@@ -1300,26 +1314,54 @@ flyingon.Query = function () { };
         
         
         //创建原型
-        prototype = flyingon.create(base = superclass.prototype);
+        prototype = flyingon.create(base = superclass.prototype || Object.prototype);
 
-    
-        //生成默认值集合
-        prototype.__defaults = flyingon.create(base && base.__defaults || null);
-
-        //生成属性集合
-        prototype.__properties = flyingon.create(base && base.__properties || null);
-    
-        
         //设置base属性
         prototype.base = base;
 
-            
-        //复制默认方法
-        cache = defaults;
-
-        for (var key in cache)
+        
+        //判读是否非支持属性
+        if ((cache = base.__defaults) || property === true || (property !== false && cache !== false))
         {
-            prototype[key] = cache[key];
+            //生成默认值集合
+            prototype.__defaults = flyingon.create(cache || null);
+
+            //生成属性集合
+            prototype.__properties = flyingon.create(base.__properties || null);
+            
+            //创建一级类则生成属性事件相关方法
+            if (cache === void 0)
+            {
+                prototype.defineProperty = defineProperty;
+                prototype.__onpropertychange = onpropertychange;
+                prototype.storage = storage;
+                prototype.get = get;
+                prototype.set = set;
+                prototype.sets = sets;
+                prototype.assign = assign;
+                prototype.defaultValue = defaultValue;
+                prototype.properties = properties;
+            }
+        }
+        else
+        {
+            prototype.__defaults = false; //标记非属性类
+        }
+        
+            
+        //创建一级类则生成默认方法
+        if (cache === void 0)
+        {
+            prototype.on = on;
+            prototype.once = once;
+            prototype.suspend = suspend;
+            prototype.resume = resume;
+            prototype.off = off;
+            prototype.trigger = trigger;
+            prototype.clone = clone;
+            prototype.is = is;
+            prototype.toString = toString;
+            prototype.dispose = dispose;
         }
         
         
@@ -1541,21 +1583,21 @@ flyingon.Query = function () { };
 
     
     //检测当前对象是否指定类型
-    defaults.is = function (type) {
+    function is(type) {
 
         return type && (this instanceof type || ((type = type.xtype) && this[type]));
     };
 
 
     //默认toString方法
-    defaults.toString = function () {
+    function toString() {
 
         return '[object ' + this.xtype + ']';
     };
     
     
     //定义属性及set_XXX方法
-    defaults.defineProperty = function (name, defaultValue, attributes) {
+    function defineProperty(name, defaultValue, attributes) {
 
         if (name.match(/\W/))
         {
@@ -1743,7 +1785,7 @@ flyingon.Query = function () { };
         
 
     //属性值变更方法
-    defaults.__onpropertychange = function (name, value, oldValue) {
+    function onpropertychange(name, value, oldValue) {
     
         var fn, cache;
         
@@ -1755,7 +1797,7 @@ flyingon.Query = function () { };
     
     
     //获取当前存储对象
-    defaults.storage = function (name) {
+    function storage(name) {
         
         var storage = this.__storage || (this.__storage = flyingon.create(this.__defaults));
         return name ? storage[name] : storage;
@@ -1763,7 +1805,7 @@ flyingon.Query = function () { };
     
         
     //获取指定名称的值(数据绑定用)
-    defaults.get = function (name, context) {
+    function get(name, context) {
         
         var fn = this[name];
         
@@ -1777,7 +1819,7 @@ flyingon.Query = function () { };
     
     
     //设置指定名称的值(数据绑定用)
-    defaults.set = function (name, value, context) {
+    function set(name, value, context) {
         
         var fn = this[name];
         
@@ -1795,7 +1837,7 @@ flyingon.Query = function () { };
     
 
     //批量设置属性值
-    defaults.sets = function (values, trigger) {
+    function sets(values, trigger) {
 
         var fn;
         
@@ -1824,7 +1866,7 @@ flyingon.Query = function () { };
     
     
     //批量赋属性值
-    defaults.assign = function (values, type) {
+    function assign(values, type) {
         
         var storage = this.__storage || (this.__storage = flyingon.create(this.__defaults));
         
@@ -1846,7 +1888,7 @@ flyingon.Query = function () { };
 
 
     //获取或设置属性默认值
-    defaults.defaultValue = function (name, value) {
+    function defaultValue(name, value) {
 
         var defaults = this.__defaults;
 
@@ -1861,7 +1903,7 @@ flyingon.Query = function () { };
 
 
     //获取属性值集合
-    defaults.properties = function (filter) {
+    function properties(filter) {
 
         var target = this.__properties,
             data = [],
@@ -1881,7 +1923,7 @@ flyingon.Query = function () { };
     
     
     //绑定事件处理 注:type不带on
-    defaults.on = flyingon.on = function (type, fn) {
+    function on(type, fn) {
 
         if (type && typeof fn === 'function')
         {
@@ -1901,7 +1943,7 @@ flyingon.Query = function () { };
 
     
     //只执行一次绑定的事件
-    defaults.once = flyingon.once = function (type, fn) {
+    function once(type, fn) {
 
         var self = this;
 
@@ -1916,7 +1958,7 @@ flyingon.Query = function () { };
 
     
     //暂停事件处理
-    defaults.suspend = flyingon.suspend = function (type) {
+    function suspend(type) {
 
         var events = this.__events;
 
@@ -1930,7 +1972,7 @@ flyingon.Query = function () { };
 
     
     //继续事件处理
-    defaults.resume = flyingon.resume = function (type) {
+    function resume(type) {
 
         var events = this.__events;
 
@@ -1951,7 +1993,7 @@ flyingon.Query = function () { };
 
     
     //移除事件处理
-    defaults.off = flyingon.off = function (type, fn) {
+    function off(type, fn) {
 
         var events = this.__events,
             items;
@@ -2006,14 +2048,15 @@ flyingon.Query = function () { };
 
     
     //分发事件
-    defaults.trigger = function (e) {
+    function trigger(e) {
 
         var type = e.type || (e = arguments[0] = new flyingon.Event(e)).type,
-            target = flyingon,
+            start = flyingon,
+            target = start,
             events,
             fn;
 
-        e.target = target.__parent = this;
+        e.target = this;
 
         do
         {
@@ -2035,8 +2078,17 @@ flyingon.Query = function () { };
                     }
                 }
             }
+            
+            if (start !== target)
+            {
+                target = (fn = target.eventBubble) && target[fn];
+            }
+            else if (start !== this)
+            {
+                target = this;
+            }
         }
-        while (target = target.__parent);
+        while (target);
 
         return !e.defaultPrevented;
     };
@@ -2044,7 +2096,7 @@ flyingon.Query = function () { };
 
 
     //以当前对象的参照复制生成新对象
-    defaults.clone = function () {
+    function clone() {
 
         var target = new this.Class(),
             storage = this.__storage;
@@ -2064,7 +2116,7 @@ flyingon.Query = function () { };
     
 
     //销毁对象
-    defaults.dispose = function () {
+    function dispose() {
 
         if (this.__events)
         {
@@ -2072,6 +2124,14 @@ flyingon.Query = function () { };
         }
     };
     
+    
+    //生成全局事件方法
+    flyingon.on = on;
+    flyingon.off = off;
+    flyingon.once = once;
+    flyingon.suspend = suspend;
+    flyingon.resume = resume;
+    flyingon.trigger = trigger;
     
     
     //输出外部接口
@@ -2168,12 +2228,12 @@ $class('Event', function () {
     };
     
     
-});
+}, true);
 
 
 
-//异步处理基类
-$class('Async', function () {
+//异步处理接口
+$interface('IAsync', function () {
 
 
 
@@ -2279,7 +2339,7 @@ $class('Async', function () {
 
     
 //Ajax类
-$class('Ajax', [Object, flyingon.Async], function () {
+$class('Ajax', [Object, flyingon.IAsync], function () {
 
 
     //发送请求
@@ -2466,7 +2526,7 @@ $class('Ajax', [Object, flyingon.Async], function () {
     };
 
 
-});
+}, false);
 
 
 //自定义ajax开始提交方法
@@ -3196,7 +3256,7 @@ $interface('IComponent', function () {
     };
     
         
-});
+}, true);
 
 
 
@@ -7548,6 +7608,35 @@ $class('Panel', [flyingon.Control, flyingon.IContainerControl], function () {
 
 $class('Page', [flyingon.Panel, flyingon.ITopControl], function (base) {
    
+    
+    
+});
+
+$class('DataView', function () {
+    
+    
+    
+});
+
+
+
+$class('DataRow', function () {
+    
+    
+}, true);
+
+
+
+
+$class('TreeDataView', flyingon.DataView, function (base) {
+   
+    
+    
+    
+});
+
+
+$class('TreeDataRow', flyingon.DataRow, function (base) {
     
     
 });
