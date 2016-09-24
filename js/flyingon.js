@@ -22,7 +22,12 @@ var flyingon = window.flyingon = function (selector, context) {
 
 
 //当前版本
-flyingon.version = '0.0.1.0';
+flyingon.version = '1.0.0';
+
+
+
+//待扩展的选择器
+flyingon.Query = function () { };
 
 
 
@@ -76,20 +81,67 @@ flyingon.extend = function (target, source, deep) {
 //编码对象
 flyingon.encode = function (data) {
 
-    if (data)
+    if (!data)
     {
-        var values = [],
-            encode = encodeURIComponent;
-
-        for (var name in data)
-        {
-            values.push(encode(name) + '=' + encode(data[name]));
-        }
-
-        return values.length > 0 ? values.join('&') : encode(data);
+        return '';
     }
+    
+    var list = [],
+        encode = encodeURIComponent,
+        value,
+        cache;
 
-    return data;
+    for (var name in data)
+    {
+        value = data[name];
+        name = encode(name);
+        
+        if (value === null)
+        {
+            list.push(name, '=null', '&');
+        }
+        
+        switch (typeof value)
+        {
+            case 'undefined':
+                list.push(name, '=&');
+                break;
+                
+            case 'boolean':
+            case 'number':
+                list.push(name, '=', value, '&');
+                break;
+                
+            case 'string':
+            case 'function':
+                list.push(name, '=', encode(cache), '&');
+                break;
+                
+            default:
+                if (value instanceof Array)
+                {
+                    for (var i = 0, _ = value.length; i < _; i++)
+                    {
+                        if ((cache = value[i]) === void 0)
+                        {
+                            list.push(name, '=&');
+                        }
+                        else
+                        {
+                            list.push(name, '=', encode(cache), '&');
+                        }
+                    }
+                }
+                else
+                {
+                    list.push(name, '=', flyingon.encode(value), '&');
+                }
+                break;
+        }
+    }
+            
+    list.pop();
+    return list.join('');
 };
 
 
@@ -174,61 +226,119 @@ flyingon.absoluteUrl = (function () {
 })();
 
 
-//待扩展的选择器
-flyingon.Query = function () { };
+
+//head兼容处理
+document.head || (document.head = document.getElementsByTagName('head')[0]);
 
 
+//是否ie9及以下版本
+flyingon.ie9 = !-[1,] || document.documentMode === 9;
+        
+
+//创建脚本标签
+flyingon.script = function (src, callback) {
+
+    var dom = document.createElement('script');
+
+    if (flyingon.ie9)
+    {
+        dom.onreadystatechange = function () {
+
+            if ('loaded,complete'.indexOf(this.readyState) >= 0)
+            {
+                callback.call(this, src);
+                dom = null;
+            }
+        };
+    }
+    else
+    {
+        dom.onload = function () {
+
+            callback.call(this, src);
+            dom = null;
+        };
+    }
+
+    dom.onerror = function (e) {
+
+        callback.call(this, src, e || true);
+        dom = null;
+    };
+
+    //dom.async = false;
+    dom.src = src;
+
+    document.head.appendChild(dom);
+
+    return dom;
+};
+
+
+//创建link标签
+flyingon.link = function (src, type, rel) {
+
+    var dom = document.createElement('link');
+
+    dom.href = src;
+    dom.type = type || 'text/css';
+    dom.rel = rel || 'stylesheet';
+    
+    document.head.appendChild(dom);
+    
+    return dom;
+};
+
+    
 
 
 //资源加载及名字空间
-(function (window, document, flyingon) {
+(function (window, flyingon) {
 
 
 
-    var head = document.getElementsByTagName('head')[0],
-
-        dom = document.createElement('div'), //清除节点用
-
-        ie9 = !-[1,] || document.documentMode === 9, //ie9及以下版本
-        
-        base_path = flyingon.absoluteUrl('/'), //网站主路径
+    var base_path = flyingon.absoluteUrl('/'), //网站主路径
 
         flyingon_path, //flyingon路径, flyingon所在目录或flyingon.js文件所在目录
 
-        require_path, //引入资源起始目录
+        require_base, //引入资源起始目录
 
         require_version = '', //引入资源版本
 
-        require_files = flyingon.create(null), //特殊指定的引入资源版本
+        version_map = flyingon.create(null), //特殊指定的引入资源版本
 
-        require_map = flyingon.create(null), //引入资源映射
-
-        require_list = flyingon.create(null), //加载资源队列
-
-        require_back = flyingon.create(null), //回溯检测关系
-
-        require_url = flyingon.create(null), //相对url对应绝对url
-
-        require_current = [], //当前加载资源缓
+        path_map = flyingon.create(null), //相对url对应绝对src映射
 
         require_sync, //是否使用同步script模式加载资源
         
-        sync_list = [], //同步资源队列
-        
-        require_ajax = ie9, //是否ajax加载js, IE6789不支持script异步加载, 因为js的执行与加载完毕事件不是一一对应
+        require_ajax = flyingon.ie9, //是否ajax加载js, IE6789不支持script异步加载, 因为js的执行与加载完毕事件不是一一对应
 
-        require_keys = { //引入资源变量
+        require_key = { //引入资源变量
             
             layout: 'default', //当前布局
             skin: 'default', //当前皮肤
             i18n: navigator.language || 'zh-CN'    //当前本地化名称
         },
         
-        key_files = {}, //已加载的变量文件集合
+        require_merge = flyingon.create(null), //引入资源合并关系
 
-        i18n_list = flyingon.create(null), //本地化信息集合
+        require_all = flyingon.create(null), //所有资源文件集合(含回溯检测关系) 值为数组或true
+
+        require_load = flyingon.create(null), //已加载(发出请求)的资源集合
         
-        translate_list = flyingon.create(null), //翻译资源文件列表        
+        require_list = [], //当前要加载的资源集合
+        
+        to_load = 0, //未加载完毕的资源数量
+        
+        to_done = 0, //待执行完毕的资源数量
+        
+        sync_list = [], //同步资源队列
+        
+        change_files = {}, //待切换资源文件集合
+
+        i18n_map = flyingon.create(null), //本地化信息集合
+        
+        translate_map = flyingon.create(null), //已翻译资源文件集合        
 
         regex_namespace = /^[a-z][a-z0-9]*(\.[a-z][a-z0-9]*)*$/, //名字空间名称检测
 
@@ -238,7 +348,7 @@ flyingon.Query = function () { };
                     
     
     //实始化起始路径
-    flyingon_path = require_path = (function () {
+    flyingon_path = require_base = (function () {
         
         var list = document.scripts,
             regex = /flyingon(?:-core)?(?:\.min)?\.js/;
@@ -261,7 +371,7 @@ flyingon.Query = function () { };
     
     
     //引入js或css资源
-    //url可为字符串路径或路径数组
+    //url可为字符串或字符串数组
     //url规则: /xxx: 相对网站根目录
     //url规则: xxx 相对flyingon.js目录
     //url规则: ./xxx: 相对flyingon.js目录
@@ -271,48 +381,68 @@ flyingon.Query = function () { };
 
         if (url)
         {
-            var require = require_list,
-                current = require_current,
+            var all = require_all,
                 items = typeof url === 'string' ? [url] : url,
-                list;
+                src,
+                list,
+                value;
             
             if (typeof css === 'function')
             {
                 callback = css;
                 css = null;
             }
+            else if (typeof callback !== 'function')
+            {
+                callback = null;
+            }
+            
+            //有callback则为按需加载, 否则为依赖加载
+            list = callback ? [] : require_list;
 
             for (var i = 0, _ = items.length; i < _; i++)
             {
-                url = items[i];
-                
-                //样式
-                if (css === true || (css !== false && url.indexOf(css || '.css') >= 0))
+                if ((url = items[i]) && (value = all[src = to_src(url)]) !== true)
                 {
-                    if (!require[url = to_src(url)])
+                    //样式
+                    if (css === true || (css !== false && url.indexOf(css || '.css') >= 0))
                     {
-                        require[url] = true; //标记css文件已经加载
-                        create_link(url);
+                        if (!value)
+                        {
+                            //标记css文件已经加载
+                            all[src] = true; 
+                            
+                            //创建link标签加载样式
+                            flyingon.link(src);
+                        }
                     }
-                }
-                else if (callback) //按需加载并执行回调
-                {
-                    (list || (list = [])).push(url);
-                }
-                else if (require[url = to_src(url)] !== true && !current[url]) //依赖加载
-                {
-                    current[url] = true;
-                    current.push(url);
+                    else if (!list[src])
+                    {
+                        //去重处理
+                        list[src] = true;
+                        
+                        //添加进资源列表
+                        list.push(src);
+
+                        //设置回溯关系
+                        (value || (all[src] = [])).push(list);
+                    }
                 }
             }
 
-            if (list && (list = check_require(list, callback)))
+            //按需加载
+            if (callback)
             {
-                load_require(list);
-            }
-            else if (callback)
-            {
-                callback(flyingon);
+                //未执行完成则注册回调
+                if (list.length > 0)
+                {
+                    list.callback = [callback, [flyingon]];
+                    load_require(list);
+                }
+                else //已经加载完成则直接执行回调
+                {
+                    callback(flyingon);
+                }
             }
         }
     };
@@ -326,42 +456,39 @@ flyingon.Query = function () { };
     };
     
     
-    //是否使用ajax模式加载资源
+    //是否使用ajax模式加载资源 IE9以下不能设置为不使用ajax加载模式
     $require.ajax = function (value) {
-      
-        if (value || !ie9) //IE9以下不能设置为不使用ajax加载模式
-        {
-            require_ajax = !!value;
-        }
+
+        require_ajax = value || flyingon.ie9;
     };
     
 
     //指定引入资源起始路径
-    $require.path = function (path) {
+    $require.base = function (path) {
 
         if (path === void 0)
         {
-            return require_path;
+            return require_base;
         }
 
         if (path && typeof path === 'string')
         {
             if (path.charAt(0) === '/')
             {
-                require_path = flyingon.absoluteUrl(path);
+                require_base = flyingon.absoluteUrl(path);
             }
             else if (path.indexOf(':/') >= 0)
             {
-                require_path = path;
+                require_base = path;
             }
             else
             {
-                require_path = flyingon.absoluteUrl(flyingon_path + path);
+                require_base = flyingon.absoluteUrl(flyingon_path + path);
             }
             
             if (path.charAt(path.length - 1) !== '/')
             {
-                require_path += '/';
+                require_base += '/';
             }
         }
     };
@@ -383,7 +510,7 @@ flyingon.Query = function () { };
         {
             for (var name in files)
             {
-                require_files[name] = files[name];
+                version_map[name] = files[name];
             }
         }
     };
@@ -400,13 +527,13 @@ flyingon.Query = function () { };
 
                 if (typeof value === 'string')
                 {
-                    require_map[value] = name;
+                    require_merge[value] = name;
                 }
                 else
                 {
                     for (var i = 0, _ = value.length; i < _; i++)
                     {
-                        require_map[value[i]] = name;
+                        require_merge[value[i]] = name;
                     }
                 }
             }
@@ -418,13 +545,13 @@ flyingon.Query = function () { };
     //转换相对url为绝对src
     function to_src(url, key) {
 
-        var src = url = require_map[url] || url,
+        var src = url = require_merge[url] || url,
             name,
             index,
             cache;
 
         //如果已经缓存则直接返回
-        if (cache = require_url[src])
+        if (cache = path_map[src])
         {
             return cache;
         }
@@ -433,9 +560,14 @@ flyingon.Query = function () { };
         if ((index = url.indexOf('{')) >= 0 && 
             (cache = url.indexOf('}')) > index &&
             (name = url.substring(index + 1, cache)) &&
-            (cache = require_keys[name]))
+            (cache = require_key[name]))
         {
             src = url.replace('{' + name + '}', cache);
+            
+            if (cache = path_map[src])
+            {
+                return cache;
+            }
         }
         else
         {
@@ -443,7 +575,7 @@ flyingon.Query = function () { };
         }
 
         //添加版本号
-        if (cache = require_files[url] || require_version)
+        if (cache = version_map[url] || require_version)
         {
             cache = src + (url.indexOf('?') >= 0 ? '&' : '?') + 'require-version=' + cache;
         }
@@ -463,95 +595,37 @@ flyingon.Query = function () { };
         }
         else if (url.indexOf(':/') < 0)
         {
-            cache = require_path + cache;
+            cache = require_base + cache;
         }
         
         //记录多语言及皮肤
         if (key !== false)
         {
-            (key_files[name] || (key_files[name] = {}))[cache] = url;
+            (change_files[name] || (change_files[name] = {}))[cache] = url;
         }
 
-        return require_url[src] = cache;
+        return path_map[src] = cache;
     };
 
-
-    //创建样式表
-    function create_link(src, url) {
-
-        var dom = document.createElement('link');
-
-        dom.href = src;
-        dom.rel = 'stylesheet';
-        dom.type = 'text/css';
-
-        head.appendChild(dom);
-
-        return true;
-    };
-
-    
-    //检测按需引入的资源
-    function check_require(list, callback) {
-        
-        var require = require_list,
-            data = [],
-            back,
-            src;
-        
-        if (callback)
-        {
-            back = require_back;
-        }
-        
-        for (var i = 0, length = list.length; i < length; i++)
-        {
-            src = to_src(list[i]);
-            
-            if (require[src] !== true && !data[src])
-            {
-                data[src] = true;
-                data.push(src);
-
-                if (back)
-                {
-                    (back[src] || (back[src] = [])).push(callback); //设置回溯
-                }
-            }
-        }
-        
-        if ((length = data.length) > 0)
-        {
-            if (callback)
-            {
-                callback.require = length;
-            }
-            
-            return data;
-        }
-    };
-    
-    
+       
     //加载引入资源
     function load_require(list) {
 
-        if (list && list.length > 0)
+        //乱序加载测试
+        list.sort(function(a, b) { return Math.random() > 0.5 ? -1 : 1; });
+
+        //调试模式使用同步script方式加载资源
+        if (require_sync)
         {
-            list = list.require || list;
-            
-            //调试模式使用同步script方式加载资源
-            if (require_sync)
-            {
-                registry_sync(list.reverse()); //倒序加入队列
-            }
-            else if (require_ajax) //使用ajax加载资源
-            {
-                script_ajax(list);
-            }
-            else //异步加载脚本
-            {
-                script_async(list);
-            }
+            registry_sync(list.reverse()); //倒序加入队列
+        }
+        else if (require_ajax) //使用ajax加载资源
+        {
+            script_ajax(list);
+        }
+        else //异步加载脚本
+        {
+            script_async(list);
         }
     };
 
@@ -559,17 +633,25 @@ flyingon.Query = function () { };
     //使用ajax的方式加载资源
     function script_ajax(list) {
                         
-        var require = require_list,
+        var load = require_load,
             src;
         
         for (var i = 0, length = list.length; i < length; i++)
         {
-            if ((src = list[i]) && !require[src])
+            if (!load[src = list[i]])
             {
+                //标记已加载
+                load[src] = true;
+                
+                //标记未加载完毕 
+                to_load++;
+                
+                //标记未执行完毕
+                to_done++;
+                     
                 //不跨域
                 if (src.indexOf(base_path) === 0)
                 {
-                    require[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
                     flyingon.ajax(src, { dataType: 'script' }).always(script_load);
                 }
                 else //跨域使用script同步加载
@@ -578,6 +660,7 @@ flyingon.Query = function () { };
                     {
                         list.splice(0, i);
 
+                        //注册同步加载
                         return registry_sync([src, function () {
                             
                             script_ajax(list);
@@ -615,8 +698,9 @@ flyingon.Query = function () { };
         
         if (!fn.load && list.length > 0)
         {
-            var src = list.pop(),
-                callback = script_sync;
+            var load = require_load,
+                src = list.pop(),
+                callback = fn;
 
             if (typeof src === 'function')
             {
@@ -624,7 +708,7 @@ flyingon.Query = function () { };
                 src = list.pop();
             }
             
-            if (require_list[src])
+            if (load[src])
             {
                 callback();
             }
@@ -633,9 +717,17 @@ flyingon.Query = function () { };
                 //标记正在加载防止重复执行
                 fn.load = true;
             
-                require_list[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
+                //标记已加载
+                load[src] = true;
+                
+                //标记未加载完毕 
+                to_load++;
+                
+                //标记未执行完毕
+                to_done++;
 
-                create_script(src, function (src) {
+                //创建加载脚本标签
+                flyingon.script(src, function (src) {
 
                     script_load(src);
                     
@@ -650,242 +742,219 @@ flyingon.Query = function () { };
     //异步加载脚本
     function script_async(list) {
         
-        var require = require_list,
+        var load = require_load,
             src;
-
+        
         for (var i = 0, _ = list.length; i < _; i++)
         {
-            if ((src = list[i]) && !require[src])
+            if (!load[src = list[i]])
             {
-                require[src] = 1; //1: 待加载js []: js已加载 true: js已完全执行
-                create_script(src, script_load);
+                //标记已加载
+                load[src] = true;
+                
+                //标记未加载完毕 
+                to_load++;
+                
+                //标记未执行完毕
+                to_done++;
+                
+                //创建加载脚本标签
+                flyingon.script(src, script_load);
             }
         }
-    };
+    };    
+
     
-
-    //创建脚本标签
-    function create_script(src, callback) {
-
-        var dom = document.createElement('script');
-
-        if (ie9)
-        {
-            dom.onreadystatechange = function () {
-
-                if ('loaded,complete'.indexOf(this.readyState) >= 0)
-                {
-                    callback(src)
-                }
-            };
-        }
-        else
-        {
-            dom.onload = function () {
-
-                callback(src)
-            };
-        }
-
-        dom.onerror = function () {
-
-            callback(src)
-        };
-
-        //dom.async = false;
-        dom.src = src;
-
-        head.appendChild(dom);
-
-        dom = null;
-    };
-    
-    
-    //脚本执行完毕
+    //脚本加载完毕后处理
     function script_load(src) {
 
-        var require = require_list,
-            current = require_current,
-            back = require_back;
+        var list = require_list;
         
-        //如果资源中包含需引入的资源则继续加载
-        if (current && current.length > 0 && check_load(require, back, src, current))
-        {
-            //标记js已加载但未执行
-            require[src] = current;
+        //标记已加载完毕
+        to_load--;
 
+        //如果资源中包含需引入的资源则继续加载
+        if (list && list.length > 0)
+        {
             //初始化当前引入对象
-            require_current = [];
+            require_list = [];
+
+            //设置回溯父url
+            list.src = src;
 
             //继续加载资源
-            load_require(current);
+            load_require(list);
         }
         else
         {
-            //标记已完全执行
-            require[src] = true;
-            
-            //回溯检测
-            check_back(require, back, src);
+            check_back(require_all, src, true);
+        }
+        
+        //如果已加载完毕且未执行完毕说明有循环引用
+        if (!to_load && to_done > 0)
+        {
+            break_cycle(require_all, src);
         }
     };
 
-
-    //检测引入资源
-    function check_load(require, back, src, list) {
+    
+    //回溯检测引入的资源是否已加载完成
+    function check_back(all, src, done) {
+      
+        var list = all[src],
+            parent;
         
-        var items, item, cache;
-        
-        for (var i = 0, length = list.length; i < length; i++)
+        for (var i = list.length - 1; i >= 0; i--)
         {
-            if ((item = list[i]) && item[0] !== true)
-            {
-                if (item === src || //自身不能引用自身
-                    (cache = require[item]) === true ||
-                    (cache && (cache = cache.require) && check_cycle(require, src, cache, 0))) //不能组成循环引用
-                {
-                    //移除当前url及执行最开始的回调函数
-                    if (i === 0)
-                    {
-                        for (var j = 1; j < length; j++)
-                        {
-                            if ((item = list[j]) && item[0] === true)
-                            {
-                                item[1].apply(item[2], item[3]);
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        
-                        cache = j - i--;
-                        length -= cache;
-                        
-                        list.splice(0, cache);
-                    }
-                    else
-                    {
-                        list.splice(i--, 1);
-                        length--;
-                    }
+            var items = list[i],
+                length = items.length,
+                cache;
 
-                    continue;
+            for (var j = length - 1; j >= 0; j--)
+            {
+                if (items[j] === src)
+                {
+                    items.splice(j, 1);
+                    length--;
+                    break;
                 }
-                
-                (items || (items = [])).push(item);
-                (back[item] || (back[item] = [])).push(src); //设置回溯
+            }
+
+            if (length > 0)
+            {
+                continue;
+            }
+            
+            //执行回调
+            if (cache = items.callback)
+            {
+                for (var j = 0, _ = cache.length; j < _; j++)
+                {
+                    cache[j++].apply(window, cache[j]);
+                }
+            }
+
+            list.splice(i, 1);
+            
+            if (cache = items.src)
+            {
+                (parent || (parent = [])).push(cache);
+            }
+        }
+               
+        //继续向上回溯检测
+        if (parent)
+        {
+            for (var i = 0, _ = parent.length; i < _; i++)
+            {
+                check_back(all, parent[i]);
             }
         }
         
-        if (items)
+        //如果没有依赖则标记已完成
+        if (done || !(length = list.length) || check_null(list, length === 1))
         {
-            list.require = items;
-            return true;
+            //标记已完全执行
+            all[src] = true;
+
+            //标记已执行完毕
+            to_done--;
         }
-     };
+    };
     
+    
+    //检测依赖是否已加载完成
+    function check_null(list, length) {
+      
+        for (var i = 0; i < length; i++)
+        {
+            if (list[i].length > 0)
+            {
+                return;
+            }
+        }
+        
+        return true;
+    };
+    
+    
+    //打破循环引用(最后引用的资源最先执行)
+    function break_cycle(all, src) {
+        
+        var list = [],
+            items,
+            cache;
+
+        for (src in all)
+        {
+            if (all[src] !== true)
+            {
+                list.push(src);
+            }
+        }
+
+        //倒序检查循环
+        for (var i = list.length - 1; i >= 0; i--)
+        {
+            if (items = check_cycle(all, src = list[i], all[src]))
+            {
+                //执行回调
+                if (cache = items.callback)
+                {
+                    for (var j = 0, _ = cache.length; j < _; j++)
+                    {
+                        cache[j++].apply(window, cache[j]);
+                    }
+                    
+                    items.src = items.callback = null;
+                }
+
+                check_back(all, src, true);
+                
+                if (to_done <= 0)
+                {
+                    break;
+                }
+            }
+        }
+    };
+
     
     //检测循环引用
-    //注: 循环引用时最后被加载的文件优先执行
-    function check_cycle(require, src, list, cycle) {
+    function check_cycle(all, src, list) {
       
-        cycle++;
-
-        for (var i = 0, _ = list.length; i < _; i++)
-        {
-            var url = list[i];
-            
-            if (url === src)
-            {
-                return true;
-            }
-
-            if (cycle > 10)
-            {
-                throw $translate('flyingon', 'require cycle');
-            }
-
-            var cache = require[url];
-
-            if (cache && (cache = cache.require) && check_cycle(require, src, cache, cycle))
-            {
-                return true;
-            }
-        }
-    };
-    
-    
-    //检测是否已加载完毕
-    function check_done(require, list) {
+        var keys, items, name;
         
-        var item;
-        
-        for (var i = 0, _ = list.length; i < _; i++)
+        while (list)
         {
-            if ((item = list[i])[0] === true)
+            for (var i = list.length - 1; i >= 0; i--)
             {
-                item[1].apply(item[2], item[3]);
-            }
-            else if (require[item] !== true)
-            {
-                if (i > 0)
+                if (name = list[i].src)
                 {
-                    list.splice(0, i);
-                }
-                
-                return false;
-            }
-        }
-        
-        //清空数组
-        list.length = 0;
-        list.require = null;
-    };
-
-
-    //回溯检测引入的资源是否已加载完成
-    function check_back(require, back, src) {
-      
-        var list = back[src],
-            item,
-            cache;
-        
-        if (list)
-        {
-            //删除回溯链
-            delete back[src];
-            
-            for (var i = 0, _ = list.length; i < _; i++)
-            {
-                if ((item = list[i]).require) //如果是回调函数则直接执行
-                {
-                    if (!--item.require) //回调函数计数器为0时则执行回调函数
+                    if (name === src)
                     {
-                        item(flyingon);
+                        return list[i];
+                    }
+
+                    if (!keys || !keys[name])
+                    {
+                        (keys || (keys = {}))[name] = true;
+                        (items || (items = [])).push.apply(items, all[name]);
                     }
                 }
-                else if ((cache = require[item]) && 
-                         cache !== true && 
-                         cache !== 1 && 
-                         check_done(require, cache) !== false)
-                {
-                    //标记已完成执行
-                    require[item] = true;
-                    
-                    //回溯检测
-                    check_back(require, back, item);
-                }
             }
+            
+            list = items;
+            items = null;
         }
     };
-
-
     
-    //获取或设置引入变量值
+    
+    
+    //获取或设置资源变量值
     $require.key = function (key, value, callback, set) {
         
-        var list = require_keys;
+        var list = require_key;
         
         if (!value)
         {
@@ -899,7 +968,7 @@ flyingon.Query = function () { };
 
             set && set();
          
-            if (list = key_files[key])
+            if (list = change_files[key])
             {
                 change_require(list, key === 'skin', callback);
             }
@@ -907,10 +976,12 @@ flyingon.Query = function () { };
     };
     
     
-    //变量皮肤或多语言资源
+    //切换皮肤或多语言资源
     function change_require(data, css, callback) {
         
-        var list = document.getElementsByTagName(css ? 'link' : 'script'),
+        var all = require_all,
+            load = require_load,
+            list = document.getElementsByTagName(css ? 'link' : 'script'),
             cache;
 
         //删除原dom节点
@@ -926,11 +997,14 @@ flyingon.Query = function () { };
         
         for (var src in data)
         {
-            //移除缓存
-            require_list[src] = require_url[cache = data[src]] = false; 
+            if (load[src] === true)
+            {
+                //移除缓存
+                all[src] = load[src] = false; 
 
-            //重新加载资源
-            list.push(cache);
+                //重新加载资源
+                list.push(cache);
+            }
         }
         
         $require(list, css, callback || function () {});
@@ -947,7 +1021,7 @@ flyingon.Query = function () { };
     //获取指定key的本地化信息
     function $i18ntext(key) {
 
-        return i18n_list[key] || key;
+        return i18n_map[key] || key;
     };
 
 
@@ -957,8 +1031,8 @@ flyingon.Query = function () { };
         return $require.key('i18n', name, null, function () {
         
             //国际化时先清空缓存
-            i18n_list = flyingon.create(null);
-            translate_list = flyingon.create(null);
+            i18n_map = flyingon.create(null);
+            translate_map = flyingon.create(null);
         });
     };
 
@@ -974,10 +1048,10 @@ flyingon.Query = function () { };
         
         if (!values)
         {
-            return i18n_list;
+            return i18n_map;
         }
         
-        var target = i18n_list;
+        var target = i18n_map;
         
         if (name)
         {
@@ -1003,7 +1077,7 @@ flyingon.Query = function () { };
       
         if (url && name)
         {
-            var target = translate_list[url];
+            var target = translate_map[url];
             
             if (target)
             {
@@ -1017,7 +1091,7 @@ flyingon.Query = function () { };
                 
             }).done(function (data) {
              
-                translate_list[url] = target = data;
+                translate_map[url] = target = data;
             });
             
             return target && target[name] || name;
@@ -1079,9 +1153,9 @@ flyingon.Query = function () { };
         if (typeof callback === 'function')
         {
             //如果正在动态加载脚本或还有依赖的js没有加载完成则先注册
-            if ((cache = require_current) && cache.length > 0)
+            if ((cache = require_list) && cache.length > 0)
             {
-                cache.push([true, load_namespace, window, [target, callback]]);
+                (cache.callback || (cache.callback = [])).push(load_namespace, [target, callback]);
             }
             else //否则立即执行
             {
@@ -1120,7 +1194,7 @@ flyingon.Query = function () { };
     window.$namespace = $namespace;
     
 
-})(window, document, flyingon);
+})(window, flyingon);
 
 
     
@@ -1250,7 +1324,7 @@ flyingon.Query = function () { };
     //name:             类名称,省略即创建匿名类型(匿名类型不支持自动反序列化)
     //superclass:       父类, 可传入基类或数组, 当传入数组时第一个子项为父类, 其它为接口, 接口只会复制其原型上的方法
     //fn:               类代码, 函数, 参数(base:父类原型, self:当前类原型)
-    //property:         是否支持属性, false不支持, 可以从非属性类继承生成非属性类, 不能从非属性类继承生成属性类
+    //property:         是否支持属性, 默认支持, 可以从非属性类继承生成非属性类, 不能从属性类继承生成非属性类
     function $class(name, superclass, fn, property) {
 
 
@@ -2341,14 +2415,16 @@ $interface('IAsync', function () {
 //Ajax类
 $class('Ajax', [Object, flyingon.IAsync], function () {
 
+    
+    
+    //jsonp序号
+    var id = 0;
+    
+        
 
-    //发送请求
     $constructor(function (url, options) {
 
-        var self = this,
-            ajax = this.ajax = new XMLHttpRequest(),
-            data,
-            cache;
+        var data, cache;
         
         if (options)
         {
@@ -2364,86 +2440,39 @@ $class('Ajax', [Object, flyingon.IAsync], function () {
                 }
             }
         }
-        else
-        {
-            options = {};
-        }
         
         //执行发送前全局start事件
         if (cache = flyingon.Ajax.start)
         {
             for (var i = 0, _ = cache.length; i < _; i++)
             {
-                cache[i].call(this, options);
+                cache[i].call(this);
             }
-        }
-
-        if ((cache = this.timeout) > 0)
-        {
-            this.__timer = setTimeout(function () {
-
-                request.abort();
-                self.fail('timeout');
-
-            }, cache);
         }
 
         cache = (cache = this.method) && cache.toUpperCase() || 'GET';
 
-        if (data)
+        if (data && cache === 'GET')
         {
-            if (cache === 'GET')
-            {
-                url += (url.indexOf('?') >= 0 ? '&' : '?') + flyingon.encode(data);
-                data = null;
-            }
-            else if (typeof data === 'object')
-            {
-                data = flyingon.encode(data);
-            }
+            url += (url.indexOf('?') >= 0 ? '&' : '?') + flyingon.encode(data);
+            data = null;
         }
 
-        //CORS
-        if (this.crossDomain)
+        if (this.dataType === 'jsonp')
         {
-            //withCredentials是XMLHTTPRequest2中独有的
-            if ('withCredentials' in ajax)
+            if (data)
             {
-                ajax.withCredentials = true;
-            }
-            else if (cache = window.XDomainRequest)
-            {
-                ajax = new cache();
+                jsonp_post(this, url, data);
             }
             else
             {
-                throw $translate('flyingon', 'ajax no crossDomain');
+                jsonp_get(this, url);
             }
         }
-        
-        ajax.open(this.method, url, this.async);
-        
-        ajax.onreadystatechange = function () {
-
-            callback(self, this, url, options);
-        };
-
-        if (cache = this.header)
+        else
         {
-            for (var name in cache)
-            {
-                ajax.setRequestHeader(name, cache[name]);
-            }
+            ajax_send(this, url, data);
         }
-
-        ajax.setRequestHeader('Content-Type', this.contentType);
-
-        if (data)
-        {
-            ajax.setRequestHeader('Content-Length', data.length);
-        }
-
-        ajax.send(data);
     });
 
 
@@ -2458,20 +2487,79 @@ $class('Ajax', [Object, flyingon.IAsync], function () {
 
     //自定义http头
     this.header = null;
-
+    
     //是否异步
     this.async = true;
+        
+    //是否支持跨域资源共享(CORS)
+    this.CORS = false;
     
-    //是否支持跨域(CORS)
-    this.crossDomain = false;
-
     //超时时间
     this.timeout = 0;
     
     
+    //发送ajax请求
+    function ajax_send(self, url, data) {
+    
+        var ajax = self.ajax = new XMLHttpRequest();
+              
+        //CORS
+        if (self.CORS)
+        {
+            //withCredentials是XMLHTTPRequest2中独有的
+            if ('withCredentials' in ajax)
+            {
+                ajax.withCredentials = true;
+            }
+            else if (cache = window.XDomainRequest)
+            {
+                ajax = new cache();
+            }
+            else
+            {
+                throw $translate('flyingon', 'ajax no CORS');
+            }
+        }
+        
+        if ((cache = this.timeout) > 0)
+        {
+            this.__timer = setTimeout(function () {
+
+                ajax.abort();
+                self.fail('timeout');
+
+            }, cache);
+        }
+
+        ajax.onreadystatechange = function () {
+
+            ajax_done(self, ajax, url);
+        };
+        
+        ajax.open(self.method, url, self.async);
+          
+        if (cache = self.header)
+        {
+            for (var name in cache)
+            {
+                ajax.setRequestHeader(name, cache[name]);
+            }
+        }
+
+        ajax.setRequestHeader('Content-Type', self.contentType);
+
+        if (data)
+        {
+            data = flyingon.encode(data);
+            ajax.setRequestHeader('Content-Length', data.length);
+        }
+
+        ajax.send(data);
+    };
+    
 
     //处理响应结果
-    function callback(self, ajax, url, options) {
+    function ajax_done(self, ajax, url) {
 
         var cache = ajax.readyState;
 
@@ -2493,7 +2581,7 @@ $class('Ajax', [Object, flyingon.IAsync], function () {
                         
                     case 'script':
                         flyingon.globalEval(ajax.responseText); //全局执行js避免变量冲突
-                        self.resolve(ajax.responseText);
+                        self.resolve(url);
                         break;
                         
                     case 'xml':
@@ -2507,7 +2595,7 @@ $class('Ajax', [Object, flyingon.IAsync], function () {
             }
             else
             {
-                self.reject('ajax', ajax);
+                self.reject(ajax.status);
             }
 
             //执行全局ajax执行结束事件
@@ -2515,18 +2603,128 @@ $class('Ajax', [Object, flyingon.IAsync], function () {
             {
                 for (var i = 0, _ = cache.length; i < _; i++)
                 {
-                    cache[i].call(self, options);
+                    cache[i].call(self, ajax);
                 }
             }
+            
+            //清除引用
+            self.ajax = self.onreadystatechange = null;
         }
         else
         {
             self.notify(ajax, cache);
         }
     };
+    
+    
+    //jsonp_get
+    function jsonp_get(self, url) {
+        
+        var items = jsonp_get.cache || (jsonp_get.cache = []),
+            name = items.pop() || 'jsonpCallback' + (++id);
+        
+        window[name] = function (data) {
+        
+            self.resolve(data);
+            self = null;
+            
+            window[name] = void 0;
+            items.push(name);
+        };
+        
+        url += (url.indexOf('?') < 0 ? '?' : '&') + 'jsonp=' + name;
+        
+        flyingon.script(url, function (src, error) {
+            
+            if (error)
+            {
+                self.reject(error);
+                self = null;
+            }
 
+            this.parentNode.removeChild(this);
+        });
+    };
+    
+    
+    //jsonp_post
+    function jsonp_post(self, url, data) {
+                
+        var head = document.head,
+            items = jsonp_post.cache || (jsonp_post.cache = []),
+            iframe = items.pop(),
+            form = items.pop();
+        
+        if (!iframe)
+        {
+            iframe = document.createElement('iframe'),
+            form = document.createElement('form');
 
+            iframe.id = ++id;
+            iframe.name = 'jsonp_iframe_' + id;
+            iframe.src = 'about:blank';
+
+            form.name = 'jsonp_form_' + id;
+            form.target = iframe.name;
+
+            iframe.contentWindow.name = iframe.name; //解决IE6在新窗口打开的BUG
+        }
+        
+        head.appendChild(iframe);
+        head.appendChild(form);
+
+        form.action = url + (url.indexOf('?') < 0 ? '?' : '&') + 'jsonp=POST';
+        form.method = self.method || 'POST';
+        form.enctype = self.enctype || 'application/x-www-form-urlencoded';
+        
+        for (var name in data)
+        {
+            var dom = document.createElement('input');
+
+            dom.name = name;
+            dom.type = 'hidden';
+            dom.value = data[name];
+
+            form.appendChild(dom);
+        }
+
+        iframe.onload = function fn(event) {
+
+            var body = iframe.contentWindow.document.body,
+                text = body.innerHTML;
+            
+            if (iframe.attachEvent) //注销事件
+            {
+                iframe.detachEvent('onload', fn);
+            }
+            else
+            {
+                iframe.onload = null;
+            }
+
+            body.innerHTML = form.innerHTML = '';
+  
+            head.removeChild(iframe);
+            head.removeChild(form);
+            
+            items.push(form, iframe);
+            self.resolve(text);
+            
+            self = head = iframe = form = null;
+        };
+
+        if (iframe.attachEvent) //解决IE6不能触发onload事件的bug
+        {
+            iframe.attachEvent('onload', iframe.onload);
+            iframe.onload = null;
+        }
+        
+        form.submit();
+    };
+    
+    
 }, false);
+
 
 
 //自定义ajax开始提交方法
@@ -2561,6 +2759,25 @@ flyingon.ajaxPost = function (url, options) {
 };
 
 
+//jsonp get提交
+flyingon.jsonp = function (url, options) {
+  
+    options = options || {};
+    options.dataType = 'jsonp';
+
+    return new flyingon.Ajax(url, options);
+};
+
+
+//jsonp get提交
+flyingon.jsonpPost = function (url, options) {
+  
+    options = options || {};
+    options.dataType = 'jsonp';
+    options.method = 'POST';
+
+    return new flyingon.Ajax(url, options);
+};
     
 
 

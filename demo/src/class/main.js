@@ -1,6 +1,7 @@
 $require('flyingon/demo/src/class/class1.js');
 $require('flyingon/demo/src/class/class2.js');
 $require('flyingon/demo/src/class/class3.js');
+$require('flyingon/demo/src/class/class4.js');
 
 
 $namespace('flyingon.test', function (test) {
@@ -69,7 +70,7 @@ $namespace('flyingon.test', function (test) {
             //注册全局事件(可优先捕获任意对象触发的事件)
             flyingon.on('my_event', function (e, data) {
 
-                alert('global events:' + event.type + data);
+                //alert('global events:' + event.type + data);
                 
                 //停止冒泡
                 //e.stopPropagation();
@@ -78,7 +79,7 @@ $namespace('flyingon.test', function (test) {
             //注册事件(支持事件冒泡)
             obj2.on('my_event', function (event, data) {
 
-                alert(event.type + data);
+                //alert(event.type + data);
             });
 
             //触发事件

@@ -1,4 +1,4 @@
-$require('flyingon/demo/src/class/class3.js');
+$require('flyingon/demo/src/class/class4.js');
 
 
 //$namespace: 定义或切换名字空间, 注：test参数为flyingon.test的别名
