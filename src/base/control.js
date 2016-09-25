@@ -93,9 +93,9 @@ $class('Control', flyingon.Visual, function (base, self) {
     });
     
     
-        
+            
     //盒模型大小是否包含边框
-    this.box_border = false;
+    this.boxBorder = false;
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
@@ -127,7 +127,7 @@ $class('Control', flyingon.Visual, function (base, self) {
                 div.appendChild(dom);
 
                 //盒模型的宽度是否包含边框
-                this.box_border = dom.offsetWidth === 100;
+                this.boxBorder = dom.offsetWidth === 100;
                 div.innerHTML = '';
 
             }, this);
@@ -612,113 +612,9 @@ $class('Control', flyingon.Visual, function (base, self) {
     };
     */
     
-      
-     
-    //使布局无效
-    this.invalidate = function (target) {
-        
-        var parent;
-        
-        if ((target || (target = this.__parent)) && target.__arrange_dirty !== 2)
-        {
-            target.__arrange_dirty = 2;
-            
-            while ((parent = target.__parent) && !parent.__arrange_dirty)
-            {
-                parent.__arrange_dirty = 1;
-                target = parent;
-            }
-            
-            if (target['flyingon.ITopControl'])
-            {
-                flyingon.update_delay(target);
-            }
-        }
-        
-        return this;
-    };
     
     
-    //渲染dom
-    this.render = function () {
-      
-        var style = this.dom.style,
-            width = this.offsetWidth,
-            height = this.offsetHeight,
-            cache;
-        
-        if (!this.box_border)
-        {
-            if ((cache = this.border()) && cache !== '0')
-            {
-                cache = flyingon.pixel_sides(cache);
-                
-                width -= cache.width;
-                height -= cache.height;
-            }
-            
-            if (!this.__no_padding && (cache = this.padding()) && cache !== '0')
-            {
-                cache = flyingon.pixel_sides(cache);
-                
-                width -= cache.width;
-                height -= cache.height;
-            }
-        }
-        
-        style.position = 'absolute';
-        style.margin = '0';
-        style.left = this.offsetLeft + 'px';
-        style.top = this.offsetTop + 'px';
-        style.width = width + 'px';
-        style.height = style.lineHeight = height + 'px';
-        
-        return this;
-    };
-        
-        
-    //重绘(默认与渲染dom相同)
-    this.update = this.render;
-    
-    
-    
-    
-    
-    var dispose = this.dispose;
-        
-    
-    //从dom容器中移除
-    this.detach = function (dispose) {
-     
-        var dom = this.dom,
-            parent = dom.parentNode;
 
-        if (parent)
-        {
-            parent.removeChild(dom);
-        }
-        
-        if (parent = this.__parent)
-        {
-            parent.remove(this, dispose);
-        }
-        else if (dispose)
-        {
-            this.dispose();
-        }
-        
-        return this;
-    };
-    
-        
-    this.dispose = function () {
-    
-        this.dom = this.dom.control = this.__parent = null;
-        dispose.call(this);
-    };
-    
-    
-    
     var update_list = [],
         update_delay;
         
@@ -747,7 +643,7 @@ $class('Control', flyingon.Visual, function (base, self) {
     
     
     //延时更新
-    flyingon.update_delay = function (control, delay) {
+    function delay_update(control, delay) {
       
         if (control && !control.__update_delay)
         {
@@ -765,80 +661,177 @@ $class('Control', flyingon.Visual, function (base, self) {
         }
     };
     
-
-});
-
-
-
-//顶级控件接口
-$interface('ITopControl', function () {
     
-    
-        
     //使布局无效
     this.invalidate = function () {
-      
-        if (this.__arrange_dirty < 2)
+        
+        var target = this,
+            parent;
+        
+        if (this.__arrange_dirty !== 2)
         {
             this.__arrange_dirty = 2;
-        }
-
-        flyingon.update_delay(this);
-        return this;
-    };
-    
-        
-    //更新布局
-    this.update = function () {
-      
-        var dom = this.dom;
-        
-        if (dom && (dom = dom.parentNode))
-        {
-            var layout = flyingon.Layout.prototype,
-                width = dom.clientWidth,
-                height = dom.clientHeight,
-                arrange = { width: width, height: height },
-                margin = layout.margin(this, arrange);
             
-            layout.measure(this, arrange, margin, width, height, false);
-            layout.locate(this, arrange, margin, 0, 0, width, height);
-            
-            this.render();
-                
-            this.__update_dirty = false;   
-
-            if (this.__arrange_dirty)
+            while (parent = target.__parent)
             {
-                this.arrange();
+                if (target.__arrange_dirty)
+                {
+                    return this;
+                }
+                
+                parent.__arrange_dirty = 1;
             }
+
+            delay_update(target);
         }
-        
+
         return this;
     };
     
         
-    //显示控件至dom容器
-    this.show = function (dom_host) {
+    //重绘(默认与渲染dom相同)
+    this.update = function () {
+        
+        if (this.__parent)
+        {
+            return this.render();
+        }
+        
+        return this.renderByRoot();
+    };
+    
+                    
+    //渲染至dom容器
+    this.renderTo = function (dom_host) {
         
         var host = dom_host || document.body,
             dom = this.dom;
-
+        
         dom.style.position = 'relative';
 
         host.appendChild(dom);
 
-        if (this.__arrange_dirty < 2)
-        {
-            this.__arrange_dirty = 2;
-        }
-        
-        flyingon.update_delay(this, false);
+        this.__arrange_dirty = 2;
+        delay_update(this, false);
         
         return this;
     };
     
+    
+    //从dom容器中移除
+    this.detach = function () {
+     
+        var dom = this.dom,
+            parent = dom.parentNode;
+
+        if (parent)
+        {
+            parent.removeChild(dom);
+        }
         
+        if (parent = this.__parent)
+        {
+            parent.remove(this);
+        }
+        
+        return this;
+    };
+    
+
+    //按根节点的方式渲染
+    this.renderByRoot = function () {
+        
+        var dom = this.dom,
+            layout = flyingon.Layout.prototype,
+            left = flyingon.pixel(this.left()),
+            top = flyingon.pixel(this.top()),
+            width = this.width(),
+            height = this.height(),
+            arrange,
+            margin;
+
+        dom.style.position = 'relative';
+        dom.style.width = width > 0 ? width + 'px' : width;
+        dom.style.height = height > 0 ? height + 'px' : height;
+
+        width = dom.offsetWidth,
+        height = dom.offsetHeight,
+
+        margin = layout.margin(this, arrange = { 
+
+            width: width, 
+            height: height 
+        });
+
+        layout.measure(this, arrange, margin, width, height, false);
+        layout.locate(this, arrange, margin, left, top, width, height);
+
+        this.render();
+
+        this.__update_dirty = false;   
+
+        if (this.__arrange_dirty)
+        {
+            this.arrange && this.arrange();
+            this.__arrange_dirty = 0;
+        }
+        
+        return this;
+    };
+    
+    
+    //渲染dom
+    this.render = function () {
+      
+        var style = this.dom.style,
+            width = this.offsetWidth,
+            height = this.offsetHeight,
+            cache;
+        
+        if (!this.boxBorder)
+        {
+            if ((cache = this.border()) && cache !== '0')
+            {
+                cache = flyingon.pixel_sides(cache);
+                
+                width -= cache.width;
+                height -= cache.height;
+            }
+            
+            if (!this.__no_padding && (cache = this.padding()) && cache !== '0')
+            {
+                cache = flyingon.pixel_sides(cache);
+                
+                width -= cache.width;
+                height -= cache.height;
+            }
+        }
+        
+        if (this.__parent)
+        {
+            style.position = 'absolute';
+        }
+        
+        style.margin = '0';
+        style.left = this.offsetLeft + 'px';
+        style.top = this.offsetTop + 'px';
+        style.width = width + 'px';
+        style.height = style.lineHeight = height + 'px';
+        
+        return this;
+    };
+        
+    
+    
+    var dispose = this.dispose;
+    
+    this.dispose = function () {
+    
+        this.dom = this.dom.control = this.__parent = null;
+        dispose.call(this);
+    };
+    
+    
 });
 
 

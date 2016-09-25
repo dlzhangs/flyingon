@@ -30,8 +30,7 @@
     $namespace('flyingon.demo', function (demo) {
 
 
-        var page = new flyingon.Page(),
-            grid = new flyingon.Grid(),
+        var grid = new flyingon.Grid(),
             columns = create_columns(),
             data = create_data();
 
@@ -103,6 +102,8 @@
 
         grid.sets({
 
+            width: 1000,
+            height: 400,
             dock: 'fill',
             columns: columns,
             dataSource: data,
@@ -117,17 +118,8 @@
                     type: 'table'
                 }
             }
-        });
-        
-        page.append(grid);
-        
-        page.sets({
-         
-            layout: 'dock',
-            width: 1000,
-            height: 400
             
-        }).show();
+        }).renderTo();
     });
         
         

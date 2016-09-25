@@ -63,7 +63,6 @@
 			'src/base/htmlcontrol.js',
 			'src/base/container.js',
 			'src/base/panel.js',
-			'src/base/page.js',
             'src/base/datatable.js',
             'src/base/popup.js',
 		],

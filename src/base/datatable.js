@@ -1,9 +1,8 @@
 
-$class('DataView', function () {
-    
-    
+$class('DataTable', function () {
     
 });
+
 
 
 
@@ -14,6 +13,19 @@ $class('DataRow', function () {
 
 
 
+$class('DataView', function () {
+    
+    
+    
+});
+
+
+
+$class('TreeDataRow', flyingon.DataRow, function (base) {
+    
+    
+});
+
 
 $class('TreeDataView', flyingon.DataView, function (base) {
    
@@ -22,8 +34,3 @@ $class('TreeDataView', flyingon.DataView, function (base) {
     
 });
 
-
-$class('TreeDataRow', flyingon.DataRow, function (base) {
-    
-    
-});

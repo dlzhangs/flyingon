@@ -5,10 +5,10 @@ $class('GridColumn', function () {
     
     
     //更新表格头
-    var update_header = { set: 'this.grid.update();' };
+    var update_header = { set: 'this.grid.renderDelay();' };
     
     //更新数据
-    var update_body = { set: 'this.grid.update(true);' };
+    var update_body = { set: 'this.grid.renderDelay(false);' };
     
     
     
@@ -32,7 +32,7 @@ $class('GridColumn', function () {
     this.defineProperty('width', 100, {
      
         minValue: 0,
-        set: 'this.grid.update();'
+        set: 'this.grid.renderDelay();'
     });
 
     //列头class
@@ -401,7 +401,7 @@ $class('GridColumn', function () {
             }
             else
             {
-                throw $errortext('flyingon', 'column type error');
+                throw $translate('flyingon', 'column type error');
             }
         }
         else
@@ -1044,6 +1044,13 @@ $class('TreeGridRow', flyingon.GridRow, function (base) {
 
 
 
+//分组表格行
+$class('GroupGridRow', flyingon.GridRow, function (base) {
+    
+    
+});
+
+
 
 //表格视图
 $class('GridView', function () {
@@ -1595,7 +1602,7 @@ $class('GridView', function () {
             }
             else
             {
-                throw $errortext('flyingon', 'view type error');
+                throw $translate('flyingon', 'view type error');
             }
         }
         else
@@ -2012,6 +2019,16 @@ $class('TreeGridView', flyingon.GridView, function (base) {
 
 
 
+//分组视图
+$class('GroupGridView', flyingon.GridView, function (base) {
+    
+    
+    this.type = 'group';
+    
+});
+
+
+
 
 //表格控件
 $class('Grid', flyingon.Control, function (base) {
@@ -2148,8 +2165,18 @@ $class('Grid', flyingon.Control, function (base) {
             style1 = 'overflow:hidden;margin:0;border:0;padding:0;',
             style2 = 'display:none;margin:0;right:0;bottom:0;z-index:1;',
             scroll = '<div style="' + style1 + 'width:1px;height:1px;"></div>',
-            width = 'width:' + flyingon.vscroll_width + 'px;',
-            height = 'height:' + flyingon.hscroll_height + 'px;';
+            width = flyingon.vscroll_width,
+            height = flyingon.hscroll_height;
+        
+        //解决IE7,8点击无法滚动或不出现滚动条的问题
+        if (flyingon.ie9)
+        {
+            width++;
+            height++;
+        }
+
+        width = 'width:' + width + 'px;';
+        height = 'height:' + height + 'px;';       
         
         return new Array(
             
@@ -2218,14 +2245,14 @@ $class('Grid', flyingon.Control, function (base) {
     //检测列操作
     function check_operate(self, e) {
 
-        var dom = self.dom_header.children[2],
-            style = dom.style,
+        var dom = self.dom_header.children[2], //ie7下未渲染时dom为空
             view = self.__view,
             cell;
 
-        if (view && e && (cell = view.eventHeaderCell(e)))
+        if (dom && view && e && (cell = view.eventHeaderCell(e)))
         {
-            var index = cell.getAttribute('column-index') | 0,
+            var style = dom.style,
+                index = cell.getAttribute('column-index') | 0,
                 column = self.__columns[index],
                 storage,
                 parent;
@@ -2239,13 +2266,11 @@ $class('Grid', flyingon.Control, function (base) {
                 style.display = 'block';
                 style.top = (cell.offsetTop + 1) + 'px';
                 style.left = (parent.parentNode.offsetLeft + parent.offsetLeft + column.left + 2) + 'px';
-                style = null;
             }
-        }
-
-        if (style)
-        {
-            style.display = 'none';
+            else
+            {
+                style.display = 'none';
+            }
         }
     };
 
@@ -2818,7 +2843,7 @@ $class('Grid', flyingon.Control, function (base) {
             columns.splice(index, 0, column);
         }
         
-        return this.update();
+        return this.renderDelay();
     };
     
     
@@ -2830,7 +2855,7 @@ $class('Grid', flyingon.Control, function (base) {
         if (columns)
         {
             columns.splice(index.renderIndex || (index | 0), 1);
-            this.update();
+            this.renderDelay();
         }
         
         return this;
@@ -2838,15 +2863,34 @@ $class('Grid', flyingon.Control, function (base) {
     
     
     
-    var update_time = 0;
+    var render_time = 0;
+    
+    //延迟绘制表格
+    this.renderDelay = function (body) {
+
+        var self = this;
+        
+        if (render_time)
+        {
+            clearTimeout(render_time);
+        }
+        
+        render_time = setTimeout(function () {
+            
+            self.render(body);
+            
+        }, 20);
+        
+        return this;
+    };
     
     
-    //刷新表格
-    this.refresh = function (body) {
+    //重绘表格
+    this.render = function (header) {
     
         var date = new Date();
 
-        this.render();
+        base.render.call(this);
         
         //先记录下窗口的大小
         this.clientWidth = this.dom.clientWidth;
@@ -2854,7 +2898,7 @@ $class('Grid', flyingon.Control, function (base) {
 
         if (this.__columns)
         {
-            if (body !== true)
+            if (header !== false)
             {
                 this.renderHeader();
             }
@@ -2874,27 +2918,6 @@ $class('Grid', flyingon.Control, function (base) {
         return this;
     };
     
-
-    //更新表格
-    this.update = function (body) {
-
-        var self = this;
-        
-        if (update_time)
-        {
-            clearTimeout(update_time);
-        }
-        
-        update_time = setTimeout(function () {
-            
-            self.refresh(body);
-            
-        }, 20);
-        
-        return this;
-    };
-
-
     
     //渲染表头
     this.renderHeader = function () {

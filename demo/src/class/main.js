@@ -79,7 +79,7 @@ $namespace('flyingon.test', function (test) {
             //注册事件(支持事件冒泡)
             obj2.on('my_event', function (event, data) {
 
-                //alert(event.type + data);
+                alert(event.type + data);
             });
 
             //触发事件

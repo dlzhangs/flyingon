@@ -26,121 +26,121 @@
     
     <script type="text/javascript">
         
-           
-        flyingon.layout('page', {
-           
-            type: 'grid',
-            spacingX: 2,
-            spacingY: 2,
-            rows: '30px',
-            columns: '300px * 200* * 200* * 300px',
-            increase: 1,
-            //vertical: true,
+        
+    flyingon.layout('panel', {
 
-             
-            adaptation: {
-                
-                'width < 400': {
-                 
-                    type: 'line',
-                    spacingX: 2,
-                    spacingY: 2,
-                    subitems: {
-                     
-                        width: 'fill'
-                    }
-                },
-                
-                'width < 800': {
-                 
-                    type: 'flow',
-                    spacingX: 2,
-                    spacingY: 2,
-                },
-                
-                
-                'width < 1000': {
-                 
-                    type: 'dock',
-                    spacingX: 20,
-                    spacingY: 20,
-                    //mirror: 'y',
+        type: 'grid',
+        spacingX: 2,
+        spacingY: 2,
+        rows: '30px',
+        columns: '300px * 200* * 200* * 300px',
+        increase: 1,
+        //vertical: true,
 
-                    sublayouts: [
 
-                        {
-                            scale: 5,
-                            dock: 'left',
-                            width: 'auto',
-                            height: 'auto',
-                            layout: 'vertical-line'
-                        },
+        adaptation: {
 
-                        {
-                            scale: 0.2,
-                            dock: 'right',
-                            width: 'auto',
-                            height: 'auto',
-                            layout: 'vertical-line'
-                        },
-                        
-                        {
-                            scale: 0.8,                            
-                            dock: 'fill',
-                            height: 'auto',
-                            layout: 'flow'
-                        }
+            'width < 400': {
 
-                    ]
+                type: 'line',
+                spacingX: 2,
+                spacingY: 2,
+                subitems: {
 
+                    width: 'fill'
                 }
+            },
+
+            'width < 800': {
+
+                type: 'flow',
+                spacingX: 2,
+                spacingY: 2
+            },
+
+
+            'width < 1000': {
+
+                type: 'dock',
+                spacingX: 20,
+                spacingY: 20,
+                //mirror: 'y',
+
+                sublayouts: [
+
+                    {
+                        scale: 5,
+                        dock: 'left',
+                        width: 'auto',
+                        height: 'auto',
+                        layout: 'vertical-line'
+                    },
+
+                    {
+                        scale: 0.2,
+                        dock: 'right',
+                        width: 'auto',
+                        height: 'auto',
+                        layout: 'vertical-line'
+                    },
+
+                    {
+                        scale: 0.8,                            
+                        dock: 'fill',
+                        height: 'auto',
+                        layout: 'flow'
+                    }
+
+                ]
+
             }
-            
-        });
-        
-        
-        var page = new flyingon.Page().sets({
-        
-            id: 'page',
-            width: 1000,
-            height: 400,
+        }
+
+    });
+
+
+    var panel = new flyingon.Panel().sets({
+
+        id: 'panel',
+        width: 1000,
+        height: 400,
+        border: 1,
+        borderStyle: 'solid',
+        padding: 8,
+        overflowX: 'auto',
+        overflowY: 'auto',
+        layout: 'panel'
+    });
+
+
+    for (var i = 0; i < 60; i++)
+    {
+        panel.append(new flyingon.HtmlControl().sets({
+
+            id: 'control' + i,
+            text: 'text' + i,
             border: 1,
             borderStyle: 'solid',
-            padding: 8,
-            overflowX: 'auto',
-            overflowY: 'auto',
-            layout: 'page'
-        });
-        
+            textAlign: 'center',
+            verticalAlign: 'middle'
+        }));
+    }
 
-        for (var i = 0; i < 60; i++)
-        {
-            page.append(new flyingon.HtmlControl().sets({
-
-                id: 'control' + i,
-                text: 'text' + i,
-                border: 1,
-                borderStyle: 'solid',
-                textAlign: 'center',
-                verticalAlign: 'middle'
-            }));
-        }
-              
-        page.show(document.body);
+    panel.renderTo(document.body);
 
 
-        flyingon.dom_on(document.body, 'mousedown', function (e) {
-            
-            var width = page.offsetWidth,
-                height = page.offsetHeight;
-                
-            flyingon.dom_drag(this, e, null, function dragmove(e) {
-          
-                page.width(width + e.distanceX);
-                page.height(height + e.distanceY);
-                
-            }, null, true, true);
-        });
+    flyingon.dom_on(document.body, 'mousedown', function (e) {
+
+        var width = panel.offsetWidth,
+            height = panel.offsetHeight;
+
+        flyingon.dom_drag(this, e, null, function dragmove(e) {
+
+            panel.width(width + e.distanceX);
+            panel.height(height + e.distanceY);
+
+        }, null, true, true);
+    });
         
       
     </script>

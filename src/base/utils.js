@@ -190,6 +190,30 @@ window.Set || (window.Set = $class(function () {
 
 
 
+window.console || (window.console = function () {
+    
+    
+    this.log = function (text) {
+        
+    };
+    
+    
+    this.warn = function (text) {
+        
+    };
+    
+    
+    this.error = function (text) {
+        
+    };
+    
+    return this;
+    
+    
+}.call({}));
+
+
+
 //动态添加样式表
 flyingon.style = function (cssText) {
   

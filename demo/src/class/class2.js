@@ -7,7 +7,7 @@ $namespace('flyingon.test', function (test) {
     
     console.log('test2.js executed!');
     
-    
+
 
     //定义子类 freeoasoft.test.ChildClass 从BaseClass继承 (注:仅在名字空间内才可定义类)
     $class('ChildClass', test.BaseClass, function (base) {
