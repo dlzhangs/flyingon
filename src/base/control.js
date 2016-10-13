@@ -77,6 +77,10 @@ flyingon.__class_extend = function (target, default_class) {
 $class('Control', flyingon.Visual, function (base, self) {
 
     
+    //唯一id生成器
+    var uniqueId = 1;
+    
+    
     
     $constructor(function (dom) {
 
@@ -89,6 +93,7 @@ $class('Control', flyingon.Visual, function (base, self) {
             dom = this.dom_template.cloneNode(true);
         }
 
+        this.uniqueId = uniqueId++;
         (this.dom = dom).control = this;
     });
     
@@ -96,6 +101,11 @@ $class('Control', flyingon.Visual, function (base, self) {
             
     //盒模型大小是否包含边框
     this.boxBorder = false;
+    
+    
+    //向上冒泡对象名
+    this.eventBubble = '__parent';
+    
     
 
     //创建dom模板(必须在创建类时使用此方法创建dom模板)
@@ -169,8 +179,7 @@ $class('Control', flyingon.Visual, function (base, self) {
         this.__default_className = dom.className = name;
     };
 
-
-
+    
 
     //父控件
     this.defineProperty('parent', function () {
@@ -232,13 +241,6 @@ $class('Control', flyingon.Visual, function (base, self) {
         return index >= length ? length - 1 : index;
     };
 
-
-
-    //id
-    this.defineProperty('id', '', {
-
-        set: 'this.dom.id = value;'
-    });
 
 
     

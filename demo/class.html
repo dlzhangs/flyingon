@@ -10,28 +10,30 @@
 
     请使用网络跟踪工具查看网络请求, 可通过修改main.js中的引入资源设置控制js合并及版本
 
-    <script type="text/javascript" src="../js/flyingon.min.js"></script>
+    <script type="text/javascript" src="../js/flyingon.js"></script>
 
     <script type="text/javascript">
 
         
     //指定引入资源版本
-    $require.version('1.0', {
+    $require.version('2.0', {
 
         //'flyingon/demo/src/class/class1.js': '1.0.1',
-        //'flyingon/demo/js/class/class.min.js': '1.0.1'
+        //'flyingon/demo/js/class/class.min.js': '2.0.1'
     });
 
 
     //指定引入资源合并关系
     $require.merge({
-
-        //'flyingon/demo/js/class/class.min.js': [
-        //    'flyingon/demo/src/class/class1.js', 
-        //    'flyingon/demo/src/class/class2.js',
-        //    'flyingon/demo/src/class/class3.js'
-        //],
-        //'flyingon/demo/js/class/main.min.js': 'flyingon/demo/src/class/main.js'
+        /*
+        'flyingon/demo/js/class/class.min.js': [
+            'flyingon/demo/src/class/class1.js', 
+            'flyingon/demo/src/class/class2.js',
+            'flyingon/demo/src/class/class3.js',
+            'flyingon/demo/src/class/class4.js'
+        ],
+        'flyingon/demo/js/class/main.min.js': 'flyingon/demo/src/class/main.js'
+        */
     });
 
 

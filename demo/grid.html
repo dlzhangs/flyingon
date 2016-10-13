@@ -20,6 +20,8 @@
 </head>
 <body>
     
+    <div id="host"></div>
+    
     <script type="text/javascript" src="../js/flyingon.js"></script>
     <script type="text/javascript" src="../js/flyingon-controls.js"></script>
     <script type="text/javascript" src="../src/controls/grid.js"></script>
@@ -30,12 +32,8 @@
     $namespace('flyingon.demo', function (demo) {
 
 
-        var grid = demo.grid = new flyingon.Grid(),
-            columns = create_columns(),
-            data = create_data();
-
-        function create_data() {
-
+        var data = (function () {
+        
             var items = [];
             
             for (var i = 0; i < 10000; i++)
@@ -51,10 +49,11 @@
             }
             
             return items;
-        };
-
-
-        function create_columns() {
+            
+        })();
+        
+        
+        var columns = (function () {
             
             var columns = [
                 
@@ -76,19 +75,27 @@
             }
             
             return columns;
-        };
+            
+        })();
         
+                
+        var table = new flyingon.DataTable();
         
-        grid.sets({
+        table.load(data);
+
+        
+        window.sampleGrid = new flyingon.Grid().sets({
 
             width: '100%',
             height: 400,
             columns: columns,
             dataSource: data,
             headerHeight: 60,
-            lockedBefore: 4
+            lockedBefore: 4,
+            dataTable: table
             
-        }).renderTo();
+        }).renderTo(host);
+        
     });
         
         

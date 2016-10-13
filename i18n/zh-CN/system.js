@@ -4,4 +4,3 @@ $i18nlist('system', {
     cancel: '取消',
     close: '关闭'
 });
-    

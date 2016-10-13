@@ -34,7 +34,48 @@ $class('Popup', [Object, flyingon.IComponent], function () {
     //扩展class相关操作
     flyingon.__class_extend(this, 'flyingon-Popup ');
     
+
+    //处理全局点击事件,点击当前弹出层以外的区域则关闭当前弹出层
+    flyingon.dom_on(document, 'mousedown', function (e) { 
+
+        var layer = layers[layers.length - 1];
+
+        if (layer) {
+
+            var dom = layer.dom,
+                target = e.target;
+
+            while (target) 
+            {
+                if (target === dom) 
+                {
+                    return;
+                }
+
+                target = target.parentNode;
+            }
+
+            //调用关闭弹出层方法, 关闭类型为'auto'
+            if (layer.trigger(new Event('autoclosing', e.target)) !== false) 
+            {
+                layer.close('auto', e);
+            }
+        }
+    });
     
+
+    //处理全局键盘事件,点击Esc则退出当前窗口
+    flyingon.dom_on(document, 'keydown', function (e) { 
+
+        var layer;
+
+        if (e.which === 27 && (layer = layers[layers.length - 1]))
+        {
+            layer.close('cancel', e);
+        }
+    });
+
+
     
     //弹出层宽度
     this.defineProperty('width', '', {
@@ -165,11 +206,6 @@ $class('Popup', [Object, flyingon.IComponent], function () {
                 }
             }
         }
-        else //绑定全局事件
-        {
-            flyingon.dom_on(document, 'mousedown', document_mousedown);
-            flyingon.dom_on(document, 'keydown', document_keydown);
-        }
 
         dom = self.dom;
         dom.style.visibility = 'visible';
@@ -196,47 +232,6 @@ $class('Popup', [Object, flyingon.IComponent], function () {
         
         //触发打开事件
         self.trigger('open');
-    };
-
-
-    //处理全局点击事件,点击当前弹出层以外的区域则关闭当前弹出层
-    function document_mousedown(e) { 
-
-        var layer = layers[layers.length - 1];
-
-        if (layer) {
-
-            var dom = layer.dom,
-                target = e.target;
-
-            while (target) 
-            {
-                if (target === dom) 
-                {
-                    return;
-                }
-
-                target = target.parentNode;
-            }
-
-            //调用关闭弹出层方法, 关闭类型为'auto'
-            if (layer.trigger(new Event('autoclosing', e.target)) !== false) 
-            {
-                layer.close('auto', e);
-            }
-        }
-    };
-
-
-    //处理全局键盘事件,点击Esc则退出当前窗口
-    function document_keydown(e) { 
-
-        var layer;
-
-        if (e.which === 27 && (layer = layers[layers.length - 1]))
-        {
-            layer.close('cancel', e);
-        }
     };
 
 
@@ -341,13 +336,6 @@ $class('Popup', [Object, flyingon.IComponent], function () {
             layers.pop();
 
             dom.parentNode.removeChild(dom);
-
-            //注销全局事件
-            if (off !== false && !layers.length)
-            { 
-                flyingon.dom_off(document, 'mousedown', document_mousedown);
-                flyingon.dom_off(document, 'keydown', document_keydown);
-            }
 
             e = new Event('closed', event);
             e.closeType = closeType || 'ok';

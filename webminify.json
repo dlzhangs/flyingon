@@ -53,9 +53,12 @@
         base: '',
         files: [
 			'src/base/flyingon.js',
+            'src/base/console.js',
+            'src/base/set.js',
+            'src/base/nodelist.js',
+            'src/base/dom.js',
             'src/base/serialize.js',
             'src/base/component.js',
-			'src/base/utils.js',
 			'src/base/visual.js',
 			'src/base/layout.js',
 			'src/base/event.js',
@@ -63,7 +66,7 @@
 			'src/base/htmlcontrol.js',
 			'src/base/container.js',
 			'src/base/panel.js',
-            'src/base/datatable.js',
+            'src/base/dataset.js',
             'src/base/popup.js',
 		],
         output: 'js/flyingon.js',
@@ -106,7 +109,7 @@
     {
         base: '',
         files: [
-			'src/controls/grid.js'
+			'src/grid/grid.js'
 		],
         output: 'js/flyingon-grid.js',
         minify: false

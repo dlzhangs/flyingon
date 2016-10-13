@@ -42,7 +42,8 @@
         files: [
 			'src/class/class1.js',
 			'src/class/class2.js',
-            'src/class/class3.js'
+            'src/class/class3.js',
+            'src/class/class4.js'
 		],
         output: 'js/class/class.min.js',
         minify: false
