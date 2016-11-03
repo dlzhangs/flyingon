@@ -3,7 +3,7 @@ $require('flyingon/css/{skin}/flyingon-controls.css', true);
 
 
 
-$class('Dialog', [flyingon.Panel, flyingon.ITopControl], function (base) {
+$class('Dialog', flyingon.Panel, function (base) {
 
 
     //已打开的窗口集合

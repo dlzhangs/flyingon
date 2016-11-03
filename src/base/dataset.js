@@ -42,7 +42,7 @@ $class('RowCollection', function () {
         var list = arguments[1] || flyingon.RowCollection(),
             row;
         
-        for (var i = 0, _ = this.length; i < _; i++)
+        for (var i = 0, l = this.length; i < l; i++)
         {
             if ((row = this[i]) && (!filter || filter(row)))
             {
@@ -77,7 +77,7 @@ $class('RowCollection', function () {
             names = names && names.length > 0 ? new RegExp('^(' + names.join('|') + ')$', 'i') : null;
         }
         
-        for (var i = 0, _ = this.length; i < _; i++)
+        for (var i = 0, l = this.length; i < l; i++)
         {
             if ((row = this[i]) && (data = row.data))
             {
@@ -136,7 +136,7 @@ $class('RowCollection', function () {
         
         writer.push('[');
         
-        for (var i = 0, _ = data.length; i < _; i++)
+        for (var i = 0, l = data.length; i < l; i++)
         {
             if (i > 0)
             {
@@ -441,6 +441,9 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
     
     
     
+    //事件类型
+    var Event = flyingon.Event;
+    
     //删除或增加数据方法
     var splice = [].splice;
     
@@ -552,26 +555,26 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
     //设置指定列的值
     this.set = function (name, value, trigger, caller) {
         
-        var data;
+        var data, oldValue;
         
-        if (name && value !== void 0 && (data = this.data))
+        //不允许设置值为undefined
+        if (name && value !== void 0 && (data = this.data) && value !== (oldValue = data[name]))
         {
-            var dataset, oldValue, names, key, cache;
-            
-            //不允许设置值为undefined
-            if (value === (oldValue = data[name]))
-            {
-                return caller ? void 0 : this;
-            }
-            
+            var dataset, e, key, cache;
+                        
             dataset = this.dataset || this;
             
-            if (trigger === false || dataset.trigger('value-changing', 
+            if (trigger === false || dataset.trigger(e = new Event('value-changing'), 
                 'row', this, 
                 'name', name, 
                 'value', value, 
                 'oldValue', oldValue) !== false)
             {
+                if (e && (cache = e.value) !== value && cache !== void 0)
+                {
+                    value = cache;
+                }
+                    
                 if (this.state === 'unchanged')
                 {
                     cache = {};
@@ -604,6 +607,8 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
                         'value', value, 
                         'oldValue', oldValue);
                 }
+                
+                return caller ? value : this;
             }
         }
         
@@ -744,7 +749,7 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
 
 
 //数据集
-$class('DataSet', [Object, flyingon.IComponent, flyingon.IDataList], function () {
+$class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function () {
     
     
     
@@ -783,7 +788,7 @@ $class('DataSet', [Object, flyingon.IComponent, flyingon.IDataList], function ()
         
         if (mapping instanceof Array)
         {
-            for (var i = 0, _ = mapping.length; i < _; i++)
+            for (var i = 0, l = mapping.length; i < l; i++)
             {
                 list.push('target["' + mapping[i] + '"] = source[' + i + '];');
             }

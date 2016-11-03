@@ -1,33 +1,67 @@
 
 //class相关操作支持接口
-flyingon.__class_extend = function (target, default_class) {
+flyingon.__class_extend = function (defaults, key) {
    
+    
+    
+    //缓存的名称正则表达式集合
+    var cache = flyingon.__class_extend;
+    
+    cache = cache.cache || (cache.cache = flyingon.create(null));
+    
+    
+    
+    if (key && typeof key !== 'string')
+    {
+        key = 'dom';
+    }
+    
     
 
     //指定class名 与html一样
-    target.defineProperty('className', '', {
+    this.defineProperty('className', '', {
 
-        query: true,
-        set: 'this.dom.className = ' + default_class + ' + (value ? value + " " : "");'
+        set: 'this.' + key + '.className = ' + (defaults || '') + ' + (value ? " " + value : "");'
     });
 
 
+    
+    //获取对应正则表达式
+    function regex(name) {
+        
+        return cache[name] = new RegExp('(\\s+|^)' + name + '(\\s+|$)', 'gi');
+    };
+    
+    
+    function replace(_, x, y) {
+        
+        return x && y ? ' ' : '';  
+    };
+    
+    
 
     //是否包含指定class
-    target.hasClass = function (name) {
+    this.hasClass = function (name) {
 
-        return name ? this.dom.className.indexOf(name + ' ') >= 0 : false;
+        var target;
+        
+        if (name && (target = this[key]))
+        {
+            return (cache[name] || regex(name)).test(target.className);
+        }
+        
+        return false;
     };
 
 
     //添加class
-    target.addClass = function (name) {
+    this.addClass = function (name) {
 
-        var dom;
+        var target;
         
-        if (name && (dom = this.dom).className.indexOf(name += ' ') < 0)
+        if (name && (target = this[key]))
         {
-            dom.className += name;
+            target.className += ' ' + name;
         }
 
         return this;
@@ -35,12 +69,13 @@ flyingon.__class_extend = function (target, default_class) {
 
 
     //移除class
-    target.removeClass = function (name) {
+    this.removeClass = function (name) {
 
-        if (name)
+        var target;
+        
+        if (name && (target = this[key]))
         {
-            var dom = this.dom;
-            dom.className = dom.className.replace(name + ' ', '');
+            target.className = target.className.replace(cache[name] || regex(name), replace);
         }
 
         return this;
@@ -48,20 +83,21 @@ flyingon.__class_extend = function (target, default_class) {
 
 
     //切换class 有则移除无则添加
-    target.toggleClass = function (name) {
+    this.toggleClass = function (name) {
 
-        if (name)
+        var target;
+        
+        if (name && (target = this[key]))
         {
-            var dom = this.dom,
-                className = dom.className;
-
-            if (className.indexOf(name += name + ' ') >= 0)
+            var className = target.className;
+            
+            if (className && (name = cache[name] || regex(name)).test(className))
             {
-                dom.className = className.replace(name, '');
+                target.className = className.replace(name, replace);
             }
             else
             {
-                dom.className += name;
+                target.className += ' ' + name;
             }
         }
 
@@ -150,14 +186,14 @@ $class('Control', flyingon.Visual, function (base, self) {
     
     
     //默认className
-    this.__default_className = 'flyingon-Control ';
+    this.__default_className = 'flyingon-Control';
 
 
     //控件类初始化处理
     this.__class_init = function (Class, base) {
      
         var dom = this.dom_template || this.createDomTemplate('<div></div>'),
-            name = 'flyingon-Control ',
+            name = 'flyingon-Control',
             cache;
         
         if (base && dom === base.dom_template)
@@ -168,12 +204,12 @@ $class('Control', flyingon.Visual, function (base, self) {
 
         if (this !== self && (cache = Class.xtype))
         {
-            name += cache.replace(/\./g, '-') + ' ';
+            name += ' ' + cache.replace(/\./g, '-');
         }
         
         if (cache = dom.className)
         {
-            name += cache + ' ';
+            name += ' ' + cache;
         }
       
         this.__default_className = dom.className = name;
@@ -245,7 +281,7 @@ $class('Control', flyingon.Visual, function (base, self) {
 
     
     //扩展class相关操作
-    flyingon.__class_extend(this, 'this.__default_className');
+    flyingon.__class_extend.call(this, 'this.__default_className');
     
     
 
@@ -291,7 +327,6 @@ $class('Control', flyingon.Visual, function (base, self) {
         self.defineProperty(name, '', {
 
             group: 'layout',
-            query: true,
             set: set
         });
     };
@@ -326,7 +361,6 @@ $class('Control', flyingon.Visual, function (base, self) {
         self.defineProperty(name, '', {
 
             group: 'appearance',
-            query: true,
             set: set || 'this.dom.style.' + name + ' = value;\n'
         });
     };
@@ -486,6 +520,13 @@ $class('Control', flyingon.Visual, function (base, self) {
     //ellipsis	显示省略符号来代表被修剪的文本 	
     //string	使用给定的字符串来代表被修剪的文本 
     style('text-overflow');
+    
+    
+    
+    this.defineProperty('tabIndex', 0);
+    
+    
+    this.defineProperty('disabled', false);
     
     
     
@@ -724,9 +765,9 @@ $class('Control', flyingon.Visual, function (base, self) {
     this.detach = function () {
      
         var dom = this.dom,
-            parent = dom.parentNode;
+            parent;
 
-        if (parent)
+        if (dom && (parent = dom.parentNode))
         {
             parent.removeChild(dom);
         }
@@ -825,12 +866,26 @@ $class('Control', flyingon.Visual, function (base, self) {
         
     
     
-    var dispose = this.dispose;
+    var off = flyingon.dom_off;
     
     this.dispose = function () {
     
-        this.dom = this.dom.control = this.__parent = null;
-        dispose.call(this);
+        var cache = this.dom;
+        
+        if (cache)
+        {
+            off(cache);
+            cache.control = null;
+            
+            this.dom = null;
+        }
+        
+        this.__parent = null;
+        
+        if (this.__events)
+        {
+            this.off();
+        }
     };
     
     

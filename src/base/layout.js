@@ -108,7 +108,7 @@ $class('Sublayout', flyingon.Visual, function (base) {
 
 
 //布局基类
-$class('Layout', [Object, flyingon.IComponent], function (base, self) {
+$class('Layout', [Object, flyingon.ISerialize], function (base, self) {
 
     
 
@@ -445,7 +445,7 @@ $class('Layout', [Object, flyingon.IComponent], function (base, self) {
             all = 0;
         }
         
-        for (var i = 0, _ = sublayouts.length; i < _; i++)
+        for (var i = 0, l = sublayouts.length; i < l; i++)
         {
             var layout = sublayouts[i],
                 scale = layout.scale(),
@@ -1195,7 +1195,7 @@ $class(flyingon.Layout, function (base) {
         //排列充满项
         if (list)
         {
-            for (var i = 0, _ = list.length; i < _; i++)
+            for (var i = 0, l = list.length; i < l; i++)
             {
                 this.measure(control = list[i++], arrange, margin = list[i], width, height, false, false, true, true);
                 this.locate(control, arrange, margin, x, y, width, height);
@@ -1452,7 +1452,7 @@ $class(flyingon.Layout, function (base) {
             target.weight = this.weight;
             target.percent = this.percent;
             
-            for (var i = 0, _ = this.length; i < _; i++)
+            for (var i = 0, l = this.length; i < l; i++)
             {
                 target.push(this[i].clone());
             }

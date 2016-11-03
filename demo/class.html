@@ -14,7 +14,7 @@
 
     <script type="text/javascript">
 
-        
+$require.sync(true);
     //指定引入资源版本
     $require.version('2.0', {
 
@@ -38,8 +38,8 @@
 
 
     //自定义初始化(等待main.js加载完毕才执行)
-    $require(['flyingon/demo/css/{skin}.css', 
-              'flyingon/demo/i18n/{i18n}/test.js',
+    $require([//'flyingon/demo/css/{skin}.css', 
+              //'flyingon/demo/i18n/{i18n}/test.js',
               'flyingon/demo/src/class/main.js'], function () {
 
         new flyingon.test.MainPage();

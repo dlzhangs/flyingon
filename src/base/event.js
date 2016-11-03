@@ -10,6 +10,42 @@ $class('DomEvent', flyingon.Event, function () {
         
     }, true);
     
+
+    //阻止事件冒泡
+    this.stopPropagation = function (dom_event) {
+
+        this.cancelBubble = true;
+        
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.stopPropagation();
+        }
+    };
+
+
+    //禁止默认事件
+    this.preventDefault = function (dom_event) {
+
+        this.defaultPrevented = true;
+           
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.preventDefault();
+        }
+    };
+
+
+    //阻止事件冒泡及禁止默认事件
+    this.stopImmediatePropagation = function (dom_event) {
+
+        this.cancelBubble = this.defaultPrevented = true;
+                   
+        if (dom_event && (dom_event = this.dom_event))
+        {
+            dom_event.stopImmediatePropagation();
+        }
+    };
+
     
 });
 

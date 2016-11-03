@@ -1,8 +1,13 @@
 
-//序列化接口
+//可序列化组件接口
 $interface('ISerialize', function () {
     
-        
+    
+    
+    //组件id
+    this.defineProperty('id', '');
+    
+    
     
     //序列化方法
     this.serialize = function (writer) {
@@ -11,12 +16,12 @@ $interface('ISerialize', function () {
         
         if (cache = this.xtype)
         {
-            writer.write_property('xtype', cache);
+            writer.writeProperty('xtype', cache);
         }
         
         if (cache = this.__storage)
         {
-            writer.write_properties(cache);
+            writer.writeProperties(cache);
         }
     };
     
@@ -35,13 +40,9 @@ $interface('ISerialize', function () {
                     fn.call(this, reader, values[name]);
                 }
             }
-            else if ((fn = this[name]) && typeof fn === 'function')
-            {
-                fn.call(this, values[name], false);
-            }
             else
             {
-                this[name] = values[name];
+                this.set(name, values[name]);
             }
         }
     };
@@ -50,60 +51,62 @@ $interface('ISerialize', function () {
     //设置不序列化xtype属性
     this.deserialize_xtype = true;
     
-});
+    
+}, true);
 
 
 
 //读序列化类
 $class('SerializeReader', function () {
 
-
-    var class_list = flyingon.__class_list,
-        Array = window.Array;
     
 
-    this.deserialize = function (values) {
+    var class_list = flyingon.__class_list;
+    
+    var Array = window.Array;
+    
+    
 
-        if (values)
+    this.deserialize = function (data) {
+
+        if (data)
         {
-            if (typeof values === 'string')
+            if (typeof data === 'string')
             {
-                values = flyingon.parseJSON(values);
+                data = flyingon.parseJSON(data);
             }
 
-            if (typeof values === 'object')
+            if (typeof data === 'object')
             {
-                this.all = null;
-                values = values instanceof Array ? this.read_array(values) : this.read_object(values);
-                
-                this.callback = null;
+                data = data instanceof Array ? this.readArray(data) : this.readObject(data);
+                this.all = this.callback = null;
             }
         }
 
-        return values;
+        return data;
     };
 
 
-    this.read = function (value) {
+    this.read = function (data) {
 
-        if (value && typeof value === 'object')
+        if (data && typeof data === 'object')
         {
-            return value instanceof Array ? this.read_array(value) : this.read_object(value);
+            return data instanceof Array ? this.readArray(data) : this.readObject(data);
         }
 
-        return value;
+        return data;
     };
 
 
-    this.read_array = function (values) {
+    this.readArray = function (data) {
 
-        if (values)
+        if (data)
         {
             var array = [];
 
-            for (var i = 0, _ = values.length; i < _; i++)
+            for (var i = 0, l = data.length; i < l; i++)
             {
-                array.push(this.read(values[i]));
+                array.push(this.read(data[i]));
             }
 
             return array;
@@ -113,71 +116,84 @@ $class('SerializeReader', function () {
     };
 
 
-    this.read_object = function (values, type) {
+    this.readObject = function (data, type) {
 
-        if (values)
+        if (data)
         {
-            var target, id, cache;
+            var target, id;
 
             if (type)
             {
                 if ((target = new type()).deserialize)
                 {
-                    target.deserialize(this, values);
+                    target.deserialize(this, data);
+                    
+                    if (id = data.id)
+                    {
+                        read_reference(target, id);
+                    }
                 }
                 else
                 {
-                    this.read_properties(target, values); 
+                    this.readProperties(target, data); 
                 }
             }
-            else if ((id = values.xtype) && (target = class_list[id]))
+            else if ((type = data.xtype) && (type = class_list[type]))
             {
-                (target = new target()).deserialize(this, values);
+                (target = new type()).deserialize(this, data);
+                
+                if (id = data.id)
+                {
+                    read_reference(target, id);
+                }
             }
             else
             {
-                this.read_properties(target = {}, values); 
+                this.readProperties(target = {}, data); 
             }
             
-            if (id = values.id)
-            {
-                (this.all || (this.all = {}))[id] = target;
-                
-                if ((cache = this.callback) && (cache = cache[id]))
-                {
-                    for (var i = cache.length - 1; i >= 0; i--)
-                    {
-                        cache[i](target);
-                    }
-                    
-                    this.callback[id] = null;
-                }
-            }
-
             return target;
         }
 
         return null;
     };
+    
+    
+    function read_reference(target, id) {
+        
+        var list = this.callback;
+        
+        (this.all || (this.all = {}))[id] = target;
+
+        if (list && (list = list[id]))
+        {
+            for (var i = 0, l = list.length; i < l; i++)
+            {
+                list[i](target);
+            }
+
+            list[id] = target = null;
+        }
+    };
 
     
-    this.read_properties = function (target, values) {
+    this.readProperties = function (target, data) {
       
-        for (var name in values)
+        for (var name in data)
         {
-            target[name] = this.read(values[name]);
+            target[name] = this.read(data[name]);
         }
     };
     
     
-    this.read_reference = function (name, callback) {
+    this.readReference = function (name, callback) {
       
         var all = this.all,
             cache;
         
         if (all && (cache = all[name]))
         {
-            callback(cache)
+            callback(cache);
         }
         else if (cache = this.callback)
         {
@@ -208,29 +224,28 @@ $class('SerializeReader', function () {
 $class('SerializeWriter', function () {
 
 
-    var Array = window.Array,
-        has = {}.hasOwnProperty;
-
     
-    $static('serialize', function (target) {
+    var Array = window.Array;
     
-        return new flyingon.SerializeWriter().serialize(target);
-    });
+    var has = {}.hasOwnProperty;
+
+    var id = 1;
     
+    
+    
+    this.serialize = function (value) {
 
-    this.serialize = function (target) {
-
-        if (target && typeof target === 'object')
+        if (value && typeof target === 'object')
         {
             var data = this.data = [];
             
-            if (target instanceof Array)
+            if (value instanceof Array)
             {
-                this.write_array(target);
+                this.writeArray(value);
             }
             else
             {
-                this.write_object(target);
+                this.writeObject(value);
             }
 
             data.pop();
@@ -238,7 +253,7 @@ $class('SerializeWriter', function () {
             return data.join('');
         }
         
-        return '' + target;
+        return '' + value;
     };
 
 
@@ -257,18 +272,21 @@ $class('SerializeWriter', function () {
                     break;
 
                 case 'string':
+                    this.data.push('"', value.replace(/"/g, '\\"'), '"', ',');
+                    break;
+                    
                 case 'function':
-                    this.data.push('"' + ('' + value).replace(/\"/g, '\\"') + '"', ',');
+                    this.data.push('"', ('' + value).replace(/"/g, '\\"'), '"', ',');
                     break;
 
                 default:
                     if (value instanceof Array)
                     {
-                        this.write_array(value);
+                        this.writeArray(value);
                     }
                     else
                     {
-                        this.write_object(value);
+                        this.writeObject(value);
                     }
                     break;
             }
@@ -280,21 +298,20 @@ $class('SerializeWriter', function () {
     };
 
 
-    this.write_array = function (array) {
+    this.writeArray = function (value) {
 
-        var data = this.data;
+        var data = this.data,
+            length;
         
-        if (array != null)
+        if (value != null)
         {
-            var length = array.length;
-
-            if (length > 0)
+            if ((length = value.length) > 0)
             {
                 data.push('[');
                 
                 for (var i = 0; i < length; i++)
                 {
-                    this.write(array[i]);
+                    this.write(value[i]);
                 }
                 
                 data.pop();
@@ -312,31 +329,24 @@ $class('SerializeWriter', function () {
     };
 
 
-    this.write_object = function (target) {
+    this.writeObject = function (value) {
 
         var data = this.data;
         
-        if (target != null)
+        if (value != null)
         {
             data.push('{');
 
-            if (target.serialize)
+            if (value.serialize)
             {
-                target.serialize(this);
+                value.serialize(this);
             }
             else
             {
-                this.write_properties(target);
+                this.writeProperties(value);
             }
 
-            if (data.pop() === ',')
-            {
-                data.push('}', ',')
-            }
-            else
-            {
-                data.push('{}', ',');
-            }
+            data.push(data.pop() === ',' ? '}' : '{}', ',');
         }
         else
         {
@@ -345,7 +355,7 @@ $class('SerializeWriter', function () {
     };
 
 
-    this.write_properties = function (values) {
+    this.writeProperties = function (values) {
 
         if (values)
         {
@@ -363,26 +373,21 @@ $class('SerializeWriter', function () {
     };
     
     
-    this.write_property = function (name, value) {
+    this.writeProperty = function (name, value) {
       
-        this.data.push('"', name, '":');
-        this.write(value);
+        if (name)
+        {
+            this.data.push('"', name, '":');
+            this.write(value);
+        }
     };
     
     
-    this.write_reference = function (name, target) {
+    this.writeReference = function (name, value) {
         
-        if (name && target)
+        if (name && value)
         {
-            var id = target.id;
-            
-            if (!id || typeof id === 'function' && !(id = target.id()))
-            {
-                throw $errortext('serialize no id').replace('{0}', target);
-            }
-            
-            this.data.push('"', name, '":');
-            this.write(id);
+            this.data.push('"', name, '":', value.id() || ('__auto_id_' + id++));
         }
     };
 
@@ -392,9 +397,9 @@ $class('SerializeWriter', function () {
     
         var writer = Class.instance = new Class();
 
-        Class.deserialize = function (target) {
+        Class.serialize = function (value) {
 
-            return writer.deserialize(target);
+            return writer.serialize(value);
         };
     };
     

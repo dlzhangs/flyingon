@@ -23,7 +23,7 @@ $class('Popup', [Object, flyingon.IComponent], function () {
 
         var dom = this.dom = document.createElement('div');
 
-        dom.className = 'flyingon-Popup ';
+        dom.className = 'flyingon-PopupLayer';
         dom.style.cssText = 'position:absolute;visibility:hidden;';
         
         this.__dispose = dispose;
@@ -32,7 +32,7 @@ $class('Popup', [Object, flyingon.IComponent], function () {
 
 
     //扩展class相关操作
-    flyingon.__class_extend(this, 'flyingon-Popup ');
+    flyingon.__class_extend.call(this, 'flyingon-PopupPopupLayer');
     
 
     //处理全局点击事件,点击当前弹出层以外的区域则关闭当前弹出层

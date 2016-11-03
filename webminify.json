@@ -32,7 +32,13 @@
     
 	{
         base: '',
-        files: ['src/base/flyingon.js'],
+        files: [
+            'src/core/oo.js',
+            'src/core/async.js',
+            'src/core/web.js',
+            'src/core/ajax.js',
+            'src/core/require.js',
+        ],
         output: 'js/flyingon-core.js',
         minify: false
 	},
@@ -52,13 +58,14 @@
     {
         base: '',
         files: [
-			'src/base/flyingon.js',
+			'src/core/oo.js',
+            'src/core/async.js',
+            'src/core/web.js',
+            'src/core/ajax.js',
+            'src/core/require.js',
             'src/base/console.js',
-            'src/base/set.js',
-            'src/base/nodelist.js',
             'src/base/dom.js',
             'src/base/serialize.js',
-            'src/base/component.js',
 			'src/base/visual.js',
 			'src/base/layout.js',
 			'src/base/event.js',
@@ -83,48 +90,6 @@
         //compress: false,
         advanced: true,
         license: '/*\n* flyingon javascript library v0.0.1.0\n* https://github.com/freeoasoft/flyingon\n*\n* Copyright 2014, yaozhengyang\n* licensed under the LGPL Version 3 licenses\n*/'
-    },
-	
-    {
-        base: '',
-        files: [
-			'src/controls/dialog.js'
-		],
-        output: 'js/flyingon-controls.js',
-        minify: false
-    },
-	
-	{
-        base: 'js',
-        files: ['flyingon-controls.js'],
-        output: 'flyingon-controls.min.js',
-        minify: true,
-        //mangle: false,
-        //mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]},
-        //compress: false,
-        advanced: true,
-        license: '/*\n* flyingon javascript library v0.0.1.0\n* https://github.com/freeoasoft/flyingon\n*\n* Copyright 2014, yaozhengyang\n* licensed under the LGPL Version 3 licenses\n*/'
-    },
-    
-    {
-        base: '',
-        files: [
-			'src/grid/grid.js'
-		],
-        output: 'js/flyingon-grid.js',
-        minify: false
-    },
-	
-	{
-        base: 'js',
-        files: ['flyingon-grid.js'],
-        output: 'flyingon-grid.min.js',
-        minify: true,
-        //mangle: false,
-        //mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]},
-        //compress: false,
-        advanced: true,
-        license: '/*\n* flyingon javascript library v0.0.1.0\n* https://github.com/freeoasoft/flyingon\n*\n* Copyright 2014, yaozhengyang\n* licensed under the LGPL Version 3 licenses\n*/'
-    },
+    }
 	
 ]

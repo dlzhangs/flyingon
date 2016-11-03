@@ -277,7 +277,7 @@ $interface('IContainerControl', function () {
             
             cache.appendChild(self.__dom_scroll = scroll_dom.cloneNode(false));
 
-            for (var i = 0, _ = children.length; i < _; i++)
+            for (var i = 0, l = children.length; i < l; i++)
             {
                 cache.appendChild(children[i].dom);
             }
@@ -391,7 +391,7 @@ $interface('IContainerControl', function () {
     //排列子项
     this.arrange_children = function (children) {
 
-        for (var i = 0, _ = children.length; i < _; i++)
+        for (var i = 0, l = children.length; i < l; i++)
         {
             var control = children[i];
             
