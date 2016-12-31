@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title></title>
+    <script type="text/javascript">
+        
+        /*
+        if (window.console && console.profile)
+        {
+            console.profile('test');
+
+            setTimeout(function () {
+
+                console.profileEnd('test');
+
+            }, 3000);
+        }
+        */
+        
+    </script>
+</head>
+<body style="padding:10px;">
+
+    <script type="text/javascript" src="../js/flyingon.js"></script>
+    
+    <script type="text/javascript">
+        
+        
+        $class('TextControl', flyingon.Control, function (base) {
+            
+            
+            this.defineProperty('text', '', {
+               
+                set: 'this.view && (this.view.value = value);'
+            });
+            
+        });
+        
+        
+        $class(flyingon.Renderer, function (base) {
+           
+            
+            this.bind(flyingon.TextControl);
+            
+            
+            this.template('<input type="text"></input>', true);
+            
+            
+            this.init = function (control) {
+            
+                var view = base.init.call(this, control);
+                
+                view.value = control.text();
+                
+                view.onchange = function () {
+                    
+                    control.text(this.value, true, 2);
+                };
+                
+                return view;
+            };
+            
+            
+            this.text = function (control, text) {
+              
+                control.view.value = text;
+            };
+            
+        });
+        
+        
+        var dataset = new flyingon.DataSet();
+        
+
+        var panel = new flyingon.Panel().sets({
+
+            width: 1000,
+            height: 400,
+            border: 1,
+            borderStyle: 'solid',
+            padding: 8,
+            layout: 'flow',
+            dataset: dataset
+            
+        }, false);
+
+
+        for (var i = 0; i < 8; i++)
+        {
+            panel.append(new flyingon.TextControl().sets({
+
+                text: '{{field' + ((i % 3) + 1) + '}}',
+                backgroundColor: '{{color' + ((i % 3) + 1) + '}}',
+                
+            }, false));
+        }
+        
+        
+        var data = [];
+        
+        for (var i = 0; i < 10; i++)
+        {
+            data.push({ 
+                
+                key: i, 
+                field1: 'text 1 row:' + i, 
+                field2: 'text 2 row:' + i, 
+                field3: 'text 3 row:' + i,
+                color1: 'yellow',
+                color2: 'silver',
+                color3: '#DDD'
+            });
+        }
+        
+        dataset.load(data);
+        dataset.bind();
+        
+
+        flyingon.showControl(panel, document.body);
+
+
+    </script>
+
+</body>
+</html>

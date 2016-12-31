@@ -12,7 +12,7 @@ $class('Ajax', flyingon.Async, function () {
     //method
     this.method = 'GET';
 
-    //text || json || script || xml
+    //text || json || xml
     this.dataType = 'text';
 
     //内容类型
@@ -27,6 +27,9 @@ $class('Ajax', flyingon.Async, function () {
     //是否支持跨域资源共享(CORS)
     this.CORS = false;
     
+    //jsonp回调名称
+    this.jsonp = 'jsonp';
+    
     //超时时间
     this.timeout = 0;
     
@@ -36,6 +39,7 @@ $class('Ajax', flyingon.Async, function () {
 
         var list = [], //自定义参数列表
             data, 
+            get,
             cache;
         
         if (options)
@@ -72,7 +76,7 @@ $class('Ajax', flyingon.Async, function () {
             return false;
         }
               
-        if (data && /get|head|options/i.test(this.method))
+        if ((get = /get|head|options/i.test(this.method)) && data)
         {
             list.push(flyingon.encode(data));
             data = null;
@@ -93,7 +97,7 @@ $class('Ajax', flyingon.Async, function () {
         //jsonp
         if (cache)
         {
-            cache = data ? jsonp_post : jsonp_get;
+            cache = get ? jsonp_get : jsonp_post;
         }
         else
         {
@@ -188,12 +192,14 @@ $class('Ajax', flyingon.Async, function () {
                 switch (self.dataType)
                 {
                     case 'json':
-                        self.resolve(flyingon.parseJSON(xhr.responseText));
-                        break;
-                        
-                    case 'script':
-                        flyingon.globalEval(xhr.responseText); //全局执行js避免变量冲突
-                        self.resolve(self.url);
+                        try
+                        {
+                            self.resolve(JSON.parse(xhr.responseText));
+                        }
+                        catch (e)
+                        {
+                            self.reject(e);
+                        }
                         break;
                         
                     case 'xml':
@@ -243,40 +249,36 @@ $class('Ajax', flyingon.Async, function () {
     function jsonp_get(self, url, list) {
         
         var target = jsonp_get,
-            items = target.items || (target.items = []),
-            name = items.pop() || 'flyingon_jsonp_get' + (++target.id || (target.id = 1));
+            cache = target.cache || (target.cache = []),
+            name = cache.pop() || 'flyingon_callback' + (++target.id || (target.id = 1));
         
         window[name] = function (data) {
         
             self.resolve(data);
             ajax_end(self, url);
-            
-            self = null;
         };
         
-        list.push('jsonp=' + name);
+        list.push(self.jsonp || 'jsonp', '=', name);
         
         if (!self.version)
         {
             list.push('jsonp-version=' + (++target.version || (target.version = 1)));
         }
         
-        url = url + list.start + list.join('&');
-          
-        flyingon.script(url, function (src, error) {
+        flyingon.script(url = url + list.start + list.join('&'), function (src, error) {
             
-            items.push(name);
+            cache.push(name);
 
             if (error)
             {
                 self.reject(error);
                 ajax_end(self, url, error);
-
-                self = null;
             }
 
             window[name] = void 0;
             this.parentNode.removeChild(this);
+            
+            self = null;
         });
     };
     
@@ -284,125 +286,111 @@ $class('Ajax', flyingon.Async, function () {
     //jsonp_post
     function jsonp_post(self, url, list, data) {
                 
-        var head = document.head,
-            target = jsonp_post,
-            items = target.items || (target.items = []),
-            iframe = items.pop(),
-            form = items.pop(),
-            window;
+        var iframe = jsonp_iframe(),
+            flag;
         
-        if (!iframe)
-        {
-            iframe = document.createElement('iframe'),
-            form = document.createElement('form');
-
-            iframe.id = ++target.id || (target.id = 1);
-            iframe.name = 'jsonp_iframe_' + target.id;
-            iframe.src = 'about:blank';
-
-            form.name = 'jsonp_form_' + target.id;
-            form.target = iframe.name;
-        }
-        
-        head.appendChild(iframe);
-        head.appendChild(form);
-
-        //解决IE6在新窗口打开的BUG
-        window = iframe.contentWindow;
-        window.name = iframe.name; 
-
-        list.push('jsonp=flyingon_jsonp_post' + 1);
+        //处理url
+        list.push('jsonp=post');
         url = url + list.start + list.join('&');
-                  
-        form.action = url;
-        form.method = self.method || 'POST';
-        form.enctype = self.enctype || 'application/x-www-form-urlencoded';
-        
-        for (var name in data)
-        {
-            var dom = document.createElement('input');
-
-            dom.name = name;
-            dom.type = 'hidden';
-            dom.value = data[name];
-
-            form.appendChild(dom);
-        }
-        
-        iframe.onload = function (event) {
-
-            var body = window.document.body,
-                text = body.textContent || body.innerText || '';
-            
-            head.removeChild(iframe);
-            head.removeChild(form);
-            
-            items.push(form, iframe);
-            
-            if (text = text.match(/flyingon_jsonp_post(\([\s\S]+\))/))
+                    
+        function load() {
+          
+            if (flag)
             {
-                self.resolve(eval(text = text[1]));
+                //IE67可能需要设置成同源的url才能取值
+                this.contentWindow.location = 'about:blank';
+
+                jsonp_end(self, url, this.contentWindow.name);
+                jsonp_iframe(this);
+
+                flyingon.dom_off(this, 'load', load);
+                self = iframe = list = data = null;
             }
             else
             {
-                self.fail(text = body.innerHTML);
+                flag = 1;
+                
+                //解决IE6在新窗口打开的BUG
+                this.contentWindow.name = this.name; 
+
+                //动态生成表单提交数据
+                jsonp_form(this, url, data, self.method);
             }
-            
-            ajax_end(self, url, text);
-            
-            body.innerHTML = form.innerHTML = '';
-            self = head = iframe = form = window = iframe.onload = null;
         };
-
-        /*
-        function fn(event) {
-
-            var body = window.document.body,
-                text = body.textContent || body.innerText || '';
-            
-            if (iframe.attachEvent) //注销事件
-            {
-                iframe.detachEvent('onload', fn);
-            }
-            else
-            {
-                iframe.onload = null;
-            }
-
-            head.removeChild(iframe);
-            head.removeChild(form);
-            
-            items.push(form, iframe);
-            
-            if (text = text.match(/jsonpCallback1(\([\s\S]+\))/))
-            {
-                self.resolve(eval(text = text[1]));
-            }
-            else
-            {
-                self.fail(text = body.innerHTML);
-            }
-            
-            ajax_end(self, url, text);
-            
-            body.innerHTML = form.innerHTML = '';
-            self = head = iframe = form = window = iframe.onload = null;
-        };
-
-        //解决IE6不能触发onload事件的bug
-        if (iframe.attachEvent) 
+        
+        //IE6不能触发onload事件, 如果要兼容ie6, 需要使用attachEvent绑定事件
+        flyingon.dom_on(iframe, 'load', load);
+        
+        iframe.src = 'about:blank';
+        document.head.appendChild(iframe);
+    };
+    
+    
+    //获取或缓存iframe
+    function jsonp_iframe(iframe) {
+        
+        var cache = jsonp_iframe.cache || (jsonp_iframe.cache = []);
+        
+        if (iframe)
         {
-            iframe.attachEvent('onload', fn);
+            cache.push(iframe);
+            iframe.parentNode.removeChild(iframe);
         }
         else
         {
-            iframe.onload = fn;
+            iframe = cache.pop();
+            
+            if (!iframe)
+            {
+                iframe = document.createElement('iframe');
+                iframe.name = 'jsonp-iframe';
+            }
+            
+            return iframe;
         }
-        */
-        
-        form.submit();
     };
+    
+
+    //生成jsonp提交表单
+    function jsonp_form(iframe, url, data, method) {
         
+        var array = ['<form id="form" enctype="application/x-www-form-urlencoded"'];
+        
+        array.push(' action="', url, '" method="', 'GET', '">'); //method || 'POST'
+        
+        for (var name in data)
+        {
+            array.push('<input type="hidden" name="', name, '"');
+            
+            if (typeof (name = data[name]) === 'string')
+            {
+                name = name.replace(/"/g, '\\"');
+            }
+            
+            array.push(' value="', name, '" />');
+        }
+        
+        array.push('</form>', '<script>form.submit();</script>');
+        
+        iframe.contentWindow.document.write(array.join(''));
+    };
+    
+
+    //jsonp返回结果处理
+    function jsonp_end(self, url, text) {
+
+        try
+        {
+            self.resolve(JSON.parse(text));
+            ajax_end(self, url);
+        }
+        catch (e)
+        {
+            self.reject(e);
+            ajax_end(self, url, e);
+        }
+    };
+
     
 
 }, false);
@@ -451,13 +439,13 @@ flyingon.jsonp = function (url, options) {
 };
 
 
-//jsonp get提交
+//jsonp post提交
+//服务器需返回 <script>window.name = 'xxx';</script> 形式的内容且不能超过2M大小
 flyingon.jsonpPost = function (url, options) {
 
     options = options || {};
     options.dataType = 'jsonp';
     options.method = 'POST';
-    options.data = { a: 1, b: 2, c: 3 };
 
     return new flyingon.Ajax().send(url, options);
 };

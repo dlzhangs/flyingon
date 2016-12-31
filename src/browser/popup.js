@@ -9,13 +9,15 @@
 * closing: 关闭前事件(可取消)
 * closed: 关闭后事件
 */
-$class('Popup', [Object, flyingon.IComponent], function () {
+$class('Popup', function () {
 
 
 
-    var layers = [], //弹出层管理器
+    //弹出层管理器
+    var layers = [];
 
-        Event = flyingon.DomEvent; //Dom事件类
+    //Dom事件类
+    var Event = flyingon.DomEvent; 
 
 
 
@@ -23,16 +25,29 @@ $class('Popup', [Object, flyingon.IComponent], function () {
 
         var dom = this.dom = document.createElement('div');
 
-        dom.className = 'flyingon-PopupLayer';
+        dom.className = this.defaultClassName;
         dom.style.cssText = 'position:absolute;visibility:hidden;';
         
         this.__dispose = dispose;
     });
 
 
+    
+    
+    //默认class名称
+    this.defaultClassName = 'flyingon-popup';
+    
+    
+    //指定class名 与html一样
+    this.defineProperty('className', '', {
 
-    //扩展class相关操作
-    flyingon.__class_extend.call(this, 'flyingon-PopupPopupLayer');
+        set: 'this.dom.className = this.defaultClassName + " " + value;'
+    });
+    
+
+    //引入class片段
+    flyingon.ClassFragment(this);
+    
     
 
     //处理全局点击事件,点击当前弹出层以外的区域则关闭当前弹出层

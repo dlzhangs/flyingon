@@ -1,6 +1,6 @@
 
-//可序列化组件接口
-$interface('ISerialize', function () {
+//序列化组件片段
+$fragment('SerializeFragment', function () {
     
     
     
@@ -73,7 +73,7 @@ $class('SerializeReader', function () {
         {
             if (typeof data === 'string')
             {
-                data = flyingon.parseJSON(data);
+                data = JSON.parse(data);
             }
 
             if (typeof data === 'object')
@@ -130,7 +130,7 @@ $class('SerializeReader', function () {
                     
                     if (id = data.id)
                     {
-                        read_reference(target, id);
+                        read_reference.call(this, target, id);
                     }
                 }
                 else
@@ -144,7 +144,7 @@ $class('SerializeReader', function () {
                 
                 if (id = data.id)
                 {
-                    read_reference(target, id);
+                    read_reference.call(this, target, id);
                 }
             }
             else
@@ -235,7 +235,7 @@ $class('SerializeWriter', function () {
     
     this.serialize = function (value) {
 
-        if (value && typeof target === 'object')
+        if (value && typeof value === 'object')
         {
             var data = this.data = [];
             

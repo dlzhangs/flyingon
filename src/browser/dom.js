@@ -371,29 +371,39 @@ flyingon.ready = (function () {
     //自动处理样式
     function css_name(name) {
 
-        var key = name.replace(regex, fn);
+        var key = name.replace(regex, fn),
+            css = name;
 
-        if (!(key in style) && 
-            !((key = prefix + key.charAt(0).toUpperCase() + key.substring(1)) in style))
+        if (!(key in style))
         {
-            key = '';
+            key = prefix + key.charAt(0).toUpperCase() + key.substring(1);
+            
+            if (key in style)
+            {
+                css = '-' + prefix + '-' + name;
+            }
+            else
+            {
+                key = css = '';
+            }
         }
 
         return fixed[name] = {
 
-            name: key
+            name: key,
+            css: css
         };
     };
 
 
     //获取可用样式名
     //name: 要获取的样式名(css样式名, 以'-'分隔的样式名)
-    flyingon.css_name = function (name) {
+    flyingon.css_name = function (name, css) {
 
-        return (fixed[name] || css_name(name)).name;
+        return (fixed[name] || css_name(name))[css ? 'css' : 'name'];
     };
-
-
+    
+    
     //设置css样式值
     //dom:      目标dom
     //name:     要获取的样式名(css样式名, 以'-'分隔的样式名)
@@ -414,6 +424,7 @@ flyingon.ready = (function () {
     };
 
 
+    
     //注册样式兼容处理
     //name:     要处理的样式名(css样式名, 以'-'分隔的样式名)
     //setter:   转换样式值的方法
@@ -464,13 +475,14 @@ flyingon.ready = (function () {
 //dom测试
 flyingon.dom_test = (function () {
 
-    var body = document.body,
-        dom = document.createElement('div');
+    var dom = document.createElement('div');
 
     dom.style.cssText = 'position:absolute;overflow:hidden;top:-10000px;top:-10000px;';
     
     return function (fn, context) {
 
+        var body = document.body;
+        
         if (body)
         {
             if (dom.parentNode !== body)
@@ -484,7 +496,7 @@ flyingon.dom_test = (function () {
         {
             flyingon.ready(function () {
 
-                (body = document.body).appendChild(dom);
+                document.body.appendChild(dom);
                 fn.call(context, dom);
             });
         }

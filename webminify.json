@@ -4,24 +4,24 @@
 //*     //js配置示例
 //*     {
 //*         base: '', //基础路径
-//*         files: ['test1.js', 'test2.js'], //要处理的源文件
+//*         source: ['test1.js', 'test2.js'], //源文件或内嵌js代码(数组项值为数组时)
 //*         output: 'test.min.js', //生成的目标文件
 //*         minify: true, //是否最小化, 不最小化时只生成及合并文件, 以下配置仅在此值为true时有效
 //*         mangle: false, //是否混淆局部变量名
 //*         mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]}, //排除特定名称混淆
 //*         compress: false, //是否优化压缩
 //*         advanced: true, //是否启用高级压缩功能
-//*         license: '/*license test*/' //版权信息
+//*         license: '/*license test*/' //版权信息, 可使用数组输入多行文字
 //*     },
 //*
 //*     //css配置示例
 //*     {
 //*         base: '', //基础路径
-//*         files: ['test1.css', 'test2.css'], //要处理的源文件
+//*         source: ['test1.css', 'test2.css'], //源文件或内嵌css代码(数组项值为数组时)
 //*         output: 'test.min.css', //生成的目标文件
 //*         minify: true, //是否最小化, 不最小化时只生成及合并文件, 以下配置仅在此值为true时有效
 //*         advanced: true, //是否启用高级压缩功能
-//*         license: '/*license test*/' //版权信息
+//*         license: '/*license test*/' //版权信息, 可使用数组输入多行文字
 //*     }
 //*
 //* ]
@@ -30,51 +30,32 @@
 
 [
     
-	{
-        base: '',
-        files: [
-            'src/core/oo.js',
-            'src/core/async.js',
-            'src/core/web.js',
-            'src/core/ajax.js',
-            'src/core/require.js',
-        ],
-        output: 'js/flyingon-core.js',
-        minify: false
-	},
-	
-    {
-        base: 'js',
-        files: ['flyingon-core.js'],
-        output: 'flyingon-core.min.js',
-        minify: true,
-        //mangle: false,
-        //mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]},
-        //compress: false,
-        advanced: true,
-        license: '/*\n* flyingon javascript library v0.0.1.0\n* https://github.com/freeoasoft/flyingon\n*\n* Copyright 2014, yaozhengyang\n* licensed under the LGPL Version 3 licenses\n*/'
-    },
-
     {
         base: '',
-        files: [
-			'src/core/oo.js',
-            'src/core/async.js',
-            'src/core/web.js',
-            'src/core/ajax.js',
-            'src/core/require.js',
-            'src/base/console.js',
-            'src/base/dom.js',
+        source: [
+			'src/base/oo.js',
+            'src/base/async.js',
+            'src/base/extend.js',
+            'src/base/class.js',
             'src/base/serialize.js',
-			'src/base/visual.js',
-			'src/base/layout.js',
-			'src/base/event.js',
-			'src/base/control.js',
-			'src/base/htmlcontrol.js',
-			'src/base/container.js',
-			'src/base/panel.js',
             'src/base/dataset.js',
-            'src/base/popup.js',
+            'src/base/bindable.js',
+            'src/control/event.js',
+			'src/control/control.js',
+            'src/control/container.js',
+			'src/control/text.js',
+			'src/control/panel.js',
+            'src/layout/sublayout.js',
+            'src/layout/layout.js',
+            'src/layout/table.js',
+            'src/browser/web.js',
+            'src/browser/ajax.js',
+            'src/browser/require.js',
+            'src/browser/dom.js',
+            'src/browser/popup.js',
+            'src/renderer/dom/control.js',
+            'src/renderer/dom/container.js',
+            'src/browser/host.js'
 		],
         output: 'js/flyingon.js',
         minify: false
@@ -82,14 +63,56 @@
 	
 	{
         base: 'js',
-        files: ['flyingon.js'],
+        source: ['flyingon.js'],
         output: 'flyingon.min.js',
         minify: true,
         //mangle: false,
         //mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]},
         //compress: false,
         advanced: true,
-        license: '/*\n* flyingon javascript library v0.0.1.0\n* https://github.com/freeoasoft/flyingon\n*\n* Copyright 2014, yaozhengyang\n* licensed under the LGPL Version 3 licenses\n*/'
-    }
+        license: [
+            '/*',
+            '* flyingon javascript library v0.0.1.0',
+            '* https://github.com/freeoasoft/flyingon',
+            '*',
+            '* Copyright 2014, yaozhengyang',
+            '* licensed under the LGPL Version 3 licenses',
+            '*/'
+        ]
+    },
+    
+	{
+        base: '',
+        source: [
+            'src/base/oo.js',
+            'src/base/async.js',
+            'src/base/extend.js',
+            'src/browser/web.js',
+            'src/browser/ajax.js',
+            'src/browser/require.js'
+        ],
+        output: 'js/flyingon-core.js',
+        minify: false
+	},
 	
+    {
+        base: 'js',
+        source: ['flyingon-core.js'],
+        output: 'flyingon-core.min.js',
+        minify: true,
+        //mangle: false,
+        //mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]},
+        //compress: false,
+        advanced: true,
+        license: [
+            '/*',
+            '* flyingon javascript library v0.0.1.0',
+            '* https://github.com/freeoasoft/flyingon',
+            '*',
+            '* Copyright 2014, yaozhengyang',
+            '* licensed under the LGPL Version 3 licenses',
+            '*/'
+        ]
+    }
+
 ]

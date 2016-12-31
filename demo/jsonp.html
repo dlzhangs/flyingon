@@ -20,18 +20,18 @@
     
         function jsonp_get() {
             
-            flyingon.jsonp('jsonp.txt').done(function (data) {
+            flyingon.jsonp('jsonp-get.txt').done(function (data) {
                
-                alert(data);
+                alert(JSON.stringify(data));
             });
         };
         
         
         function jsonp_post() {
 
-            flyingon.jsonpPost('jsonp.txt').done(function (data) {
+            flyingon.jsonpPost('jsonp-post.html').done(function (data) {
                
-                alert(data);
+                alert(JSON.stringify(data));
             });
         };
 

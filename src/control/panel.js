@@ -1,10 +1,15 @@
 
-$class('Panel', [flyingon.Control, flyingon.IContainerControl], function () {
+$class('Panel', flyingon.Control, function () {
 
 
         
     this.defaultWidth = this.defaultHeight = 400;
         
+    
+    
+    //引入容器组件片段
+    flyingon.ContainerFragment(this);
+    
     
     
     //当前布局

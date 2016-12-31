@@ -11,47 +11,34 @@
     <script type="text/javascript">
     
                 
-        $class('TestClass', flyingon.Component, function (self) {
+        $class('TestClass', function () {
             
             
-            self.defineProperty('a', 0);
+            this.defineProperty('a', 0);
             
-            self.defineProperty('b', 0);
+            this.defineProperty('b', 0);
             
-            self.defineProperty('c', 0);
+            this.defineProperty('c', 0);
             
-            self.defineProperty('d', 0);
+            this.defineProperty('d', 0);
+            
+            
+            flyingon.SerializeFragment(this);
             
         });
         
         
         var obj = flyingon.SerializeReader.deserialize({
             
-            target: {
-                
-                xtype: 'flyingon.TestClass',
-                id: 'target',
-                
-                bindings: {
-                    
-                    a: { source: 'source', expression: 'b' },
-                    c: { source: 'source', expression: 'c + d + 10' }
-                }
-            },
-            source: {
-                
-                xtype: 'flyingon.TestClass',
-                id: 'source',
-                a: 10,
-                b: 20,
-                c: 30,
-                d: 40
-            }
+            xtype: 'flyingon.TestClass',
+            a: 10,
+            b: 20,
+            c: 30,
+            d: 40
         });
         
-        obj.source.b(100).d(200);
-        
-        alert(obj.target.a() + ', ' + obj.target.c());
+
+        alert(obj.a() + ', ' + obj.c());
 
         alert(flyingon.SerializeWriter.serialize(obj));
         

@@ -2,9 +2,8 @@ $i18nlist({
     
     json_parse_error: 'json parse error!',
     namespace_name_error: 'namespace name can use lowercase letters and numbers and begin with a lowercase letter, add use \'.\' to separated!',
-    interface_name_error: 'interface name use only letters and numbers and begin with a \'I\' and upper letter!',
-    interface_can_not_new: 'interface can not use "new" operator to create object!',
-    interface_target_error: 'interface extend must be input a target object!',
+    fragment_name_error: 'fragment name use only letters and numbers and begin with a \'I\' and upper letter!',
+    fragment_target_error: 'fragment extend must be input a target object!',
     class_name_error: 'class name can use only letters and numbers and begin with a upper letter!',
     class_fn_error: 'class fn must be a function!',
     $constructor_not_in_class: 'function \'$constructor\' can only be call in class!',

@@ -30,9 +30,9 @@
         
         require_merge = create(null), //引入资源合并关系
 
-        require_files = window.require_files = create(null), //所有资源文件集合加载状态 0:未加载 1:已请求 2:已响应 3:已执行
+        require_files = create(null), //所有资源文件集合加载状态 0:未加载 1:已请求 2:已响应 3:已执行
 
-        require_back = window.require_back = create(null), //资源回溯关系
+        require_back = create(null), //资源回溯关系
         
         require_wait = 0, //等待加载的请求数
         
@@ -373,14 +373,7 @@
                 if (file.indexOf(base_path) === 0)
                 {
                     //发出请求
-                    flyingon.ajax(file, {
-                        
-                        dataType: 'script'
-                        
-                    }).done(load_done).fail(function () {
-
-                        load_done(this.url);
-                    });
+                    flyingon.ajax(file).complete(ajax_done);
                 }
                 else //跨域使用script同步加载
                 {
@@ -401,6 +394,24 @@
             }
         }
     };
+    
+        
+    //ajax调用完毕处理
+    function ajax_done(text, error) {
+        
+        if (text)
+        {
+            flyingon.globalEval(text);
+        }
+        
+        load_done(this.url);
+        
+        if (error)
+        {
+            throw error;
+        }
+    };
+    
     
     
     //注册同步资源队列
@@ -531,12 +542,15 @@
             list,
             parent,
             cache;
-        
+
+        //处理完毕则移除回溯关系
+        delete back[file];
+
         if (!items)
         {
             return;
         }
-
+        
         //循环检测
         for (var i = items.length - 1; i >= 0; i--)
         {
@@ -553,8 +567,6 @@
             //如果有回溯
             if (cache = list.file)
             {
-                list.file = null;
-                
                 //标记请求已执行
                 files[cache] = 3;
 
@@ -572,12 +584,6 @@
                     cache[j++].apply(window, cache[j]);
                 }
             }
-        }
-
-        //处理完毕则移除回溯关系
-        if (!items.length)
-        {
-            delete back[file];
         }
 
         //继续向上回溯检测

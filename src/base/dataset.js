@@ -250,7 +250,7 @@ $class('RowCollection', function () {
 
 
 //数据集合接口
-$interface('IDataList', function () {
+$fragment('IDataList', function () {
     
     
     
@@ -440,9 +440,10 @@ $interface('IDataList', function () {
 $class('DataRow', [Object, flyingon.IDataList], function () {
     
     
+
+    //默认事件
+    var default_event = new flyingon.Event();
     
-    //事件类型
-    var Event = flyingon.Event;
     
     //删除或增加数据方法
     var splice = [].splice;
@@ -477,6 +478,14 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
     //changed       已修改状态
     this.state = 'unchanged';
                 
+    
+
+    //是否dataset当前行
+    this.isCurrent = function () {
+        
+        return this.uniqueId === this.dataset.__current_id;
+    };
+    
     
     
     //获取数据行在数据集中的顺序
@@ -551,68 +560,69 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
         }
     };
     
-
+    
     //设置指定列的值
-    this.set = function (name, value, trigger, caller) {
+    this.set = function (name, value, trigger, source) {
         
         var data, oldValue;
         
         //不允许设置值为undefined
         if (name && value !== void 0 && (data = this.data) && value !== (oldValue = data[name]))
         {
-            var dataset, e, key, cache;
-                        
-            dataset = this.dataset || this;
+            var dataset = this.dataset, 
+                e, 
+                key, 
+                cache;
             
-            if (trigger === false || dataset.trigger(e = new Event('value-changing'), 
-                'row', this, 
-                'name', name, 
-                'value', value, 
-                'oldValue', oldValue) !== false)
+            if (trigger !== false)
             {
-                if (e && (cache = e.value) !== value && cache !== void 0)
+                e = default_event;
+                e.type = 'value-changing';
+                e.row = this;
+                e.name = name;
+                e.value = value;
+                e.oldValue = oldValue;
+                
+                if (e && dataset.trigger(e) === false)
+                {
+                    return this;
+                }
+                
+                if ((cache = e.value) !== value && cache !== void 0)
                 {
                     value = cache;
                 }
-                    
-                if (this.state === 'unchanged')
-                {
-                    cache = {};
-                
-                    for (key in data)
-                    {
-                        cache[key] = data[key];
-                    }
-                    
-                    this.originalData = data;
-                    this.data = data = cache;
-                    this.state = 'changed';
-                    
-                    dataset.__changed_rows.push(this);
-                }
-                
-                data[name] = value;
-
-                //同步数据至绑定目标
-                if (dataset.bindings)
-                {
-                    dataset.sync(this, name, value, caller);             
-                }
-                
-                if (trigger !== false)
-                {
-                    dataset.trigger('value-changed', 
-                        'row', this, 
-                        'name', name, 
-                        'value', value, 
-                        'oldValue', oldValue);
-                }
-                
-                return caller ? value : this;
             }
+            
+            if (this.state === 'unchanged')
+            {
+                cache = {};
+
+                for (key in data)
+                {
+                    cache[key] = data[key];
+                }
+
+                this.originalData = data;
+                this.data = data = cache;
+                this.state = 'changed';
+
+                dataset.__changed_rows.push(this);
+            }
+
+            data[name] = value;
+
+            if (e)
+            {
+                e.type = 'value-changed';
+                dataset.trigger(e);
+            }
+            
+            //触发变更动作
+            dataset.dispatch('change', this, name, source);
         }
         
-        return caller ? void 0 : this;
+        return this;
     };
     
     
@@ -860,7 +870,7 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
             }
             else
             {
-                continue;
+                data = {};
             }
 
             row = new rowType();
@@ -872,7 +882,7 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
                 row.parent = parent;
             }
             
-            row.data = data || {};
+            row.data = data;
             
             keys1[row.uniqueId = uniqueId++] = row;
             
@@ -942,24 +952,27 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
     this.currentRow = function (row) {
         
         var keys = this.__keys1,
-            oldRow = this.__current_id,
-            id;
+            id = this.__current_id,
+            oldValue = id && keys[id];
         
         if (row === void 0)
         {
-            return keys[oldRow] || null;
+            return oldValue || null;
         }
         
-        if (oldRow !== (id = row && row.uniqueId || row))
+        if (oldValue !== row)
         {
-            row = id && keys[id];
-            oldRow = oldRow && keys[oldRow];
-            
-            if (this.trigger('current-changing', 'row', row, 'oldRow', oldRow) !== false)
+            if (this.trigger('current-changing', 'value', row, 'oldValue', oldValue) === false)
             {
                 this.__current_id = id;
-                this.trigger('current-changed', 'row', row, 'oldRow', oldRow);
+                return this;
             }
+            
+            this.__current_id = row && row.uniqueId;
+            this.trigger('current-changed', 'value', row, 'oldValue', oldValue);
+            
+            //触发行移动事件
+            this.dispatch('move', row);
         }
         
         return this;
@@ -1075,10 +1088,82 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
     };
     
     
-    //同步数据至绑定目标
-    this.sync = function (row, name, value, target) {
+    
+    //订阅或取消订阅变更动作
+    this.subscribe = function (control, cancel) {
         
+        if (control && control.receive)
+        {
+            var list = this.__action_list,
+                index;
+            
+            if (list)
+            {
+                index = list.indexOf(control);
+                
+                if (cancel)
+                {
+                    if (index >= 0)
+                    {
+                        list.splice(index, 1);
+                    }
+                }
+                else if (index < 0)
+                {
+                    list.push(control);
+                }
+            }
+            else if (!cancel)
+            {
+                (this.__action_list = []).push(control);
+            }
+        }
+    };
+    
+    
+    //派发变更动作
+    this.dispatch = function (type, row, name, source) {
         
+        var list, control, action, flag;
+        
+        if (type && (list = this.__action_list))
+        {
+            for (var i = 0, l = list.length; i < l; i++)
+            {
+                //如果绑定的是当前行
+                if ((control = list[i]).subscribeCurrent)
+                {
+                    //指定行并且不是当前行
+                    if (flag || flag === void 0 && (flag = !!row && row.uniqueId !== this.__current_id))
+                    {
+                        continue;
+                    }
+                }
+
+                control.receive(this, action || (action = {
+                
+                    dataset: this,
+                    type: type,
+                    row: row || this.currentRow(),
+                    name: name || null,
+                    source: source || null
+                }));
+            }
+        }
+    };
+    
+    
+    //绑定数据源
+    this.bind = function () {
+        
+        var row;
+        
+        if (!this.__current_id && (row = this[0]))
+        {
+            this.currentRow(row);
+        }
+        
+        this.dispatch('bind');
     };
     
         

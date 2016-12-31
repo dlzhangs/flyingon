@@ -3,49 +3,13 @@
 $class('DomEvent', flyingon.Event, function () {
     
     
-    $constructor(function (type, dom_event) {
+    $constructor(function (type, event) {
     
         this.type = type;
-        this.dom_event = dom_event;
+        this.dom_event = event;
         
     }, true);
     
-
-    //阻止事件冒泡
-    this.stopPropagation = function (dom_event) {
-
-        this.cancelBubble = true;
-        
-        if (dom_event && (dom_event = this.dom_event))
-        {
-            dom_event.stopPropagation();
-        }
-    };
-
-
-    //禁止默认事件
-    this.preventDefault = function (dom_event) {
-
-        this.defaultPrevented = true;
-           
-        if (dom_event && (dom_event = this.dom_event))
-        {
-            dom_event.preventDefault();
-        }
-    };
-
-
-    //阻止事件冒泡及禁止默认事件
-    this.stopImmediatePropagation = function (dom_event) {
-
-        this.cancelBubble = this.defaultPrevented = true;
-                   
-        if (dom_event && (dom_event = this.dom_event))
-        {
-            dom_event.stopImmediatePropagation();
-        }
-    };
-
     
 });
 
@@ -58,7 +22,7 @@ $class('MouseEvent', flyingon.Event, function () {
 
     $constructor(function (event) {
 
-        //关联的原始dom事件
+        //关联的原始事件
         this.dom_event = event;
 
         //事件类型

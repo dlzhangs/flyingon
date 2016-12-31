@@ -4,24 +4,24 @@
 //*     //js配置示例
 //*     {
 //*         base: '', //基础路径
-//*         files: ['test1.js', 'test2.js'], //要处理的源文件
+//*         source: ['test1.js', 'test2.js'], //源文件或内嵌js代码(数组项值为数组时)
 //*         output: 'test.min.js', //生成的目标文件
 //*         minify: true, //是否最小化, 不最小化时只生成及合并文件, 以下配置仅在此值为true时有效
 //*         mangle: false, //是否混淆局部变量名
 //*         mangleProperties: { vars: [ "define" ... ], props: [ "length" ... ]}, //排除特定名称混淆
 //*         compress: false, //是否优化压缩
 //*         advanced: true, //是否启用高级压缩功能
-//*         license: '/*license test*/' //版权信息
+//*         license: '/*license test*/' //版权信息, 可使用数组输入多行文字
 //*     },
 //*
 //*     //css配置示例
 //*     {
 //*         base: '', //基础路径
-//*         files: ['test1.css', 'test2.css'], //要处理的源文件
+//*         source: ['test1.css', 'test2.css'], //源文件或内嵌css代码(数组项值为数组时)
 //*         output: 'test.min.css', //生成的目标文件
 //*         minify: true, //是否最小化, 不最小化时只生成及合并文件, 以下配置仅在此值为true时有效
 //*         advanced: true, //是否启用高级压缩功能
-//*         license: '/*license test*/' //版权信息
+//*         license: '/*license test*/' //版权信息, 可使用数组输入多行文字
 //*     }
 //*
 //* ]
@@ -32,14 +32,14 @@
     
 	{
         base: '',
-        files: ['src/class/main.js'],
+        source: ['src/class/main.js'],
         output: 'js/class/main.min.js',
         minify: false
 	},
 	
     {
         base: '',
-        files: [
+        source: [
 			'src/class/class1.js',
 			'src/class/class2.js',
             'src/class/class3.js',

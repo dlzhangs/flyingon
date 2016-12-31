@@ -29,23 +29,20 @@
         
     flyingon.layout('panel', {
 
-        type: 'grid',
         spacingX: 2,
         spacingY: 2,
-        rows: '30px',
-        columns: '300px * 200* * 200* * 300px',
-        increase: 1,
-        //vertical: true,
 
-
-        adaptation: {
+        //自适应
+        adaption: {
 
             'width < 400': {
 
-                type: 'line',
+                type: 'vertical-line',
                 spacingX: 2,
                 spacingY: 2,
-                subitems: {
+                
+                //子项定位属性值
+                location: {
 
                     width: 'fill'
                 }
@@ -59,25 +56,52 @@
             },
 
 
-            'width < 1000': {
+            'width < 1500': {
 
                 type: 'dock',
                 spacingX: 20,
                 spacingY: 20,
                 //mirror: 'y',
 
-                sublayouts: [
+                //分割
+                partition: [
 
                     {
-                        scale: 5,
+                        scale: 10, //固定十个
                         dock: 'left',
-                        width: 'auto',
+                        width: 200,
                         height: 'auto',
-                        layout: 'vertical-line'
+                        
+                        layout: {
+                            
+                            type: 'vertical-line',
+                            spacingX: 2,
+                            spacingY: 2,
+                            
+                            //子项定位属性值
+                            location: {
+                             
+                                width: 'fill',
+                                
+                                //不同的条件设置不同的定位属性值
+                                condition: {
+                                 
+                                    'index % 3 === 0': {
+                                     
+                                        width: 100
+                                    },
+                                    
+                                    'index % 3 === 1': {
+                                     
+                                        width: 150
+                                    }
+                                }
+                            }
+                        }
                     },
 
                     {
-                        scale: 0.2,
+                        scale: 2.2, //固定2个 + 余量20%
                         dock: 'right',
                         width: 'auto',
                         height: 'auto',
@@ -85,7 +109,7 @@
                     },
 
                     {
-                        scale: 0.8,                            
+                        scale: 8.8, //固定8个 + 余量80%
                         dock: 'fill',
                         height: 'auto',
                         layout: 'flow'
@@ -113,9 +137,9 @@
     });
 
 
-    for (var i = 0; i < 60; i++)
+    for (var i = 0; i < 70; i++)
     {
-        panel.append(new flyingon.HtmlControl().sets({
+        panel.append(new flyingon.Text().sets({
 
             id: 'control' + i,
             text: 'text' + i,
@@ -126,13 +150,14 @@
         }));
     }
 
-    panel.renderTo(document.body);
+    flyingon.showControl(panel, document.body);
 
 
     flyingon.dom_on(document.body, 'mousedown', function (e) {
 
-        var width = panel.offsetWidth,
-            height = panel.offsetHeight;
+        var box = panel.viewBox,
+            width = box.offsetWidth,
+            height = box.offsetHeight;
 
         flyingon.dom_drag(this, e, null, function dragmove(e) {
 
