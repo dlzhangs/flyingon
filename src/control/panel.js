@@ -17,7 +17,7 @@ $class('Panel', flyingon.Control, function () {
      
         group: 'locate',
         query: true,
-        set: 'this.__layout = value && typeof value === "object";this.invalidate();'
+        set: 'this.__layout = null;this.invalidate();'
     });
     
     

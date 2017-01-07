@@ -14,7 +14,7 @@ $class('Sublayout', flyingon.Control, function (base) {
     //布局
     this.defineProperty('layout', null, {
      
-        set: 'this.__layout = value && typeof value === "object";'
+        set: 'this.__layout = null;'
     });
     
     
@@ -25,34 +25,21 @@ $class('Sublayout', flyingon.Control, function (base) {
     
     this.onmeasure = function (box) {
 
-        var layout = this.__layout,
-            autoWidth = box.autoWidth,
+        var autoWidth = box.autoWidth,
             autoHeight = box.autoHeight;
-        
-        if (layout)
-        {
-            if (layout === true)
-            {
-                layout = this.__layout = flyingon.findLayout(this.layout());
-            }
-        }
-        else
-        {
-            layout = flyingon.findLayout(this.layout());
-        }
-        
-        layout.init(this, this.__children, false, false, true);
+           
+        flyingon.arrange(this, this.__children, false, false, true);
         
         if (autoWidth || autoHeight)
         {
             if (autoWidth)
             {
-                box.offsetWidth = box.contentWidth + box.border.width;
+                this.offsetWidth = box.contentWidth + box.border.width;
             }
 
             if (autoHeight)
             {
-                box.offsetHeight = box.contentHeight + box.border.height;
+                this.offsetHeight = box.contentHeight + box.border.height;
             }
         }
         else
@@ -65,18 +52,19 @@ $class('Sublayout', flyingon.Control, function (base) {
     this.onlocate = function (box) {
         
         var items = this.__children,
-            x = box.offsetLeft,
-            y = box.offsetTop;
+            x = this.offsetLeft,
+            y = this.offsetTop,
+            control;
         
         //处理定位偏移
         if (items && (x || y))
         {
             for (var i = items.length - 1; i >= 0; i--)
             {
-                if ((box = items[i]) && (box = box.viewBox))
+                if (control = items[i])
                 {
-                    box.offsetLeft += x;
-                    box.offsetTop += y;
+                    control.offsetLeft += x;
+                    control.offsetTop += y;
                 }
             }
         }

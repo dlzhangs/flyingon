@@ -29,142 +29,9 @@ flyingon.dom_test(function (div) {
 
 
 //宿主容器
-(function () {
+(function (flyingon, document) {
     
-        
-    var update_list = [];
-    
-    var update_delay;
-    
-    
-    //更新
-    function update() {
-        
-        var list = update_list,
-            index = 0,
-            item;
-        
-        while (item = list[index++])
-        {
-            item.update();
-        }
-        
-        list.length = 0;
-        
-        if (index = update_delay)
-        {
-            clearTimeout(index);
-            update_delay = 0;
-        }
-    };
-    
-    
-    //延时更新
-    flyingon.__delay_update = function (control, delay) {
-      
-        var list = update_list;
-        
-        if (control && list.indexOf(control) < 0)
-        {
-            list.push(control);
-            
-            if (delay === false)
-            {
-                update();
-            }
-            else if (!update_delay)
-            {
-                update_delay = setTimeout(update, delay || 30); //30毫秒后定时刷新
-            }
-        }
-    };
-    
-    
-    
-    //按根节点的方式重绘
-    function update_root() {
-        
-        var dom = this.view || this.renderer.init(this),
-            left = this.left(),
-            top = this.top(),
-            width = 0,
-            height = 0,
-            box;
-
-        dom.style.position = 'relative';
-
-        if (dom = dom.parentNode)
-        {
-            width = dom.clientWidth;
-            height = dom.clientHeight;
-        }
-        
-        box = this.initViewBox(width, height);
-
-        this.measure(box, width, height, false);
-        
-        if (left)
-        {
-            left = flyingon.pixel(left);
-            width = 0;
-        }
-        
-        if (top)
-        {
-            top = flyingon.pixel(top);
-            height = 0;
-        }
-        
-        this.locate(box, left, top, width, height);
-        this.Class.prototype.update.call(this);
-
-        return this;
-    };
-    
- 
-
-    //显示控件至指定的dom
-    flyingon.showControl = function (control, host) {
-
-        if (control && !control.__parent && control.update !== update_root)
-        {
-            var dom = control.view || control.renderer.init(control);
-
-            control.update = update_root;
-            
-            (host || document.body).appendChild(dom);
-            flyingon.__delay_update(control, false);
-        }
-    };
-
-
-    //隐藏控件
-    flyingon.hideControl = function (control, dispose) {
-
-        var dom;
-        
-        if (control && control.update === update_root)
-        {
-            delete control.update;
-
-            if ((dom = control.view) && (parent = dom.parentNode))
-            {
-                parent.removeChild(dom);
-            }
-
-            if (parent = control.__parent)
-            {
-                parent.remove(control);
-            }
-            
-            if (dispose !== false)
-            {
-                control.dispose();
-            }
-        }
-    };
-
-          
+   
           
     /*
 
@@ -200,17 +67,166 @@ flyingon.dom_test(function (div) {
 
     */
    
-    var body = document.body;
     
-    var on = flyingon.dom_on;
-        
-    var off = flyingon.dom_off;
-        
+    //事件处理
+    var events = flyingon.create(null);
+    
     var MouseEvent = flyingon.MouseEvent;
         
     var KeyEvent = flyingon.KeyEvent;
     
+    var on = flyingon.dom_on;
     
+    //鼠标按下事件
+    var mousedown = null;
+    
+    //调整大小参数
+    var resizable = 0;
+    
+    //拖动控件参数
+    var draggable = null;
+    
+    
+    //顶级控件
+    var controls = flyingon.controls = [];
+        
+    
+    //延迟更新队列
+    var update_list = [];
+    
+    var update_delay;
+    
+    
+    
+    //更新
+    function update() {
+        
+        var list = update_list,
+            index = 0,
+            item;
+        
+        while (item = list[index++])
+        {
+            update_root(item);
+        }
+        
+        list.length = 0;
+        
+        if (index = update_delay)
+        {
+            clearTimeout(index);
+            update_delay = 0;
+        }
+    };
+    
+    
+    //按根节点的方式重绘
+    function update_root(control) {
+        
+        var dom = control.view || control.renderer.init(control),
+            left = control.left(),
+            top = control.top(),
+            width = 0,
+            height = 0;
+
+        dom.style.position = 'relative';
+
+        if (dom = dom.parentNode)
+        {
+            width = dom.clientWidth;
+            height = dom.clientHeight;
+        }
+        
+        control.initBoxModel(width, height);
+        control.measure(width, height, false);
+        
+        if (left)
+        {
+            left = flyingon.pixel(left);
+            width = 0;
+        }
+        
+        if (top)
+        {
+            top = flyingon.pixel(top);
+            height = 0;
+        }
+        
+        control.locate(left, top, width, height);
+        control.update();
+    };
+    
+    
+    //延时更新
+    flyingon.__delay_update = function (control, delay) {
+      
+        var list = update_list;
+        
+        if (control && list.indexOf(control) < 0)
+        {
+            list.push(control);
+            
+            if (delay === false)
+            {
+                update();
+            }
+            else if (!update_delay)
+            {
+                update_delay = setTimeout(update, delay || 30); //30毫秒后定时刷新
+            }
+        }
+    };
+     
+
+    //显示控件至指定的dom
+    flyingon.showControl = function (control, host) {
+
+        if (control && !control.__parent && controls.indexOf(control) < 0)
+        {
+            var dom = control.view || control.renderer.init(control);
+
+            if (typeof host === 'string')
+            {
+                host = document.getElementById(host);
+            }
+            
+            controls.push(control);
+            
+            (host || document.body).appendChild(dom);
+            flyingon.__delay_update(control, false);
+            
+            return true;
+        }
+    };
+
+
+    //隐藏控件
+    flyingon.hideControl = function (control, dispose) {
+
+        var dom, index;
+        
+        if (control && (index = controls.indexOf(control)) >= 0)
+        {
+            controls.splice(index, 1);
+            
+            if ((dom = control.view) && (parent = dom.parentNode))
+            {
+                parent.removeChild(dom);
+            }
+ 
+            if (parent = control.__parent)
+            {
+                parent.remove(control);
+            }
+            
+            if (dispose !== false)
+            {
+                control.dispose();
+            }
+        }
+    };
+
+       
         
     //查找与指定dom关联的控件
     flyingon.findControl = function (dom) {
@@ -228,7 +244,9 @@ flyingon.dom_test(function (div) {
         }
     };
     
-        
+    
+    
+    //通用鼠标事件处理
     function mouse_event(e) {
         
         var control = flyingon.findControl(e.target);
@@ -240,6 +258,7 @@ flyingon.dom_test(function (div) {
     };
     
     
+    //通用键盘事件处理
     function key_event(e) {
         
         var control = flyingon.findControl(e.target);
@@ -250,50 +269,343 @@ flyingon.dom_test(function (div) {
         }
     };
     
+    
+    
+    function check_resize(control, value, e) {
         
-    on(body, 'mousedown', mouse_event);
-    
-    on(body, 'mousemove', mouse_event);
-    
-    on(body, 'mouseup', mouse_event);
-    
-    on(body, 'click', mouse_event);
-    
-    on(body, 'dblclick', mouse_event);
-    
-    on(body, 'mouseover', mouse_event);
-    
-    on(body, 'mouseout', mouse_event);
-    
-    on(body, 'mouseenter', mouse_event);
-    
-    on(body, 'mouseleave', mouse_event);
-    
-    
-    on(body, 'keydown', key_event);
-    
-    on(body, 'keypress', key_event);
-    
-    on(body, 'keyup', key_event);
-    
-    
-    /*
-    on(body, 'focus', function (e) {
+        var dom = control.view,
+            rect = dom.getBoundingClientRect(),
+            side = 0,
+            cursor = '',
+            x,
+            y;
         
+        if (value !== 'x')
+        {
+            x = e.clientY - rect.top;
+            
+            if (x >= 0 && x <= 4)
+            {
+                side = 1;
+                cursor = 's';                
+            }
+            else
+            {
+                y = control.offsetHeight;
+                
+                if (x >= y - 4 && x <= y)
+                {
+                    side = 2;
+                    cursor = 'n';
+                }
+            }
+        }
+        
+        if (value !== 'y')
+        {
+            x = e.clientX - rect.left;
+            
+            if (x >= 0 && x <= 4)
+            {
+                side |= 4;
+                cursor += 'e';
+            }
+            else
+            {
+                y = control.offsetWidth;
+                
+                if (x >= y - 4 && x <= y)
+                {
+                    side |= 8;
+                    cursor += 'w';
+                }
+            }
+        }
+        
+        dom.style.cursor = cursor ? cursor + '-resize' : (control.__storage || control.__defaults).cursor;
+        
+        return resizable = side;
     };
     
-    on(body, 'blur', function (e) {
+    
+    function do_resize(control, data) {
         
+        var side = data.side;
+        
+        if ((side & 1) === 1) //top
+        {
+            control.height(data.height - data.distanceY);
+        }
+        else if ((side & 2) === 2) //bottom
+        {
+            control.height(data.height + data.distanceY);
+        }
+        
+        if ((side & 4) === 4) //left
+        {
+            control.width(data.width - data.distanceX);
+        }
+        else if ((side & 8) === 8) //right
+        {
+            control.width(data.width + data.distanceX);
+        }
     };
     
-    on(body, 'focusin', function (e) {
+    
+    
+    function start_drag(control, e) {
         
+        var target, cache, rect;
+        
+        if (control.trigger('dragstart', e = new MouseEvent(e)) !== false)
+        {
+            var view = control.view,
+                dom = view.cloneNode(true),
+                style = view.style;
+            
+            rect = view.getBoundingClientRect();
+            
+            style.borderStyle = 'dashed';
+            style.borderColor = 'red';
+            
+            style = dom.style;
+            style.opacity = 0.2;
+            style.left = rect.left + 'px';
+            style.top = rect.top + 'px';
+            
+            document.body.appendChild(dom);
+            
+            target = {
+            
+                dom: dom,
+                left: rect.left,
+                top: rect.top
+            };
+        }
+        else if (!(target = e.draggable))
+        {
+            return;
+        }
+        
+        //获取拖动容器及偏移位置
+        while (cache = control.__parent)
+        {
+            control = cache;
+        }
+        
+        rect = control.view.getBoundingClientRect();
+        
+        target.host = control;
+        target.offsetX = e.clientX - rect.left;
+        target.offsetY = e.clientY - rect.top;
+        
+        return draggable = target;
     };
     
-    on(body, 'focusout', function (e) {
+    
+    function do_drag(control, data, e) {
         
+        var style = data.dom.style,
+            x = data.distanceX,
+            y = data.distanceY,
+            parent = control.__parent,
+            host = data.host,
+            target = host.findDropTarget(data.offsetX + x, data.offsetY + y);
+
+        if (parent !== host)
+        {
+            parent.remove(control);
+            host.insert(target[1], control);
+        }
+        else
+        {
+            control.index(target[1]);
+        }
+
+        style.left = data.left + x + 'px';
+        style.top = data.top + y + 'px';
+
+        control.trigger('drag', new MouseEvent(e));
     };
-    */
+    
+    
+    function end_drag(control, data, e) {
+        
+        var dom = data.dom,
+            style1 = dom.style,
+            style2 = control.view.style,
+            parent;
+
+        if (parent = dom.parentNode)
+        {
+            parent.removeChild(dom);
+        }
+
+        style2.borderStyle = style1.borderStyle;
+        style2.borderColor = style1.borderColor;
+
+        control.trigger('dragend', new MouseEvent(e))
+    };
+    
+    
+
+    events.mousedown = function (e) {
+        
+        var control = flyingon.findControl(e.target),
+            parent,
+            cache;
+        
+        if (control && control.trigger(mousedown = new MouseEvent(e)) !== false)
+        {
+            if (cache = resizable)
+            {
+                resizable = {
+                 
+                    side: cache,
+                    width: control.offsetWidth,
+                    height: control.offsetHeight
+                }
+            }
+            else if ((parent = control.__parent) && (control.__storage || control.__defaults).draggable)
+            {
+                cache = start_drag(control, e);
+            }
+            
+            if (cache && (cache = control.view))
+            {
+                cache.setCapture && cache.setCapture();
+
+                cache = document.body;
+                cache.__ondragstart = cache.ondragstart;
+                cache.ondragstart = function () {
+                  
+                    return false;
+                };
+            }
+        }
+    };
+    
+    
+    events.mousemove = function (e) {
+        
+        var start = mousedown,
+            control,
+            cache;
+        
+        if (start && (control = start.target))
+        {
+            var x = e.clientX - start.clientX,
+                y = e.clientY - start.clientY;
+                
+            if (cache = resizable)
+            {
+                cache.distanceX = x;
+                cache.distanceY = y;
+                
+                do_resize(control, cache);
+            }
+            else if (cache = draggable)
+            {
+                cache.distanceX = x;
+                cache.distanceY = y;
+                
+                do_drag(control, cache, e);
+            }
+            else
+            {
+                e = new MouseEvent(e);
+                
+                e.mousedown = start;
+                e.distanceX = x;
+                e.distanceY = y;
+                
+                control.trigger(e);
+            }
+        }
+        else if ((control = flyingon.findControl(e.target)) && control.trigger(new MouseEvent(e)) !== false)
+        {
+            if ((cache = (control.__storage || control.__defaults).resizable) !== 'none')
+            {
+                check_resize(control, cache, e);
+            }
+        }
+    };
+    
+    
+    //按下鼠标时弹起处理
+    events.mouseup = function (e) {
+        
+        var start = mousedown,
+            control,
+            cache;
+        
+        if (start && (control = start.target))
+        {
+            if (cache = resizable)
+            {
+                resizable = 0;
+            }
+            else if (cache = draggable)
+            {
+                end_drag(control, cache, e);
+                draggable = null;
+            }
+
+            e = new MouseEvent(e);
+
+            e.mousedown = start;
+            e.distanceX = e.clientX - start.clientX;
+            e.distanceY = e.clientY - start.clientY;
+
+            control.trigger(e);
+
+            if (cache = control.view)
+            {
+                cache.setCapture && cache.releaseCapture();
+                cache = document.body;
+                
+                if (cache.ondragstart = cache.__ondragstart)
+                {
+                    cache.__ondragstart = null;
+                }
+            }
+            
+            mousedown = null;
+        }
+        else if (control = flyingon.findControl(e.target))
+        {
+            control.trigger(new MouseEvent(e));
+        }
+    };
+        
+            
+    events.click = mouse_event;
+    
+    
+    events.dblclick = mouse_event;
+    
+    
+    events.mouseover = mouse_event;
+    
+    
+    events.mouseout = mouse_event;
+    
+    
+    
+    events.keydown = key_event;
+    
+    events.keypress = key_event;
+    
+    events.keyup = key_event;
+        
+    
+    
+    //绑定事件
+    for (var name in events)
+    {
+        on(document, name, events[name]);
+    }
+    
 
     
-})();
+})(flyingon, document);

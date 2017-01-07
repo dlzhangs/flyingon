@@ -1,8 +1,9 @@
 
-//表格布局类
-$class(flyingon.Layout, function (base) {
-
-        
+//布局格
+(function (layout) {
+    
+    
+    
     //行列格式: row[column ...] ... row,column可选值: 
     //整数            固定行高或列宽 
     //数字+%          总宽度或高度的百分比 
@@ -14,175 +15,18 @@ $class(flyingon.Layout, function (base) {
     //示例(九宫格正中内嵌九宫格,留空为父表的一半): '*[* * *] *[* *{(50% 50%) L*[* * *]^3} *] *[* * *]'
     
     
-    var parse_cache = flyingon.create(null),
+    var parse_list = flyingon.create(null),
         
         regex_loop = /L([^L\^]+)\^(\d+)/g,
                 
-        regex_parse = /[*%.!\w]+|[\[\]{}()]/g,
-        
-        pixel = flyingon.pixel,
-        
-        parse = parseFloat;
+        regex_parse = /[*%.\w]+|[\[\]{}()!]/g;
     
     
     
-    this.type = 'table';
-
-    
-    //是否按纵向开始拆分
-    this.defineProperty('vertical', false);
-
-    
-    //头部区域
-    this.defineProperty('header', '', {
-    
-        set: 'this.__header = null;'
-    });
-    
-    
-    //内容区域
-    this.defineProperty('body', '*[* * *]', {
-     
-        set: 'this.__body = null;'
-    });
-
-    
-    //循环内容区域
-    this.defineProperty('loop', 3, {
-       
-        dataType: 'object'
-    });
-    
-    
-    //尾部区域
-    this.defineProperty('footer', '', {
-       
-        set: 'this.__footer = null;'
-    });
-
-
-    
-    //排列布局
-    this.arrange = function (arrange, hscroll, vscroll, items, start, end) {
-
-        var header = this.header(),
-            body = this.__body || (this.__body = parse(this.body())),
-            loop = this.loop(),
-            footer = this.footer(),
-            total;
+    //解析布局
+    layout.parse = function (text) {
         
-        header && (header = this.__header || (this.__header = parse(header)));
-        footer && (footer = this.__footer || (this.__footer = parse(footer)));
-        
-        
-    };
-
-        
-            
-    //单元格类
-    var item_type = $class(function () {
-
-        //比例
-        this.scale = 0;
-        
-        //单位
-        this.unit = '';
-        
-        //是否可用
-        this.enabled = true;
-        
-        //子项
-        this.items = null;
-        
-        
-        //开始位置
-        this.start = 0;
-        
-        //大小
-        this.size = 0;
-        
-        
-        this.clone = function () {
-            
-            var target = new this.Class();
-            
-            target.scale = this.scale;
-            target.unit = this.unit;
-            target.enabled = this.enabled;
-            
-            if (this.items)
-            {
-                target.items = this.items.clone();
-            }
-            
-            return target;
-        };
-
-    });
-
-
-    //单元格集合类
-    var items_type = $class(Array, function () {
-
-        
-        //是否竖直切分
-        this.vertical = false;
-        
-        //水平间距
-        this.spacingX = '100%';
-        
-        //竖直间距
-        this.spacingY = '100%';
-        
-        
-        //固定子项大小合计
-        this.values = 0;
-        
-        //余量权重合计
-        this.weight = 0;
-        
-        //百分比合计
-        this.percent = 0;
-        
-        
-        //开始位置
-        this.start = 0;
-        
-        //大小
-        this.size = 0;
-        
-        
-        this.compute = function (width, height, spacingX, spacingY) {
-          
-            
-        };
-        
-                
-        this.clone = function () {
-          
-            var target = new this.Class();
-            
-            target.vertical = this.vertical;
-            target.spacingX = this.spacingX;
-            target.spacingY = this.spacingY;
-            target.values = this.values;
-            target.weight = this.weight;
-            target.percent = this.percent;
-            
-            for (var i = 0, l = this.length; i < l; i++)
-            {
-                target.push(this[i].clone());
-            }
-            
-            return target;
-        };
-
-    });
-    
-    
-    function parse(layout, text) {
-        
-        var items = parse_cache[text],
+        var items = parse_list[text],
             tokens;
         
         if (items)
@@ -190,19 +34,18 @@ $class(flyingon.Layout, function (base) {
             return items.clone();
         }
         
-        items = new items_type();
-        tokens = parse_loop(text).match(regex_parse);
+        items = new Group();
         
-        if (tokens)
+        if (tokens = parse_loop(text || (text = '')).match(regex_parse))
         {
-            items.vertical = tokens[0] === '{';
-            parse_items(items, tokens, 0, items.vertical ? '}' : ']');
+            items.parse(tokens, 0);
         }
 
-        return parse_cache[text] = items;
+        return parse_list[text] = items;
     };
+        
     
-    
+    //解析循环
     function parse_loop(text) {
     
         var regex = regex_loop,
@@ -234,35 +77,582 @@ $class(flyingon.Layout, function (base) {
     };
     
     
-    function parse_items(items, tokens, index, end) {
-      
-        var item, token;
         
-        while (token = tokens[index++])
-        {
-            switch (token)
+    //布局单元格
+    var Cell = layout.Cell = $class(function () {
+        
+                
+        //值
+        this.value = 0;
+        
+        //单位
+        this.unit = '';
+        
+        //是否禁用
+        this.disabled = false;
+        
+        //子组
+        this.group = null;
+        
+        
+        //开始坐标
+        this.start = 0;
+        
+        //大小
+        this.size = 0;
+        
+        
+        
+        //复制
+        this.clone = function () {
+          
+            var cell = new Cell(),
+                cache;
+            
+            cell.value = this.value;
+            
+            if (!(cell.unit = this.unit))
             {
-                case '[':
-                    token = new items_type();
-                    token.vertical = true;
-                    index = parse_items(item ? (item.items = token) : token, tokens, index, ']');
-                    break;
+                cell.size = this.size;
+            }
+            
+            cell.disabled = this.disabled;
+            
+            if (cache = this.group)
+            {
+                cell.group = cache.clone();
+            }
+                        
+            return cell;
+        };
+        
+        
+    }, false);
+    
+    
+    
+    //布局组
+    var Group = layout.Group = $class(function () {
+        
 
-                case '{':
-                    token = new items_type();
-                    index = parse_items(item ? (item.items = token) : token, tokens, index, '}');
-                    break;
+        var pixel = flyingon.pixel,
+            parse = parseFloat;
+        
+        
+        //子项数
+        this.length = 0;
+                
+        //子项固定值总数
+        this.fixed = 0;
+                
+        //子项权重总数
+        this.weight = 0;
+        
+        //子项百分比集合
+        this.persent = null;
+                
+        //参数集
+        this.parameters = null;
+        
+        
+        //开始位置
+        this.start = 0;
+        
+        //大小
+        this.size = 0;
+        
+        
+        
+        //解析
+        this.parse = function (tokens, index) {
+
+            var length = this.length,
+                token,
+                cell, 
+                value;
+
+            while (token = tokens[index++])
+            {
+                switch (token)
+                {
+                    case '[':
+                    case '{':
+                        if (!cell)
+                        {
+                            cell = this[length++] = new Cell();
+                            cell.value = 100;
+                            cell.weight = 100;
+
+                            this.width += 100;
+                        }
+
+                        index = (cell.group = new Group()).parse(tokens, index);
+                        break;
+
+                    case ']':
+                    case '}':
+                        this.length = length;
+                        return index;
+
+                    case '(':
+                        while ((token = tokens[index++]) !== ')')
+                        {
+                            if (token.indexOf('%') < 0)
+                            {
+                                token = pixel(token);
+                            }
+
+                            (this.parameters || (this.parameters = [])).push(token);
+                        }
+                        break;
+
+                    case '!':
+                        cell && (cell.disabled = true);
+                        break;
+
+                    default:
+                        cell = this[length++] = new Cell();
+                        
+                        if (token === '*')
+                        {
+                            cell.value = 100;
+                            cell.unit = '*';
+
+                            this.weight += 100;
+                        }
+                        else if ((value = parse(token)) === value) //可转为有效数字
+                        {
+                            switch (cell.unit = token.replace(value, ''))
+                            {
+                                case '*':
+                                    this.weight += value;
+                                    break;
+
+                                case '%':
+                                    (this.percent || (this.persent = [])).push(this.value);
+                                    break;
+
+                                default:
+                                    this.fixed += (value = cell.size = pixel(token));
+                                    break;
+                            }
+
+                            cell.value = value;
+                        }
+                        break;
+                }
+            }
+
+            this.length = length;
+            return index;
+        };
+        
+        
+        //获取可用单元格总数
+        this.count = function (index) {
+            
+            var count = 0,
+                cache;
+            
+            index |= 0;
+            
+            while (cache = this[index++])
+            {
+                if (cache.disabled)
+                {
+                    continue;
+                }
+
+                if (cache = cache.group)
+                {
+                    count += cache.count();
+                }
+                else
+                {
+                    count++;
+                }
+            }
+            
+            return count;
+        };
+        
+        
+        //复制子项
+        function copy_cell(start, end) {
+            
+            var length = this.length,
+                cell;
+            
+            for (var i = start; i < end; i++)
+            {
+                if (cell = this[i])
+                {
+                    switch (cell.unit)
+                    {
+                        case '*':
+                            this.weight += cell.value;
+                            break;
+                            
+                        case '%':
+                            this.persent.push(cell.value);
+                            break;
+                            
+                        default:
+                            this.fixed += cell.value;
+                            break;
+                    }
+  
+                    this[length++] = cell.clone();
+                }
+            }
+            
+            this.length = length;
+        };
+        
+        
+        //计算自动增长
+        function auto_cell(auto, total) {
+            
+            var start, end, cache;
+            
+            if (auto === false)
+            {
+                if (auto = this.__auto)
+                {
+                    [].splice.call(this, auto.length);
+                        
+                    this.fixed = auto.fixed;
+                    this.weight = auto.weight;
                     
-                case '(':
-                    index = parse_parameters(items, tokens, index);
-                    break;
+                    if (cache = auto.persent)
+                    {
+                        this.persent.splice(cache);
+                    }
+                }
+            }
+            else if (auto > 0 && (total -= this.count()) > 0)
+            {
+                start = (end = this.length) - auto;
+                
+                if ((auto = this.count(start)) > 0)
+                {
+                    //记录原始auto值
+                    this.__auto = {
 
-                case end:
-                    return index;
+                        length: end,
+                        fixed: this.fixed,
+                        weight: this.weight,
+                        persent: (cache = this.persent) && cache.length
+                    };
+                    
+                    auto = Math.ceil(total / auto);
+                    
+                    for (var i = 0; i < auto; i++)
+                    {
+                        copy_cell.call(this, start, end);
+                    }
 
-                default:
-                    item = parse_item(items, token) || item;
-                    break;
+                    return auto;
+                }
+            }
+        };
+        
+        
+        //测量
+        this.measure = function (width, height, spacingX, spacingY, vertical, auto, items) {
+            
+            var keys = [width, height, spacingX, spacingY, vertical, auto, 0];
+            
+            if (auto > 0)
+            {
+                keys[6] = auto_cell.call(this, auto, items.length);
+            }
+            else if (this.__auto)
+            {
+                auto_cell.call(this, false);
+            }
+            
+            //如果缓存了排列则跳过
+            if (this.__keys !== (keys = keys.join(',')))
+            {
+                this.compute(width, height, spacingX, spacingY, vertical);                
+                this.__keys = keys;
+            }
+        };
+        
+        
+        //计算位置
+        this.compute = function (width, height, spacingX, spacingY, vertical) {
+            
+            var list = this.parameters,
+                weight = this.weight,
+                start = 0,
+                length = this.length,
+                cell,
+                size,
+                spacing, 
+                cache;
+            
+            this.width = width;
+            this.height = height;
+            
+            if (vertical)
+            {
+                size = width;
+                cache = list && list[1];
+                spacing = spacingX;
+            }
+            else
+            {
+                size = height;
+                cache = list && list[1];
+                spacing = spacingY;
+            }
+            
+            vertical = !vertical;
+            
+            if (cache)
+            {
+                spacing = cache > 0 ? cache : pixel(cache, spacing);
+            }
+            
+            //计算百分比
+            if (size > 0 && (list = this.persent))
+            {
+                list = list.slice(0);
+                cache = 0;
+                
+                for (var i = list.length - 1; i >= 0; i--)
+                {
+                    cache += (list[i] = (size * list[i] / 100 + 0.5) | 0);
+                }
+                
+                if ((size -= cache) < 0)
+                {
+                    size = 0;
+                }
+                
+                list.index = 0;
+            }
+            
+            //减去固定尺寸
+            if (size > 0 && (size -= this.fixed + spacing * (length - 1)) < 0)
+            {
+                size = 0;
+            }
+            
+            //计算余量
+            for (var i = 0; i < length; i++)
+            {
+                if (cell = this[i])
+                {
+                    switch (cell.unit)
+                    {
+                        case '*':
+                            if (size > 0)
+                            {
+                                cache = cell.value;
+                                size -= (cell.size = cache * size / weight | 0);
+                                weight -= cache;
+                            }
+                            else
+                            {
+                                cell.size = 0;
+                            }
+                            break;
+                            
+                        case '%':
+                            cell.size = list[list.index++] || 0;
+                            break;
+                    }
+                    
+                    cell.start = start;
+                    start += cell.size + spacing;
+                    
+                    //排列子项
+                    if (cache = cell.group)
+                    {
+                        if (vertical)
+                        {
+                            cache.compute(width, cell.size, spacingX, spacingY, vertical);
+                        }
+                        else
+                        {
+                            cache.compute(cell.size, height, spacingX, spacingY, vertical);
+                        }
+                    }
+                }
+            }
+        };
+            
+        
+        //复制
+        this.clone = function () {
+            
+            var target = new this.Class(),
+                length = this.length,
+                cache;
+            
+            target.length = length;
+            target.fixed = this.fixed;
+            target.weight = this.weight;
+            target.parsent = (cache = this.persent) && cache.slice(0);
+            target.parameters = this.parameters;
+            
+            if ((cache = this.length) > 0)
+            {
+                for (var i = 0; i < cache; i++)
+                {
+                    target[i] = this[i].clone(); 
+                }
+            }
+            
+            return target;
+        };
+
+        
+    }, false);
+    
+    
+    
+})(flyingon.Layout);
+
+
+
+//表格布局类
+$class(flyingon.Layout, function (base) {
+
+    
+    //模板解析
+    var parse = flyingon.Layout.parse;
+    
+    
+    
+    this.type = 'table';
+
+    
+    //是否纵向布局
+    this.defineProperty('vertical', false);
+    
+    
+    //内容区域
+    this.defineProperty('data', '*[* * *] *[* * *] *[* * *]', {
+     
+        set: 'this.__data = null;'
+    });
+
+    
+    //自动循环的记录数
+    this.defineProperty('auto', 0);
+    
+    
+    
+    //排列布局
+    this.arrange = function (container, items, hscroll, vscroll) {
+
+        var data = this.__data || (this.__data = parse(this.data())),
+            vertical = this.vertical(),
+            x = container.arrangeLeft,
+            y = container.arrangeTop,
+            width = container.clientWidth,
+            height = container.clientHeight,
+            pixel = flyingon.pixel,
+            spacingX = pixel(this.spacingX(), width),
+            spacingY = pixel(this.spacingY(), height);
+            
+        //测量
+        data.measure(width, height, spacingX, spacingY, vertical, this.auto(), items);
+        
+        //初始化盒子模型
+        for (var i = items.length - 1; i >= 0; i--)
+        {
+            items[i].initBoxModel(width, height);
+        }
+        
+        //排列
+        (vertical ? arrange_vertical : arrange)(container, data, items, 0, x, y);
+
+        //检查是否需要重排
+        if (hscroll || vscroll)
+        {
+            this.rearrange(container, items, hscroll, vscroll);
+        }
+    };
+    
+    
+    function arrange(container, group, items, index, x, y) {
+        
+        var width = group.width,
+            cell, 
+            control, 
+            box,
+            cache;
+        
+        for (var i = 0, l = group.length; i < l; i++)
+        {
+            if (cell = group[i]) 
+            {
+                if (!cell.disabled)
+                {
+                    if (cache = cell.group)
+                    {
+                        index = arrange_vertical(container, cache, items, index, x, y + cell.start);
+                        
+                        if (index < 0)
+                        {
+                            return -1;
+                        }
+                    }
+                    else if (control = items[index++])
+                    {
+                        control.measure(width, cache = cell.size, false, false, true, true);
+                        control.locate(x, y + cell.start, width, cache, container);
+                    }
+                    else
+                    {
+                        return -1;
+                    }
+                }
+            }
+        }
+        
+        return index;
+    };
+
+        
+    function arrange_vertical(container, group, items, index, x, y) {
+        
+        var height = group.height,
+            cell, 
+            control, 
+            box,
+            cache;
+        
+        for (var i = 0, l = group.length; i < l; i++)
+        {
+            if (cell = group[i]) 
+            {
+                if (!cell.disabled)
+                {
+                    if (cache = cell.group)
+                    {
+                        index = arrange(container, cache, items, index, x + cell.start, y);
+                        
+                        if (index < 0)
+                        {
+                            return -1;
+                        }
+                    }
+                    else if (control = items[index++])
+                    {
+                        control.measure(cache = cell.size, height, false, false, true, true);
+                        control.locate(x + cell.start, y, cache, height, container);
+                    }
+                    else
+                    {
+                        return -1;
+                    }
+                }
             }
         }
         
@@ -270,87 +660,6 @@ $class(flyingon.Layout, function (base) {
     };
     
     
-    function parse_item(items, token) {
-      
-        var item = new item_type(), 
-            value;
-        
-        if (token.indexOf('!') >= 0)
-        {
-            item.enabled = false;
-            token = token.replace('!', '');   
-        }
-        
-        if (token === '*')
-        {
-            item.scale = 100;
-            item.unit = '*';
-            items.weight += 100;
-        }
-        else if ((value = parse(token)) === value) //可转为有效数字
-        {
-            switch (item.unit = token.replace(value, ''))
-            {
-                case '*':
-                    items.weight += value;
-                    break;
-                    
-                case '%':
-                    items.percent += value;
-                    break;
-                    
-                default:
-                    value = pixel(token);
-                    items.values += value;
-                    break;
-            }
-            
-            item.scale = value;
-        }
-        else
-        {
-            return;
-        }
-        
-        items.push(item);
-        return item;
-    };
-    
-    
-    function parse_parameters(items, tokens, index) {
-        
-        var token, x;
-        
-        while (token = tokens[index++])
-        {
-            if (token === ')')
-            {
-                return index;
-            }
-            
-            if (x !== 0)
-            {
-                if (token.indexOf('%') < 0)
-                {
-                    token = pixel(token) | 0;
-                }
-                
-                items.spacingY = token;
-                
-                if (x)
-                {
-                    x = 0;
-                }
-                else
-                {
-                    items.spacingX = token;
-                    x = 1;
-                }
-            }
-        }
-    };
-    
-
 });
 
 

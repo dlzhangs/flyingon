@@ -18,7 +18,7 @@ $class('RowCollection', function () {
     //查找数据行
     this.find = function (filter) {
     
-        var list = flyingon.RowCollection(),
+        var list = new flyingon.RowCollection(),
             index = 0,
             length = this.length,
             row;
@@ -39,7 +39,7 @@ $class('RowCollection', function () {
     //查找所有下级行
     this.findAll = function (filter) {
 
-        var list = arguments[1] || flyingon.RowCollection(),
+        var list = arguments[1] || new flyingon.RowCollection(),
             row;
         
         for (var i = 0, l = this.length; i < l; i++)
@@ -249,8 +249,8 @@ $class('RowCollection', function () {
 
 
 
-//数据集合接口
-$fragment('IDataList', function () {
+//数据集功能片段
+$fragment('DataListFragment', function () {
     
     
     
@@ -437,7 +437,7 @@ $fragment('IDataList', function () {
 
 
 //数据行基类
-$class('DataRow', [Object, flyingon.IDataList], function () {
+$class('DataRow', function () {
     
     
 
@@ -488,52 +488,24 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
     
     
     
-    //获取数据行在数据集中的顺序
-    this.index = function (index) {
+    //获取数据行在数据集中的索引
+    this.index = function () {
         
-        var dataset = this.dataset,
-            list = this.parent || dataset;
+        var list = this.parent || this.dataset,
+            length;
 
-        if (list)
+        if (list && (length = list.length) > 0)
         {
-            var oldValue = -1,
-                i = 0,
-                length = list.length;
-            
-            while (i < length)
+            for (var i = 0; i < length; i++)
             {
                 if (list[i] === this)
                 {
-                    oldValue = i;
-                    break;
+                    return i;
                 }
-                
-                i++;
-            }
-            
-            if (index === void 0)
-            {
-                return oldValue;
-            }
-            
-            if ((index |= 0) < 0 || index >= length)
-            {
-                index = length - 1;
-            }
-            
-            if (index !== oldValue)
-            {
-                splice.call(list, oldValue, 1);
-                splice.call(list, index, 0, this);
-                
-                (dataset || this).trigger('index-changed', 
-                    'row', this, 
-                    'value', index, 
-                    'oldValue', oldValue);
             }
         }
-        
-        return this;
+
+        return -1;        
     };
     
         
@@ -714,7 +686,13 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
         return this;
     };
     
-        
+
+    
+    //引入数据集合片段
+    flyingon.DataListFragment(this);
+    
+
+    
     //获取树级别
     this.level = function () {
      
@@ -759,7 +737,7 @@ $class('DataRow', [Object, flyingon.IDataList], function () {
 
 
 //数据集
-$class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function () {
+$class('DataSet', function () {
     
     
     
@@ -816,6 +794,15 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
             return new Function('source', list.join('\n'));
         }
     };
+    
+    
+    
+    //引入可序列化片段
+    flyingon.SerializeFragment(this);
+    
+    
+    //引入数据集合片段
+    flyingon.DataListFragment(this);
     
     
         
@@ -953,11 +940,11 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
         
         var keys = this.__keys1,
             id = this.__current_id,
-            oldValue = id && keys[id];
+            oldValue = id && keys[id] || null;
         
         if (row === void 0)
         {
-            return oldValue || null;
+            return oldValue;
         }
         
         if (oldValue !== row)
@@ -971,11 +958,73 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
             this.__current_id = row && row.uniqueId;
             this.trigger('current-changed', 'value', row, 'oldValue', oldValue);
             
-            //触发行移动事件
+            //触发行移动动作
             this.dispatch('move', row);
         }
         
         return this;
+    };
+    
+    
+    //移动到第一行
+    this.first = function () {
+        
+        var row;
+        
+        if (row = this.at(0))
+        {
+            this.currentRow(row);
+        }
+    };
+    
+    
+    //移动到上一行
+    this.previous = function () {
+        
+        var row = this.currentRow(),
+            index = row && row.index() - 1 || 0;
+        
+        if (row = this.at(index))
+        {
+            this.currentRow(row);
+        }
+    };
+    
+    
+    //移动到下一行
+    this.next = function () {
+        
+        var row = this.currentRow(),
+            index = row && row.index() + 1 || 0;
+        
+        if (row = this.at(index))
+        {
+            this.currentRow(row);
+        }
+    };
+    
+    
+    //移动到最后一行
+    this.last = function () {
+        
+        var row;
+        
+        if (row = this.at(this.length - 1))
+        {
+            this.currentRow(row);
+        }
+    };
+    
+    
+    //移动到指定索引的行
+    this.moveTo = function (index) {
+        
+        var row;
+        
+        if (row = this.at(index))
+        {
+            this.currentRow(row);
+        }
     };
     
     
@@ -994,6 +1043,7 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
     };
     
         
+    
     //获取变更的数据行
     this.getChanges = function (state) {
     
@@ -1082,6 +1132,9 @@ $class('DataSet', [Object, flyingon.ISerialize, flyingon.IDataList], function ()
             }
             
             rows.length = 0;
+            
+            //触发重新绑定动作
+            this.dispatch('bind');
         }
         
         return this;

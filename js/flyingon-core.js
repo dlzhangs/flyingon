@@ -1099,14 +1099,18 @@
     //获取或设置属性默认值
     function defaultValue(name, value) {
 
-        var defaults = this.__defaults;
+        var target = this.__defaults;
 
         if (value === void 0)
         {
-            return defaults[name];
+            return target[name];
         }
 
-        defaults[name] = value;
+        target[name] = value;
+        target = this.__properties;
+        
+        (target[name] = flyingon.extend({}, target[name])).defaultValue = value;
+                
         return this;
     };
 
@@ -1277,6 +1281,7 @@
             start,
             target,
             events,
+            length,
             fn;
 
         e.target = this;

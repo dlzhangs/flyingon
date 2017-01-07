@@ -246,9 +246,9 @@ $class('Renderer', function () {
     //渲染控件
     this.render = function (control) {
       
-        var box = control.viewBox,
-            width = box.offsetWidth,
-            height = box.offsetHeight,
+        var box = control.boxModel,
+            width = control.offsetWidth,
+            height = control.offsetHeight,
             style = control.view.style,
             cache;
         
@@ -282,8 +282,8 @@ $class('Renderer', function () {
             }
         }
         
-        style.left = box.offsetLeft + 'px';
-        style.top = box.offsetTop + 'px';
+        style.left = control.offsetLeft + 'px';
+        style.top = control.offsetTop + 'px';
         style.width = width + 'px';
         style.height = style.lineHeight = height + 'px';
     };

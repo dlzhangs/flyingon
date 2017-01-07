@@ -2,23 +2,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <title></title>
-    <script type="text/javascript">
-        
-        /*
-        if (window.console && console.profile)
-        {
-            console.profile('test');
-
-            setTimeout(function () {
-
-                console.profileEnd('test');
-
-            }, 3000);
-        }
-        */
-        
-    </script>
+    <title>flyingon布局演示</title>
 </head>
 <body style="padding:10px;">
 
@@ -27,20 +11,74 @@
     <script type="text/javascript">
         
         
-    flyingon.layout('panel', {
+        flyingon.layout('wall', {
 
-        spacingX: 2,
-        spacingY: 2,
+            type: 'table',
+            spacingX: 2,
+            spacingY: 2,
+            data: '*[* * * * * * * *] *[50* * * * * * * * 50*] *[* * * * * * * *]'      
+        });
 
-        //自适应
-        adaption: {
 
-            'width < 400': {
+        flyingon.layout('panel', [
 
+            {
+                type: 'dock',
+                spacingX: 10,
+                spacingY: 10,
+                //mirror: 'x',
+
+                //子布局
+                sublayouts: [
+
+                    {
+                        scale: 25,
+                        dock: 'top',
+                        height: 40,
+                        layout: 'wall'
+                    },
+
+                    {
+                        scale: 25,
+                        dock: 'bottom',
+                        height: 40,
+                        layout: 'wall'
+                    },
+
+                    {
+                        dock: 'fill',
+
+                        layout: {
+
+                            type: 'uniform',
+                            size: 10,
+
+                            location: function (item, index, width, height) {
+
+                                var value = Math.sin(60 * (index + 1) / Math.PI);
+
+                                if (value < 0)
+                                {
+                                    value = -value;
+                                }
+
+                                return {
+
+                                    alignY: 'bottom',
+                                    height: value * height / 2 | 0
+                                };
+                            }
+                        }
+                    }
+
+                ],
+            },
+
+            {
+                condition: 'width < 250',
                 type: 'vertical-line',
-                spacingX: 2,
                 spacingY: 2,
-                
+
                 //子项定位属性值
                 location: {
 
@@ -48,124 +86,54 @@
                 }
             },
 
-            'width < 800': {
-
+            {
+                condition: 'width < 500',
                 type: 'flow',
                 spacingX: 2,
                 spacingY: 2
             },
 
-
-            'width < 1500': {
-
-                type: 'dock',
-                spacingX: 20,
-                spacingY: 20,
-                //mirror: 'y',
-
-                //分割
-                partition: [
-
-                    {
-                        scale: 10, //固定十个
-                        dock: 'left',
-                        width: 200,
-                        height: 'auto',
-                        
-                        layout: {
-                            
-                            type: 'vertical-line',
-                            spacingX: 2,
-                            spacingY: 2,
-                            
-                            //子项定位属性值
-                            location: {
-                             
-                                width: 'fill',
-                                
-                                //不同的条件设置不同的定位属性值
-                                condition: {
-                                 
-                                    'index % 3 === 0': {
-                                     
-                                        width: 100
-                                    },
-                                    
-                                    'index % 3 === 1': {
-                                     
-                                        width: 150
-                                    }
-                                }
-                            }
-                        }
-                    },
-
-                    {
-                        scale: 2.2, //固定2个 + 余量20%
-                        dock: 'right',
-                        width: 'auto',
-                        height: 'auto',
-                        layout: 'vertical-line'
-                    },
-
-                    {
-                        scale: 8.8, //固定8个 + 余量80%
-                        dock: 'fill',
-                        height: 'auto',
-                        layout: 'flow'
-                    }
-
-                ]
-
+            {
+                condition: 'width < 800',
+                type: 'table',
+                spacingX: 2,
+                spacingY: 2,
+                data: '20[* * *] *[50* *{(50% 50%) L*[* * *]^3} 50*] 20[* * *]',
+                auto: 2
             }
-        }
 
-    });
-
-
-    var panel = new flyingon.Panel().sets({
-
-        id: 'panel',
-        width: 1000,
-        height: 400,
-        border: 1,
-        borderStyle: 'solid',
-        padding: 8,
-        overflowX: 'auto',
-        overflowY: 'auto',
-        layout: 'panel'
-    });
+        ]);
 
 
-    for (var i = 0; i < 70; i++)
-    {
-        panel.append(new flyingon.Text().sets({
+        var panel = new flyingon.Panel().sets({
 
-            id: 'control' + i,
-            text: 'text' + i,
+            width: 1000,
+            height: 400,
             border: 1,
             borderStyle: 'solid',
-            textAlign: 'center',
-            verticalAlign: 'middle'
-        }));
-    }
-
-    flyingon.showControl(panel, document.body);
+            padding: 8,
+            resizable: 'all',
+            layout: 'panel'
+        });
 
 
-    flyingon.dom_on(document.body, 'mousedown', function (e) {
+        for (var i = 0; i < 101; i++)
+        {
+            panel.append(new flyingon.Text().sets({
 
-        var box = panel.viewBox,
-            width = box.offsetWidth,
-            height = box.offsetHeight;
+                border: 1,
+                borderStyle: 'solid',
+                draggable: true
+            }));
+        }
+        
+        panel.on('dragend', function (e) {
+           
+            e.target.backgroundColor('silver');
+        });
 
-        flyingon.dom_drag(this, e, null, function dragmove(e) {
 
-            panel.width(width + e.distanceX);
-            panel.height(height + e.distanceY);
-
-        }, null, true, true);
-    });
+        flyingon.showControl(panel, document.body);
         
       
     </script>

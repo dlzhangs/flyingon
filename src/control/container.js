@@ -40,7 +40,7 @@ $fragment('ContainerFragment', function () {
             }
             else
             {
-                throw $errortext('flyingon', 'children type').replace('{0}', type.xtype);
+                return false;
             }
         }
         
@@ -51,10 +51,9 @@ $fragment('ContainerFragment', function () {
     //添加子控件
     this.append = function (control) {
 
-        var list = check_control(this, arguments, 0),
-            children;
+        var list, children;
         
-        if (list)
+        if (list = check_control(this, arguments, 0))
         {
             children = this.__children || this.children();
             
@@ -76,19 +75,20 @@ $fragment('ContainerFragment', function () {
             {
                 this.invalidate();
             }
+            
+            return true;
         }
         
-        return this;
+        return false;
     };
 
 
     //在指定位置插入子控件
     this.insert = function (index, control) {
 
-        var list = check_control(this, arguments, 1),
-            children;
+        var list, children;
         
-        if (list)
+        if (list = check_control(this, arguments, 1))
         {
             children = this.__children || this.children();
             
@@ -123,9 +123,11 @@ $fragment('ContainerFragment', function () {
             {
                 this.invalidate();
             }
+            
+            return true;
         }
-
-        return this;
+        
+        return false;
     };
     
     
@@ -159,9 +161,11 @@ $fragment('ContainerFragment', function () {
         {
             children.splice(index, 1);
             remove(control, index, dispose);
+            
+            return true;
         }
 
-        return this;
+        return false;
     };
 
 
@@ -174,9 +178,11 @@ $fragment('ContainerFragment', function () {
         {       
             children.splice(index, 1);
             remove(control, index, dispose);
+            
+            return true;
         }
 
-        return this;
+        return false;
     };
 
 
@@ -211,9 +217,9 @@ $fragment('ContainerFragment', function () {
             {
                 this.invalidate();
             }
+            
+            return true;
         }
-        
-        return this;
     };
     
         
@@ -230,12 +236,12 @@ $fragment('ContainerFragment', function () {
 
             if (autoWidth)
             {
-                box.offsetWidth = box.contentWidth + box.border.width;
+                this.offsetWidth = box.contentWidth + box.border.width;
             }
 
             if (autoHeight)
             {
-                box.offsetHeight = box.contentHeight + box.border.height;
+                this.offsetHeight = box.contentHeight + box.border.height;
             }
         }
         else
@@ -254,9 +260,13 @@ $fragment('ContainerFragment', function () {
     //排列子控件
     this.arrange = function () {
 
-        var box = this.viewBox,
-            hscroll, 
-            vscroll;
+        var box = this.boxModel,
+            list,
+            items,
+            item,
+            x, 
+            y,
+            cache;
         
         if (box)
         {
@@ -268,7 +278,7 @@ $fragment('ContainerFragment', function () {
                     break;
 
                 case 'auto':
-                    hscroll = true;
+                    x = true;
                     break;
                     
                 default:
@@ -283,7 +293,7 @@ $fragment('ContainerFragment', function () {
                     break;
 
                 case 'auto':
-                    vscroll = true;
+                    y = true;
                     break;
                     
                 default:
@@ -291,35 +301,112 @@ $fragment('ContainerFragment', function () {
                     break;
             }
 
-            //初始化布局
-            this.getLayout().init(this, this.__children, hscroll, vscroll);
-        }
-        
-        //排列子项
-        this.__arrange_dirty = 0;
-    };
-    
-    
-    //获取布局器对象
-    this.getLayout = function () {
+            list = [];
+            items = this.__children;
 
-        var layout = this.__layout;
-            
-        if (layout)
-        {
-            if (layout === true)
+            //筛选出非隐藏控件
+            if (items && (length = items.length) > 0)
             {
-                layout = this.__layout = flyingon.findLayout(this.layout());
+                for (var i = 0; i < length; i++)
+                {
+                    (item = items[i]).__index = i;
+
+                    if ((item.__storage || item.__defaults).visible)
+                    {
+                        list.push(item);
+                    }
+                }
+            }
+
+            //排列
+            flyingon.arrange(this, list, x, y);
+            
+            //计算出可见控件
+            if (length = list.length)
+            {
+                x = this.offsetWidth;
+                y = this.offsetHeight;
+                
+                this.__visible_list = items = [];
+                
+                for (var i = 0; i < length; i++)
+                {
+                    item = list[i];
+                    
+                    if ((cache = item.offsetLeft) < x 
+                        && cache + item.offsetWidth > 0
+                        && (cache = item.offsetTop) < y
+                        && cache + item.offsetHeight > 0)
+                    {
+                        items.push(item);
+                    }
+                }
+            }
+            else
+            {
+                this.__visible_list = [];
             }
         }
-        else
-        {
-            layout = flyingon.findLayout(this.layout());
-        }
         
-        return layout;
+        this.__arrange_dirty = 0;
+        return this;
     };
     
+    
+    //查找拖拉放置目标及位置
+    this.findDropTarget = function (x, y) {
+        
+        var list = this.__visible_list,
+            item,
+            index,
+            length;
+        
+        if (list && (length = list.length) > 0)
+        {
+            if (!list.__sort)
+            {
+                list.__sort = true;
+                
+                //按照高到宽排序
+                list.sort(function (a, b) {
+
+                    return (a.offsetTop + a.offsetHeight << 16)
+                        + a.offsetLeft + a.offsetWidth
+                        - (b.offsetTop + b.offsetHeight << 16)
+                        - b.offsetLeft - b.offsetWidth;
+                });
+            }
+            
+            if ((item = this.boxModel) && (item = item.border))
+            {
+                x -= item.left;
+                y -= item.top;
+            }
+            
+            index = list[length - 1].__index + 1;
+            
+            for (var i = 0; i < length; i++)
+            {
+                item = list[i];
+                
+                if (item.offsetTop + item.offsetHeight > y &&
+                    item.offsetLeft + item.offsetWidth > x)
+                {
+                    index = item.__index;
+                    break;
+                }
+            }
+
+            if (item.findDropTarget && (item.__storage || item.__defaults).droppable)
+            {
+                return item.findDropTarget(x - item.offsetLeft, y - item.offsetTop);
+            }
+            console.log(x, y, index);
+            return [this, index];
+        }
+        
+        return [this, 0];
+    };
     
     
     //接收数据集变更动作处理
@@ -366,7 +453,7 @@ $fragment('ContainerFragment', function () {
 
             flyingon.__delay_update(target);
         }
-
+        
         return this;
     };
     
@@ -384,26 +471,31 @@ $fragment('ContainerFragment', function () {
             this.render();
             this.__update_dirty = false;
         }
+        
+        return this;
     };
     
     
            
     this.serialize = function (writer) {
         
-        var children;
+        var children = this.__children;
         
         this.base.serialize.call(this, writer);
         
         if (children && children.length)
         {
-            writer.write_property('children', children);
+            writer.writeProperty('children', children);
         }
+        
+        return this;
     };
     
     
     this.deserialize_children = function (reader, values) {
       
-        this.__children = reader.read_array(values);
+        this.__children = reader.readArray(values);
+        return this;
     };
 
 

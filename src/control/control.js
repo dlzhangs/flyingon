@@ -21,9 +21,10 @@
     unit.ex = 6;
     unit.pc = 16;
     unit.px = 1;
-    unit.in = 96;
     unit.pt = 4 / 3;
+    
     unit.mm = (unit.cm = 96 / 2.54) / 10;
+    unit['in'] = 96;
     
 
     //或者或设置象素转换单位
@@ -219,6 +220,35 @@ $class('Control', function () {
         return this.__parent || null;
     };
     
+    
+    //获取调整控件在父控件中的索引
+    this.index = function (index) {
+        
+        var list, cache;
+        
+        if ((cache = this.__parent) && (list = cache.__children))
+        {
+            cache = list.indexOf(this);
+        }
+        else
+        {
+            cache = -1;
+        }
+        
+        if (index === void 0)
+        {
+            return cache;
+        }
+        
+        if (list && index !== cache && cache >= 0 && index >= 0 && index < list.length)
+        {
+            list.splice(cache, 1);
+            list.splice(index, 0, this);
+            
+            this.invalidate();
+        }
+    };
+    
         
         
     //文本
@@ -393,17 +423,17 @@ $class('Control', function () {
     
     
 
-    //初始化视框
-    this.initViewBox = function (width, height) {
+    //初始化盒子模型
+    this.initBoxModel = function (width, height) {
 
         var storage = this.__storage || this.__defaults;
         
         if (storage && !storage.visible)
         {
-            return this.viewBox = null;
+            return this.boxModel = null;
         }
         
-        var box = this.viewBox || (this.viewBox = {}),
+        var box = this.boxModel || (this.boxModel = {}),
             fn = flyingon.pixel_sides,
             values = this.__location_values,
             value;
@@ -414,41 +444,43 @@ $class('Control', function () {
         
         fn = flyingon.pixel;
         
+        box.autoWidth = box.autoHeight = false;
+        
         switch (value = values && values.width || storage.width)
         {
             case 'default':
-                box.offsetWidth = false;
+                box.width = false;
                 break;
                 
             case 'fill':
-                box.offsetWidth = true;
+                box.width = true;
                 break;
                 
             case 'auto':
-                box.offsetWidth = box.autoWidth = true;
+                box.width = box.autoWidth = true;
                 break;
                 
             default:
-                box.offsetWidth = fn(value, width);
+                box.width = fn(value, width);
                 break;
         }
         
         switch (value = values && values.height || storage.height)
         {
             case 'default':
-                box.offsetHeight = false;
+                box.height = false;
                 break;
                 
             case 'fill':
-                box.offsetHeight = true;
+                box.height = true;
                 break;
                 
             case 'auto':
-                box.offsetHeight = box.autoHeight = true;
+                box.height = box.autoHeight = true;
                 break;
                 
             default:
-                box.offsetHeight = fn(value, height);
+                box.height = fn(value, height);
                 break;
         }
         
@@ -473,21 +505,21 @@ $class('Control', function () {
     
          
     //测量控件大小
-    //box               控件视框
     //availableWidth    可用宽度 
     //availableHeight   可用高度
     //lessWidth         宽度不足时的宽度 true:默认宽度 正整数:指定宽度 其它:0
     //lessHeight        高度不足时的高度 true:默认高度 正整数:指定高度 其它:0
     //defaultWidth      默认宽度 true:可用宽度 正整数:指定宽度 其它:0
     //defaultHeight     默认高度 true:可用高度 正整数:指定高度 其它:0
-    this.measure = function (box, availableWidth, availableHeight, lessWidth, lessHeight, defaultWidth, defaultHeight) {
+    this.measure = function (availableWidth, availableHeight, lessWidth, lessHeight, defaultWidth, defaultHeight) {
         
-        var minWidth = box.minWidth,
+        var box = this.boxModel,
+            minWidth = box.minWidth,
             maxWidth = box.maxWidth,
             minHeight = box.minHeight,
             maxHeight = box.maxHeight,
-            width = box.offsetWidth,
-            height = box.offsetHeight;
+            width = box.width,
+            height = box.height;
 
         //处理宽度
         if (width === false)
@@ -556,35 +588,35 @@ $class('Control', function () {
         }
         
         //设置大小
-        box.offsetWidth = width;
-        box.offsetHeight = height;
+        this.offsetWidth = width;
+        this.offsetHeight = height;
         
         //测量后处理
         if (this.onmeasure(box) !== false)
         {
             //处理最小及最大宽度
-            if (box.offsetWidth !== width)
+            if (this.offsetWidth !== width)
             {
-                if ((width = box.offsetWidth) < minWidth)
+                if ((width = this.offsetWidth) < minWidth)
                 {
-                    box.offsetWidth = minWidth;
+                    this.offsetWidth = minWidth;
                 }
                 else if (maxWidth > 0 && width > maxWidth)
                 {
-                    box.offsetWidth = maxWidth;
+                    this.offsetWidth = maxWidth;
                 }
             }
 
             //处理最小及最大高度
-            if (box.offsetHeight !== height)
+            if (this.offsetHeight !== height)
             {
-                if ((height = box.offsetHeight) < minHeight)
+                if ((height = this.offsetHeight) < minHeight)
                 {
-                    box.offsetHeight = minHeight;
+                    this.offsetHeight = minHeight;
                 }
                 else if (maxHeight > 0 && height > maxHeight)
                 {
-                    box.offsetHeight = maxHeight;
+                    this.offsetHeight = maxHeight;
                 }
             }
         }
@@ -599,11 +631,12 @@ $class('Control', function () {
     
 
     //定位控件
-    this.locate = function (box, x, y, alignWidth, alignHeight, container) {
+    this.locate = function (x, y, alignWidth, alignHeight, container) {
         
-        var values = box.margin,
-            width = box.offsetWidth,
-            height = box.offsetHeight,
+        var box = this.boxModel,
+            margin = box.margin,
+            width = this.offsetWidth,
+            height = this.offsetHeight,
             value;
 
         if (alignWidth > 0 && (value = alignWidth - width))
@@ -619,13 +652,13 @@ $class('Control', function () {
                     break;
                     
                 default:
-                    x += values.left;
+                    x += margin.left;
                     break;
             }
         }
         else
         {
-            x += values.left;
+            x += margin.left;
         }
 
         if (alignHeight > 0 && (value = alignHeight - height))
@@ -641,37 +674,35 @@ $class('Control', function () {
                     break;
                     
                 default:
-                    y += values.top;
+                    y += margin.top;
                     break;
             }
         }
         else
         {
-            y += values.top;
+            y += margin.top;
         }
         
-        box.offsetLeft = x;
-        box.offsetTop = y;
+        this.offsetLeft = x;
+        this.offsetTop = y;
         
         if (this.onlocate(box) !== false)
         {
-            x = box.offsetLeft;
-            y = box.offsetTop;
+            x = this.offsetLeft;
+            y = this.offsetTop;
         }
         
         if (container)
         {
-            container.arrangeX = x = x + width + values.right;
-            container.arrangeY = y = y + height + values.bottom;
+            container.arrangeX = (x += width + margin.right);
+            container.arrangeY = (y += height + margin.bottom);
 
-            values = box.padding;
-            
-            if ((x += values.right) > container.contentWidth)
+            if (x > container.contentWidth)
             {
                 container.contentWidth = x;
             }
 
-            if ((y += values.bottom) > container.contentHeight)
+            if (y > container.contentHeight)
             {
                 container.contentHeight = y;
             }
@@ -890,6 +921,20 @@ $class('Control', function () {
      
         attribute: true
     });
+    
+    
+    
+    //none
+    //x
+    //y
+    //all
+    this.defineProperty('resizable', 'none');
+    
+    
+    this.defineProperty('draggable', false);
+    
+    
+    this.defineProperty('droppable', false);
 
     
            
@@ -941,6 +986,7 @@ $class('Control', function () {
     this.render = function () {
         
         this.renderer.render(this);
+        return this;
     };
     
     

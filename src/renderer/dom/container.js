@@ -76,7 +76,7 @@ $class('ContainerRenderer', flyingon.Renderer, function (base) {
     
     this.render = function (control) {
         
-        var box = control.viewBox;
+        var box = control.boxModel;
         
         if (box)
         {
